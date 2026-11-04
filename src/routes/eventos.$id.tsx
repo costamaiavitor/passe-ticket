@@ -57,7 +57,7 @@ function EventPage() {
   return (
     <div className="min-h-screen">
       <SiteHeader />
-      <div className="relative h-[42vh] min-h-72 overflow-hidden border-b">
+      <div className="relative h-[42vh] min-h-72 overflow-hidden">
         <img src={ev.coverUrl} alt={ev.title} width={1280} height={768} className="size-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
       </div>

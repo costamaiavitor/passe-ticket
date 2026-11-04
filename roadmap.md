@@ -1,0 +1,12 @@
+# Roadmap — Marketplace de eventos
+- [x] 1. Design system e layouts
+- [x] 2. Marketplace público (home + explorar com filtros)
+- [x] 3. Detalhes do evento (lotes, quantidade, taxa 10%)
+- [x] 4. Cadastro e login (via API, VITE_API_URL)
+- [ ] 4b. Recuperação de senha, confirmação de e-mail, perfil
+- [ ] 5. Checkout (titular + CPF por ingresso, estados de pagamento)
+- [ ] 6. Área do comprador (ingressos, QR, pedidos, transferências)
+- [ ] 7. Dashboard do organizador
+- [ ] 8. Eventos (wizard 5 etapas) e lotes
+- [ ] 9. Equipe e leitor de QR Code
+- [ ] 10. Painel administrativo
