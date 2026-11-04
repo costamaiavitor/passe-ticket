@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Ticket } from "lucide-react";
+import { Search, Ticket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function SiteHeader() {
@@ -15,9 +15,14 @@ export function SiteHeader() {
         <nav className="hidden items-center gap-5 text-sm text-muted-foreground md:flex">
           <Link to="/eventos" className="transition-colors hover:text-foreground" activeProps={{ className: "text-foreground" }}>Explorar</Link>
           <Link to="/eventos" search={{ category: "shows" }} className="transition-colors hover:text-foreground">Shows</Link>
+          <Link to="/eventos" search={{ category: "festas" }} className="transition-colors hover:text-foreground">Festas</Link>
           <Link to="/eventos" search={{ category: "conferencias" }} className="transition-colors hover:text-foreground">Conferências</Link>
+          <Link to="/eventos" search={{ category: "teatro" }} className="hidden transition-colors hover:text-foreground lg:inline">Teatro</Link>
+          <Link to="/eventos" search={{ category: "esportes" }} className="hidden transition-colors hover:text-foreground lg:inline">Esportes</Link>
         </nav>
         <div className="ml-auto flex items-center gap-2">
+          <Button asChild variant="ghost" size="icon" aria-label="Buscar eventos"><Link to="/eventos"><Search /></Link></Button>
+          <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex"><Link to="/cadastro">Vender ingressos</Link></Button>
           <Button asChild variant="ghost" size="sm"><Link to="/entrar">Entrar</Link></Button>
           <Button asChild size="sm"><Link to="/cadastro">Criar conta</Link></Button>
         </div>
