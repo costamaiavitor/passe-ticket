@@ -75,7 +75,7 @@ function Home() {
           <div className="grid gap-10 md:grid-cols-2">
             <div>
               <p className="text-sm text-primary">Para organizadores</p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight">Venda ingressos com controle total.</h2>
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight">Divulgue seu evento com segurança.</h2>
               <p className="mt-3 text-muted-foreground">Lotes, equipe de check-in, transferências e relatórios em um só painel.</p>
               <Button asChild className="mt-6"><Link to="/cadastro">Começar a vender <ArrowRight /></Link></Button>
             </div>
