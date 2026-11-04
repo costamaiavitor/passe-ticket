@@ -1,5 +1,5 @@
 // Camada HTTP central. Base: VITE_API_URL + /api/v1.
-export const API_BASE = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "");
+export const API_BASE = (import.meta.env["VITE_API_URL"] as string | undefined)?.replace(/\/$/, "");
 export const USE_MOCKS = !API_BASE;
 
 export class ApiError extends Error {

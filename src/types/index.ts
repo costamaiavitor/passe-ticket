@@ -37,12 +37,12 @@ export interface EventDetail extends EventSummary {
 }
 
 export interface EventFilters {
-  q?: string;
-  city?: string;
-  category?: EventCategory;
-  date?: string;
-  maxPrice?: number;
-  onlyAvailable?: boolean;
+  q?: string | undefined;
+  city?: string | undefined;
+  category?: EventCategory | undefined;
+  date?: string | undefined;
+  maxPrice?: number | undefined;
+  onlyAvailable?: boolean | undefined;
 }
 
 export interface AuthUser {
