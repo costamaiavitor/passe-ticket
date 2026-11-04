@@ -22,7 +22,7 @@ export function SiteHeader() {
         </nav>
         <div className="ml-auto flex items-center gap-3">
           <Button asChild variant="ghost" size="icon" aria-label="Buscar eventos"><Link to="/eventos"><Search /></Link></Button>
-          <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex"><Link to="/cadastro">Vender ingressos</Link></Button>
+          <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex"><Link to="/cadastro">Criar evento</Link></Button>
           <Button asChild variant="ghost" size="sm"><Link to="/entrar">Entrar</Link></Button>
           <Button asChild size="sm"><Link to="/cadastro">Criar conta</Link></Button>
         </div>
