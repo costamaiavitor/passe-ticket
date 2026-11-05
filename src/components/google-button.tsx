@@ -64,7 +64,8 @@ export function GoogleButton({ onSuccess }: { onSuccess: () => void }) {
   if (!GOOGLE_ENABLED) return null;
   return (
     <div className="space-y-4">
-      <div ref={box} className={busy ? "pointer-events-none opacity-60" : undefined} style={{ minHeight: 44 }} />
+      {/* colorScheme "light": sem isso o navegador pinta um fundo branco atrás do botão do Google no tema escuro. */}
+      <div ref={box} className={busy ? "pointer-events-none opacity-60" : undefined} style={{ minHeight: 44, colorScheme: "light" }} />
       {error && <p className="text-sm text-destructive">{error}</p>}
       <div className="flex items-center gap-3 text-xs text-muted-foreground">
         <span className="h-px flex-1 bg-border" />ou com e-mail<span className="h-px flex-1 bg-border" />
