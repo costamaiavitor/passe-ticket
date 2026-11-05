@@ -37,6 +37,10 @@ export const config = {
   allowSimulatedPayments: env["ALLOW_SIMULATED_PAYMENTS"] === "true",
 };
 
+if (config.isProd && !config.databaseUrl) {
+  // Sem Postgres, o banco embutido gravaria em disco temporário e os dados sumiriam.
+  throw new Error("Defina DATABASE_URL (Postgres/Neon) em produção");
+}
 if (config.isProd && config.paymentProvider === "mock" && !config.allowSimulatedPayments) {
   throw new Error("PAYMENT_PROVIDER=mock não é permitido em produção (use ALLOW_SIMULATED_PAYMENTS=true só para demonstração)");
 }
