@@ -1,6 +1,6 @@
 import { createHash, createHmac, randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
-import { config } from "../config.ts";
+import { config } from "../config.js";
 
 const scryptAsync = promisify(scrypt) as (pw: string, salt: Buffer, len: number) => Promise<Buffer>;
 

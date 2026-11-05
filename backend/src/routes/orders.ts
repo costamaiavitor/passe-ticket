@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { z } from "zod";
-import { config } from "../config.ts";
-import { all, one } from "../db.ts";
-import { approveOrder, cancelOwnOrder, createOrder, syncPayment, toOrder, type OrderRow } from "../domain/orders.ts";
-import { forbidden, HttpError, notFound } from "../lib/errors.ts";
-import { parse, rateLimit, requireAuth, user } from "../lib/http.ts";
+import { config } from "../config.js";
+import { all, now, one } from "../db.js";
+import { approveOrder, cancelOwnOrder, createOrder, releaseOrder, syncPayment, toOrder, type OrderRow } from "../domain/orders.js";
+import { forbidden, HttpError, notFound } from "../lib/errors.js";
+import { parse, rateLimit, requireAuth, user } from "../lib/http.js";
 
 export const ordersRouter = Router();
 ordersRouter.use(requireAuth);
@@ -17,15 +17,16 @@ const createSchema = z.object({
 
 ordersRouter.post("/", rateLimit({ windowMs: 60_000, max: 20, key: (r) => `order:${r.auth?.id}` }), async (req, res) => {
   const o = await createOrder(user(req).id, parse(createSchema, req.body));
-  res.status(201).json(toOrder(o));
+  res.status(201).json(await toOrder(o));
 });
 
-ordersRouter.get("/", (req, res) => {
-  res.json(all<OrderRow>("SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC", user(req).id).map(toOrder));
+ordersRouter.get("/", async (req, res) => {
+  const rows = await all<OrderRow>("SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC", user(req).id);
+  res.json(await Promise.all(rows.map(toOrder)));
 });
 
-function own(userId: string, id: string) {
-  const o = one<OrderRow>("SELECT * FROM orders WHERE id = ?", id);
+async function own(userId: string, id: string) {
+  const o = await one<OrderRow>("SELECT * FROM orders WHERE id = ?", id);
   if (!o) throw notFound("Pedido não encontrado.");
   if (o.user_id !== userId) throw forbidden();
   return o;
@@ -33,21 +34,26 @@ function own(userId: string, id: string) {
 
 /** O checkout faz polling aqui enquanto o Pix não é pago. */
 ordersRouter.get("/:id", async (req, res) => {
-  let o = own(user(req).id, req.params.id);
+  let o = await own(user(req).id, req.params.id);
   if (o.status === "pending") o = await syncPayment(o).catch(() => o);
-  res.json(toOrder(o));
+  // Reserva vencida e ainda não paga: devolve os ingressos para a venda.
+  if (o.status === "pending" && o.expires_at < now()) {
+    await releaseOrder(o.id, "expired");
+    o = await own(user(req).id, o.id);
+  }
+  res.json(await toOrder(o));
 });
 
-ordersRouter.post("/:id/cancel", (req, res) => {
-  cancelOwnOrder(user(req).id, req.params.id);
-  res.json(toOrder(own(user(req).id, req.params.id)));
+ordersRouter.post("/:id/cancel", async (req, res) => {
+  await cancelOwnOrder(user(req).id, req.params.id);
+  res.json(await toOrder(await own(user(req).id, req.params.id)));
 });
 
 /** Só no modo de pagamento simulado (desenvolvimento): finge que o Pix foi pago. */
-ordersRouter.post("/:id/simulate-payment", (req, res) => {
+ordersRouter.post("/:id/simulate-payment", async (req, res) => {
   if (config.paymentProvider !== "mock") throw new HttpError(404, "NOT_FOUND", "Não encontrado.");
-  const o = own(user(req).id, req.params.id);
+  const o = await own(user(req).id, req.params.id);
   if (o.status !== "pending") throw new HttpError(409, "ORDER_NOT_PENDING", "Pedido não está aguardando pagamento.");
-  approveOrder(o.id);
-  res.json(toOrder(own(user(req).id, o.id)));
+  await approveOrder(o.id);
+  res.json(await toOrder(await own(user(req).id, o.id)));
 });

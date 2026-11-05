@@ -7,7 +7,7 @@ o segurança escaneia na entrada → o ingresso é marcado como **utilizado** e 
 
 ## Rodando localmente
 
-Requer **Node 22.18+** (usa o SQLite embutido do Node e executa TypeScript direto, sem build).
+Requer **Node 22.18+**. O banco é Postgres: em produção o Neon; localmente, sem `DATABASE_URL`, a API usa o PGlite (Postgres embutido, sem instalar nada) em `./data/pglite`.
 
 ```bash
 cd backend
@@ -75,9 +75,19 @@ Erros seguem `{ code, message }`, que o `src/services/http.ts` do frontend já e
 2. `PUBLIC_URL` precisa ser a URL pública da API — o Mercado Pago chama `PUBLIC_URL/api/v1/webhooks/mercadopago`.
 3. O webhook nunca é confiado sozinho: a API reconsulta o pagamento no Mercado Pago antes de liberar ingressos.
 
-## Produção
+## Produção (Vercel + Neon, plano grátis)
 
-- `NODE_ENV=production`, `JWT_SECRET` e `QR_SECRET` fortes (o servidor não sobe sem eles). **Não troque o `QR_SECRET` depois de vender**: todos os QR emitidos deixariam de valer.
-- `CORS_ORIGINS` com o domínio do site. Com front e API em domínios diferentes o cookie de refresh usa `SameSite=None; Secure` (HTTPS obrigatório).
-- O banco é um arquivo SQLite (`DATABASE_PATH`): use um disco persistente (Railway volume, Render disk, Fly volume) e faça backup.
-- A câmera da portaria só funciona em HTTPS.
+Site e API ficam num único projeto da Vercel (veja `vercel.json` na raiz): `/api/*` vai para esta API, o resto para o site.
+
+1. Importe o repositório na Vercel (não mude a pasta raiz).
+2. Em **Storage**, crie um banco **Neon** e conecte ao projeto: a Vercel cria a variável `DATABASE_URL`. As tabelas são criadas sozinhas no primeiro acesso.
+3. Variáveis de ambiente do projeto:
+   - `VITE_API_URL` = endereço do site (ex.: `https://passe-ticket.vercel.app`)
+   - `CORS_ORIGINS` = o mesmo endereço
+   - `NODE_ENV=production`
+   - `JWT_SECRET` e `QR_SECRET`: textos longos e aleatórios. **Não troque o `QR_SECRET` depois de vender**: todos os QR emitidos deixariam de valer.
+   - `PAYMENT_PROVIDER=mercadopago`, `MP_ACCESS_TOKEN` (de teste começa com `TEST-`) e, opcional, `MP_WEBHOOK_SECRET`
+   - `ADMIN_EMAILS` = seu e-mail
+4. Faça o deploy. A câmera da portaria só funciona em HTTPS (a Vercel já entrega HTTPS).
+
+Reservas não pagas são liberadas a cada consulta de eventos/pedidos (não há processo rodando em segundo plano na Vercel).

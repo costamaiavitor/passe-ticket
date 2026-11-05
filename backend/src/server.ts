@@ -1,6 +1,7 @@
-import { createApp } from "./app.ts";
-import { config } from "./config.ts";
-import { expireStaleOrders } from "./domain/orders.ts";
+// Servidor local (npm run dev / npm start). Na Vercel a entrada é src/vercel.ts.
+import { createApp } from "./app.js";
+import { config } from "./config.js";
+import { expireStaleOrders } from "./domain/orders.js";
 
 const app = createApp();
 app.listen(config.port, () => {
@@ -9,6 +10,7 @@ app.listen(config.port, () => {
 
 // Libera reservas de pedidos não pagos.
 setInterval(() => {
-  const n = expireStaleOrders();
-  if (n) console.log(`${n} pedido(s) expirado(s)`);
+  expireStaleOrders()
+    .then((n) => { if (n) console.log(`${n} pedido(s) expirado(s)`); })
+    .catch((e) => console.error("Falha ao expirar pedidos:", e));
 }, 30_000).unref();

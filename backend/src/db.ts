@@ -1,7 +1,9 @@
+// Banco de dados: Postgres.
+// - Produção (Vercel + Neon): DATABASE_URL aponta para o Postgres.
+// - Desenvolvimento e testes: sem DATABASE_URL, usa o PGlite (Postgres embutido, sem instalar nada).
+import { AsyncLocalStorage } from "node:async_hooks";
 import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
-import { DatabaseSync, type SQLInputValue } from "node:sqlite";
-import { config } from "./config.ts";
+import { config } from "./config.js";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -108,7 +110,7 @@ CREATE TABLE IF NOT EXISTS event_staff (
 
 -- Registro de todas as leituras na portaria (auditoria).
 CREATE TABLE IF NOT EXISTS checkins (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  id BIGSERIAL PRIMARY KEY,
   event_id TEXT NOT NULL,
   ticket_id TEXT,
   staff_id TEXT NOT NULL,
@@ -118,38 +120,112 @@ CREATE TABLE IF NOT EXISTS checkins (
 CREATE INDEX IF NOT EXISTS checkins_event ON checkins(event_id, at);
 `;
 
-export function openDatabase(path = config.databasePath): DatabaseSync {
-  if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
-  const db = new DatabaseSync(path);
-  db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
-  db.exec(SCHEMA);
-  return db;
+type Param = string | number | boolean | null;
+interface Result { rows: Record<string, unknown>[]; rowCount: number }
+type Query = (text: string, params: Param[]) => Promise<Result>;
+interface Driver {
+  query: Query;
+  exec(sql: string): Promise<void>;
+  transaction<T>(fn: (q: Query) => Promise<T>): Promise<T>;
+  close(): Promise<void>;
 }
 
-export let db = openDatabase(config.isTest ? ":memory:" : config.databasePath);
+// COUNT/SUM do Postgres vêm como bigint/numeric (texto); a API trabalha com number.
+const toNumber = (v: string) => Number(v);
 
-/** Só para testes: troca o banco por um novo em memória. */
-export function resetDatabase() {
-  db.close();
-  db = openDatabase(":memory:");
+async function pgDriver(url: string): Promise<Driver> {
+  const { default: pg } = await import("pg");
+  pg.types.setTypeParser(20, toNumber);
+  pg.types.setTypeParser(1700, toNumber);
+  const pool = new pg.Pool({ connectionString: url, max: 5, idleTimeoutMillis: 10_000 });
+  const query: Query = async (text, params) => {
+    const r = await pool.query(text, params);
+    return { rows: r.rows, rowCount: r.rowCount ?? 0 };
+  };
+  return {
+    query,
+    exec: async (sql) => { await pool.query(sql); },
+    async transaction(fn) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const r = await fn(async (text, params) => {
+          const x = await client.query(text, params);
+          return { rows: x.rows, rowCount: x.rowCount ?? 0 };
+        });
+        await client.query("COMMIT");
+        return r;
+      } catch (e) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        throw e;
+      } finally {
+        client.release();
+      }
+    },
+    close: () => pool.end(),
+  };
 }
 
-type Params = SQLInputValue[];
-export const one = <T>(sql: string, ...p: Params) => db.prepare(sql).get(...p) as T | undefined;
-export const all = <T>(sql: string, ...p: Params) => db.prepare(sql).all(...p) as T[];
-export const run = (sql: string, ...p: Params) => db.prepare(sql).run(...p);
+async function pgliteDriver(dataDir?: string): Promise<Driver> {
+  const { PGlite } = await import("@electric-sql/pglite");
+  if (dataDir) mkdirSync(dataDir, { recursive: true });
+  const db = await PGlite.create(dataDir, { parsers: { 20: toNumber, 1700: toNumber } });
+  const wrap = (r: { rows: unknown[]; affectedRows?: number }): Result =>
+    ({ rows: r.rows as Record<string, unknown>[], rowCount: r.affectedRows ?? r.rows.length });
+  return {
+    query: async (text, params) => wrap(await db.query(text, params)),
+    exec: async (sql) => { await db.exec(sql); },
+    transaction: (fn) => db.transaction((t) => fn(async (text, params) => wrap(await t.query(text, params)))),
+    close: () => db.close(),
+  };
+}
 
-/** Transação síncrona com bloqueio de escrita imediato (evita overbooking). */
-export function tx<T>(fn: () => T): T {
-  db.exec("BEGIN IMMEDIATE");
-  try {
-    const r = fn();
-    db.exec("COMMIT");
-    return r;
-  } catch (e) {
-    db.exec("ROLLBACK");
-    throw e;
+async function connect(): Promise<Driver> {
+  const d = config.databaseUrl
+    ? await pgDriver(config.databaseUrl)
+    : await pgliteDriver(config.isTest ? undefined : config.localDataDir);
+  await d.exec(SCHEMA);
+  return d;
+}
+
+let driver: Promise<Driver> = connect();
+
+/** Fecha a conexão (scripts como o seed precisam disso para terminar). */
+export async function closeDatabase() {
+  await (await driver).close();
+}
+
+/** Só para testes: troca o banco por um novo, vazio. */
+export async function resetDatabase() {
+  await (await driver).close();
+  driver = connect();
+  await driver;
+}
+
+/** Converte os "?" das consultas para $1, $2... (ignora "?" dentro de strings). */
+function toPg(sql: string) {
+  let n = 0, out = "", inStr = false;
+  for (const ch of sql) {
+    if (ch === "'") inStr = !inStr;
+    out += ch === "?" && !inStr ? `$${++n}` : ch;
   }
+  return out;
+}
+
+const txQuery = new AsyncLocalStorage<Query>();
+async function q(sql: string, params: Param[]) {
+  const inTx = txQuery.getStore();
+  return (inTx ?? (await driver).query)(toPg(sql), params);
+}
+
+export const one = async <T>(sql: string, ...p: Param[]) => (await q(sql, p)).rows[0] as T | undefined;
+export const all = async <T>(sql: string, ...p: Param[]) => (await q(sql, p)).rows as T[];
+export const run = async (sql: string, ...p: Param[]) => ({ changes: (await q(sql, p)).rowCount });
+
+/** Transação: tudo dentro de fn usa a mesma conexão. Use SELECT ... FOR UPDATE para travar linhas disputadas. */
+export async function tx<T>(fn: () => Promise<T>): Promise<T> {
+  if (txQuery.getStore()) return fn(); // já dentro de uma transação
+  return (await driver).transaction((query) => txQuery.run(query, fn));
 }
 
 export const now = () => new Date().toISOString();

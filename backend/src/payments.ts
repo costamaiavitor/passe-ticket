@@ -1,5 +1,5 @@
 import { createHmac, randomUUID } from "node:crypto";
-import { config } from "./config.ts";
+import { config } from "./config.js";
 
 export interface PaymentInfo {
   method: "pix";

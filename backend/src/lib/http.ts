@@ -1,8 +1,8 @@
 import type { NextFunction, Request, Response } from "express";
 import type { z, ZodTypeAny } from "zod";
-import { one } from "../db.ts";
-import { verifyAccessToken } from "./crypto.ts";
-import { badRequest, forbidden, HttpError, unauthorized } from "./errors.ts";
+import { one } from "../db.js";
+import { verifyAccessToken } from "./crypto.js";
+import { badRequest, forbidden, HttpError, unauthorized } from "./errors.js";
 
 export type Role = "buyer" | "organizer" | "staff" | "admin";
 export interface AuthCtx { id: string; roles: Role[] }
@@ -50,16 +50,16 @@ export const user = (req: Request): AuthCtx => {
 };
 
 /** Organizador dono do evento ou admin. */
-export function assertEventOwner(auth: AuthCtx, eventId: string) {
-  const ev = one<{ organizer_id: string }>("SELECT organizer_id FROM events WHERE id = ?", eventId);
+export async function assertEventOwner(auth: AuthCtx, eventId: string) {
+  const ev = await one<{ organizer_id: string }>("SELECT organizer_id FROM events WHERE id = ?", eventId);
   if (!ev) throw new HttpError(404, "NOT_FOUND", "Evento não encontrado.");
   if (ev.organizer_id !== auth.id && !auth.roles.includes("admin")) throw forbidden();
 }
 
 /** Pode operar a portaria: equipe do evento, organizador dono ou admin. */
-export function canScan(auth: AuthCtx, eventId: string): boolean {
+export async function canScan(auth: AuthCtx, eventId: string): Promise<boolean> {
   if (auth.roles.includes("admin")) return true;
-  return !!one(
+  return !!await one(
     `SELECT 1 FROM events e WHERE e.id = ? AND (e.organizer_id = ? OR EXISTS
        (SELECT 1 FROM event_staff s WHERE s.event_id = e.id AND s.user_id = ?))`,
     eventId, auth.id, auth.id,

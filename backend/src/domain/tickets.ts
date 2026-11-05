@@ -1,7 +1,7 @@
-import { all, now, one, run, tx } from "../db.ts";
-import { buildQrPayload, parseQrPayload } from "../lib/crypto.ts";
-import { isValidCpf, maskCpf, onlyDigits } from "../lib/cpf.ts";
-import { badRequest, conflict, forbidden, notFound } from "../lib/errors.ts";
+import { all, now, one, run, tx } from "../db.js";
+import { buildQrPayload, parseQrPayload } from "../lib/crypto.js";
+import { isValidCpf, maskCpf, onlyDigits } from "../lib/cpf.js";
+import { badRequest, conflict, forbidden, notFound } from "../lib/errors.js";
 
 export interface TicketRow {
   id: string; order_id: string; event_id: string; batch_id: string; owner_id: string; holder_name: string;
@@ -33,11 +33,11 @@ function toTicket(t: JoinedTicket) {
   };
 }
 
-export const listMyTickets = (userId: string) =>
-  all<JoinedTicket>(`${SELECT} WHERE t.owner_id = ? AND t.status IN ('valid','used') ORDER BY e.starts_at, t.created_at`, userId).map(toTicket);
+export const listMyTickets = async (userId: string) =>
+  (await all<JoinedTicket>(`${SELECT} WHERE t.owner_id = ? AND t.status IN ('valid','used') ORDER BY e.starts_at, t.created_at`, userId)).map(toTicket);
 
-export function getMyTicket(userId: string, id: string) {
-  const t = one<JoinedTicket>(`${SELECT} WHERE t.id = ?`, id);
+export async function getMyTicket(userId: string, id: string) {
+  const t = await one<JoinedTicket>(`${SELECT} WHERE t.id = ?`, id);
   if (!t || t.status === "pending" || t.status === "cancelled") throw notFound("Ingresso não encontrado.");
   if (t.owner_id !== userId) throw forbidden();
   return toTicket(t);
@@ -47,24 +47,25 @@ export function getMyTicket(userId: string, id: string) {
 export function transferTicket(userId: string, id: string, input: { email: string; holderName: string; holderCpf: string }) {
   const cpf = onlyDigits(input.holderCpf);
   if (!isValidCpf(cpf)) throw badRequest("INVALID_CPF", "CPF do novo titular inválido.");
-  return tx(() => {
-    const t = one<JoinedTicket>(`${SELECT} WHERE t.id = ?`, id);
+  return tx(async () => {
+    const t = await one<JoinedTicket>(`${SELECT} WHERE t.id = ? FOR UPDATE OF t`, id);
     if (!t || t.status === "pending" || t.status === "cancelled") throw notFound("Ingresso não encontrado.");
     if (t.owner_id !== userId) throw forbidden();
     if (t.status !== "valid") throw conflict("TICKET_USED", "Ingresso já utilizado.");
     if (t.transfers >= t.max_transfers) throw conflict("TRANSFER_LIMIT", "Limite de transferências atingido.");
     if (now() >= (t.transfer_deadline ?? t.starts_at)) throw conflict("TRANSFER_CLOSED", "Prazo de transferência encerrado.");
-    const to = one<{ id: string }>("SELECT id FROM users WHERE email = ?", input.email.trim().toLowerCase());
+    const to = await one<{ id: string }>("SELECT id FROM users WHERE email = ?", input.email.trim().toLowerCase());
     if (!to) throw notFound("Não existe conta com esse e-mail. Peça para a pessoa se cadastrar primeiro.");
     if (to.id === userId && cpf === t.holder_cpf) throw badRequest("SAME_HOLDER", "Esse já é o titular atual.");
-    const ev = one<{ max_per_cpf: number }>("SELECT max_per_cpf FROM events WHERE id = ?", t.event_id)!;
+    // Trava o evento para o limite por CPF não ser furado por compras simultâneas.
+    const ev = (await one<{ max_per_cpf: number }>("SELECT max_per_cpf FROM events WHERE id = ? FOR UPDATE", t.event_id))!;
     if (cpf !== t.holder_cpf) {
-      const { c } = one<{ c: number }>(
+      const { c } = (await one<{ c: number }>(
         "SELECT COUNT(*) c FROM tickets WHERE event_id = ? AND holder_cpf = ? AND status IN ('pending','valid','used')", t.event_id, cpf,
-      )!;
+      ))!;
       if (c >= ev.max_per_cpf) throw conflict("CPF_LIMIT", `Esse CPF já tem ${ev.max_per_cpf} ingressos neste evento.`);
     }
-    run(
+    await run(
       "UPDATE tickets SET owner_id = ?, holder_name = ?, holder_cpf = ?, qr_version = qr_version + 1, transfers = transfers + 1 WHERE id = ?",
       to.id, input.holderName.trim(), cpf, t.id,
     );
@@ -90,16 +91,16 @@ const MESSAGES: Record<ScanResult, string> = {
  * ingresso ainda estiver 'valid', então dois seguranças lendo o mesmo QR ao
  * mesmo tempo nunca liberam duas entradas.
  */
-export function scanTicket(staffId: string, eventId: string, code: string) {
+export async function scanTicket(staffId: string, eventId: string, code: string) {
   const at = now();
   const log = (result: ScanResult, ticketId: string | null) =>
     run("INSERT INTO checkins (event_id, ticket_id, staff_id, result, at) VALUES (?,?,?,?,?)", eventId, ticketId, staffId, result, at);
 
   const parsed = parseQrPayload(code);
-  const t = parsed ? one<JoinedTicket>(`${SELECT} WHERE t.id = ?`, parsed.ticketId) : undefined;
+  const t = parsed ? await one<JoinedTicket>(`${SELECT} WHERE t.id = ?`, parsed.ticketId) : undefined;
 
-  const respond = (result: ScanResult, extra: Record<string, unknown> = {}) => {
-    log(result, t?.id ?? null);
+  const respond = async (result: ScanResult, extra: Record<string, unknown> = {}) => {
+    await log(result, t?.id ?? null);
     return {
       result, ok: result === "ok", message: MESSAGES[result], scannedAt: at,
       ticket: t && result !== "invalid"
@@ -116,22 +117,22 @@ export function scanTicket(staffId: string, eventId: string, code: string) {
   if (t.status === "cancelled") return respond("cancelled");
   if (t.status === "used") return respond("already_used", { checkedInAt: t.checked_in_at });
 
-  const r = run(
+  const r = await run(
     "UPDATE tickets SET status = 'used', checked_in_at = ?, checked_in_by = ? WHERE id = ? AND status = 'valid' AND qr_version = ?",
     at, staffId, t.id, parsed.version,
   );
   if (r.changes === 0) {
-    const cur = one<TicketRow>("SELECT * FROM tickets WHERE id = ?", t.id)!;
+    const cur = (await one<TicketRow>("SELECT * FROM tickets WHERE id = ?", t.id))!;
     return respond(cur.status === "used" ? "already_used" : "invalid", { checkedInAt: cur.checked_in_at });
   }
   return respond("ok", { checkedInAt: at });
 }
 
-export function eventCheckinStats(eventId: string) {
-  const s = one<{ total: number; used: number }>(
-    "SELECT COUNT(*) total, COALESCE(SUM(status = 'used'), 0) used FROM tickets WHERE event_id = ? AND status IN ('valid','used')", eventId,
-  )!;
-  const recent = all<{ result: string; at: string; holder_name: string | null }>(
+export async function eventCheckinStats(eventId: string) {
+  const s = (await one<{ total: number; used: number }>(
+    "SELECT COUNT(*) total, COUNT(*) FILTER (WHERE status = 'used') used FROM tickets WHERE event_id = ? AND status IN ('valid','used')", eventId,
+  ))!;
+  const recent = await all<{ result: string; at: string; holder_name: string | null }>(
     `SELECT c.result, c.at, t.holder_name FROM checkins c LEFT JOIN tickets t ON t.id = c.ticket_id
      WHERE c.event_id = ? ORDER BY c.id DESC LIMIT 20`, eventId,
   );

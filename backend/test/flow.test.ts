@@ -6,9 +6,9 @@ import assert from "node:assert/strict";
 import type { AddressInfo } from "node:net";
 import { after, before, describe, it } from "node:test";
 
-const { createApp } = await import("../src/app.ts");
-const { run, now } = await import("../src/db.ts");
-const { hashPassword } = await import("../src/lib/crypto.ts");
+const { createApp } = await import("../src/app.js");
+const { run, now } = await import("../src/db.js");
+const { hashPassword } = await import("../src/lib/crypto.js");
 
 let base = "";
 const server = createApp().listen(0);
@@ -29,8 +29,8 @@ const CPF_A = "52998224725", CPF_B = "11144477735", CPF_C = "39053344705";
 
 async function setup() {
   const pw = await hashPassword("senha12345");
-  run("INSERT INTO users (id, name, email, cpf, password_hash, roles, created_at) VALUES ('org','Produtor','org@t.dev',?,?,'[\"buyer\",\"organizer\"]',?)", CPF_A, pw, now());
-  run("INSERT INTO users (id, name, email, cpf, password_hash, roles, created_at) VALUES ('staff','Seguranca','staff@t.dev',?,?,'[\"buyer\"]',?)", CPF_B, pw, now());
+  await run("INSERT INTO users (id, name, email, cpf, password_hash, roles, created_at) VALUES ('org','Produtor','org@t.dev',?,?,'[\"buyer\",\"organizer\"]',?)", CPF_A, pw, now());
+  await run("INSERT INTO users (id, name, email, cpf, password_hash, roles, created_at) VALUES ('staff','Seguranca','staff@t.dev',?,?,'[\"buyer\"]',?)", CPF_B, pw, now());
   const login = async (email: string) => (await api("/auth/login", { body: { email, password: "senha12345" } })).body.accessToken as string;
   return { org: await login("org@t.dev"), staff: await login("staff@t.dev") };
 }
@@ -167,7 +167,7 @@ describe("Passe API", () => {
     assert.equal(r.status, 201, JSON.stringify(r.body)); // último ingresso do lote fica reservado
     const blocked = await api("/orders", { token: tokens.buyer, body: { eventId, batchId, holders: [{ name: "Fulano de Tal", cpf: CPF_C }] } });
     assert.equal(blocked.body.code, "SOLD_OUT");
-    run("UPDATE orders SET expires_at = ? WHERE id = ?", new Date(Date.now() - 1000).toISOString(), r.body.id);
+    await run("UPDATE orders SET expires_at = ? WHERE id = ?", new Date(Date.now() - 1000).toISOString(), r.body.id);
     const again = await api("/orders", { token: tokens.buyer, body: { eventId, batchId, holders: [{ name: "Fulano de Tal", cpf: CPF_C }] } });
     assert.equal(again.status, 201, JSON.stringify(again.body));
     assert.equal((await api(`/orders/${r.body.id}`, { token: tokens.other })).body.status, "expired");

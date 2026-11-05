@@ -17,7 +17,9 @@ export const config = {
   publicUrl: (env["PUBLIC_URL"] || env["RENDER_EXTERNAL_URL"] || `http://localhost:${env["PORT"] ?? 3333}`).replace(/\/$/, ""),
   corsOrigins: (env["CORS_ORIGINS"] ?? "http://localhost:8080,http://localhost:5173,http://localhost:3000")
     .split(",").map((s) => s.trim()).filter(Boolean),
-  databasePath: env["DATABASE_PATH"] ?? "./data/passe.db",
+  // Postgres (Neon). Sem ela, usa o Postgres embutido (PGlite) na pasta localDataDir.
+  databaseUrl: env["DATABASE_URL"] || env["POSTGRES_URL"] || "",
+  localDataDir: env["LOCAL_DATA_DIR"] ?? "./data/pglite",
   jwtSecret: secret("JWT_SECRET", "dev-only-jwt-secret-change-me"),
   qrSecret: secret("QR_SECRET", "dev-only-qr-secret-change-me"),
   accessTokenTtlSec: 15 * 60,

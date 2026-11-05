@@ -2,14 +2,13 @@
 // Uso: npm run seed   (use --reset para apagar o banco antes)
 import { randomUUID } from "node:crypto";
 import { rmSync } from "node:fs";
-import { config } from "./config.ts";
+import { config } from "./config.js";
 
-if (process.argv.includes("--reset")) {
-  for (const s of ["", "-wal", "-shm"]) rmSync(config.databasePath + s, { force: true });
-}
+// --reset só apaga o banco local (PGlite); nunca mexe no Postgres de produção.
+if (process.argv.includes("--reset") && !config.databaseUrl) rmSync(config.localDataDir, { recursive: true, force: true });
 
-const { now, one, run, tx } = await import("./db.ts");
-const { hashPassword } = await import("./lib/crypto.ts");
+const { closeDatabase, now, one, run, tx } = await import("./db.js");
+const { hashPassword } = await import("./lib/crypto.js");
 
 const PASSWORD = "passe1234";
 const users = [
@@ -22,10 +21,10 @@ const users = [
 const hash = await hashPassword(PASSWORD);
 const ids: Record<string, string> = {};
 for (const u of users) {
-  const existing = one<{ id: string }>("SELECT id FROM users WHERE email = ?", u.email);
+  const existing = await one<{ id: string }>("SELECT id FROM users WHERE email = ?", u.email);
   ids[u.email] = existing?.id ?? randomUUID();
   if (!existing)
-    run("INSERT INTO users (id, name, email, cpf, password_hash, roles, created_at) VALUES (?,?,?,?,?,?,?)",
+    await run("INSERT INTO users (id, name, email, cpf, password_hash, roles, created_at) VALUES (?,?,?,?,?,?,?)",
       ids[u.email]!, u.name, u.email, u.cpf, hash, JSON.stringify(u.roles), now());
 }
 
@@ -45,12 +44,12 @@ const events = [
 ];
 
 let created = 0;
-tx(() => {
+await tx(async () => {
   for (const e of events) {
-    if (one("SELECT 1 FROM events WHERE slug = ?", e.slug)) continue;
+    if (await one("SELECT 1 FROM events WHERE slug = ?", e.slug)) continue;
     const id = e.slug;
     const starts = new Date(e.startsAt);
-    run(
+    await run(
       `INSERT INTO events (id, slug, organizer_id, title, category, cover_url, starts_at, venue, city, address, description,
         important_info, refund_policy, max_transfers, transfer_deadline, max_per_cpf, featured, status, created_at)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,2,?, 'published', ?)`,
@@ -61,14 +60,15 @@ tx(() => {
     const start = new Date().toISOString();
     const end = new Date(starts.getTime() - 3600_000).toISOString();
     const batches: [string, number, number][] = [["1º Lote", 12000, 300], ["2º Lote", 15000, 400], ["VIP", 32000, 80]];
-    batches.forEach(([name, price, total], i) =>
-      run("INSERT INTO batches (id, event_id, name, price, total, sales_start, sales_end, status, position) VALUES (?,?,?,?,?,?,?, 'active', ?)",
-        `${id}-b${i + 1}`, id, name, price, total, start, end, i));
+    for (const [i, [name, price, total]] of batches.entries())
+      await run("INSERT INTO batches (id, event_id, name, price, total, sales_start, sales_end, status, position) VALUES (?,?,?,?,?,?,?, 'active', ?)",
+        `${id}-b${i + 1}`, id, name, price, total, start, end, i);
     // Equipe da portaria em todos os eventos de demonstração
-    run("INSERT OR IGNORE INTO event_staff (event_id, user_id, created_at) VALUES (?,?,?)", id, ids["portaria@passe.dev"]!, now());
+    await run("INSERT INTO event_staff (event_id, user_id, created_at) VALUES (?,?,?) ON CONFLICT DO NOTHING", id, ids["portaria@passe.dev"]!, now());
     created++;
   }
 });
 
 console.log(`Seed ok: ${created} evento(s) criados.`);
 console.log(`Contas (senha "${PASSWORD}"): ${users.map((u) => u.email).join(", ")}`);
+await closeDatabase();

@@ -1,16 +1,16 @@
 import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { fileURLToPath } from "node:url";
-import { config } from "./config.ts";
-import { HttpError } from "./lib/errors.ts";
-import { adminRouter } from "./routes/admin.ts";
-import { authRouter } from "./routes/auth.ts";
-import { checkinRouter } from "./routes/checkin.ts";
-import { eventsRouter } from "./routes/events.ts";
-import { ordersRouter } from "./routes/orders.ts";
-import { organizerRouter } from "./routes/organizer.ts";
-import { ticketsRouter } from "./routes/tickets.ts";
-import { webhooksRouter } from "./routes/webhooks.ts";
+import { config } from "./config.js";
+import { HttpError } from "./lib/errors.js";
+import { adminRouter } from "./routes/admin.js";
+import { authRouter } from "./routes/auth.js";
+import { checkinRouter } from "./routes/checkin.js";
+import { eventsRouter } from "./routes/events.js";
+import { ordersRouter } from "./routes/orders.js";
+import { organizerRouter } from "./routes/organizer.js";
+import { ticketsRouter } from "./routes/tickets.js";
+import { webhooksRouter } from "./routes/webhooks.js";
 
 export function createApp() {
   const app = express();

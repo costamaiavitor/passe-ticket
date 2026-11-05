@@ -1,4 +1,4 @@
-import { all, one } from "../db.ts";
+import { all, one } from "../db.js";
 
 export interface EventRow {
   id: string; slug: string; organizer_id: string; title: string; category: string; cover_url: string;
@@ -47,13 +47,13 @@ function summary(e: EventRow, batches: BatchRow[]) {
   };
 }
 
-export function toEventSummary(e: EventRow) {
-  return summary(e, batchesOf(e.id));
+export async function toEventSummary(e: EventRow) {
+  return summary(e, await batchesOf(e.id));
 }
 
-export function toEventDetail(e: EventRow) {
-  const batches = batchesOf(e.id);
-  const org = one<{ id: string; name: string }>("SELECT id, name FROM users WHERE id = ?", e.organizer_id);
+export async function toEventDetail(e: EventRow) {
+  const batches = await batchesOf(e.id);
+  const org = await one<{ id: string; name: string }>("SELECT id, name FROM users WHERE id = ?", e.organizer_id);
   return {
     ...summary(e, batches),
     description: e.description,
