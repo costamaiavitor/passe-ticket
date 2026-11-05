@@ -14,6 +14,8 @@ import { Route as CadastroRouteImport } from './routes/cadastro'
 import { Route as EntrarRouteImport } from './routes/entrar'
 import { Route as IngressosRouteImport } from './routes/ingressos'
 import { Route as PortariaRouteImport } from './routes/portaria'
+import { Route as PrivacidadeRouteImport } from './routes/privacidade'
+import { Route as TermosRouteImport } from './routes/termos'
 import { Route as CheckoutOrderIdRouteImport } from './routes/checkout.$orderId'
 import { Route as EventosIndexRouteImport } from './routes/eventos.index'
 import { Route as EventosIdRouteImport } from './routes/eventos.$id'
@@ -43,6 +45,16 @@ const IngressosRoute = IngressosRouteImport.update({
 const PortariaRoute = PortariaRouteImport.update({
   id: '/portaria',
   path: '/portaria',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacidadeRoute = PrivacidadeRouteImport.update({
+  id: '/privacidade',
+  path: '/privacidade',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermosRoute = TermosRouteImport.update({
+  id: '/termos',
+  path: '/termos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CheckoutOrderIdRoute = CheckoutOrderIdRouteImport.update({
@@ -77,6 +89,8 @@ export interface FileRoutesByFullPath {
   '/entrar': typeof EntrarRoute
   '/ingressos': typeof IngressosRoute
   '/portaria': typeof PortariaRoute
+  '/privacidade': typeof PrivacidadeRoute
+  '/termos': typeof TermosRoute
   '/checkout/$orderId': typeof CheckoutOrderIdRoute
   '/eventos/$id': typeof EventosIdRoute
   '/organizador/novo': typeof OrganizadorNovoRoute
@@ -89,6 +103,8 @@ export interface FileRoutesByTo {
   '/entrar': typeof EntrarRoute
   '/ingressos': typeof IngressosRoute
   '/portaria': typeof PortariaRoute
+  '/privacidade': typeof PrivacidadeRoute
+  '/termos': typeof TermosRoute
   '/checkout/$orderId': typeof CheckoutOrderIdRoute
   '/eventos/$id': typeof EventosIdRoute
   '/organizador/novo': typeof OrganizadorNovoRoute
@@ -102,6 +118,8 @@ export interface FileRoutesById {
   '/entrar': typeof EntrarRoute
   '/ingressos': typeof IngressosRoute
   '/portaria': typeof PortariaRoute
+  '/privacidade': typeof PrivacidadeRoute
+  '/termos': typeof TermosRoute
   '/checkout/$orderId': typeof CheckoutOrderIdRoute
   '/eventos/$id': typeof EventosIdRoute
   '/organizador/novo': typeof OrganizadorNovoRoute
@@ -116,6 +134,8 @@ export interface FileRouteTypes {
     | '/entrar'
     | '/ingressos'
     | '/portaria'
+    | '/privacidade'
+    | '/termos'
     | '/checkout/$orderId'
     | '/eventos/$id'
     | '/organizador/novo'
@@ -128,6 +148,8 @@ export interface FileRouteTypes {
     | '/entrar'
     | '/ingressos'
     | '/portaria'
+    | '/privacidade'
+    | '/termos'
     | '/checkout/$orderId'
     | '/eventos/$id'
     | '/organizador/novo'
@@ -140,6 +162,8 @@ export interface FileRouteTypes {
     | '/entrar'
     | '/ingressos'
     | '/portaria'
+    | '/privacidade'
+    | '/termos'
     | '/checkout/$orderId'
     | '/eventos/$id'
     | '/organizador/novo'
@@ -153,6 +177,8 @@ export interface RootRouteChildren {
   EntrarRoute: typeof EntrarRoute
   IngressosRoute: typeof IngressosRoute
   PortariaRoute: typeof PortariaRoute
+  PrivacidadeRoute: typeof PrivacidadeRoute
+  TermosRoute: typeof TermosRoute
   CheckoutOrderIdRoute: typeof CheckoutOrderIdRoute
   EventosIdRoute: typeof EventosIdRoute
   OrganizadorNovoRoute: typeof OrganizadorNovoRoute
@@ -195,6 +221,20 @@ declare module '@tanstack/react-router' {
       path: '/portaria'
       fullPath: '/portaria'
       preLoaderRoute: typeof PortariaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacidade': {
+      id: '/privacidade'
+      path: '/privacidade'
+      fullPath: '/privacidade'
+      preLoaderRoute: typeof PrivacidadeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/termos': {
+      id: '/termos'
+      path: '/termos'
+      fullPath: '/termos'
+      preLoaderRoute: typeof TermosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/checkout/$orderId': {
@@ -241,6 +281,8 @@ const rootRouteChildren: RootRouteChildren = {
   EntrarRoute: EntrarRoute,
   IngressosRoute: IngressosRoute,
   PortariaRoute: PortariaRoute,
+  PrivacidadeRoute: PrivacidadeRoute,
+  TermosRoute: TermosRoute,
   CheckoutOrderIdRoute: CheckoutOrderIdRoute,
   EventosIdRoute: EventosIdRoute,
   OrganizadorNovoRoute: OrganizadorNovoRoute,

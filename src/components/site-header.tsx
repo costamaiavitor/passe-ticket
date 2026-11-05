@@ -59,7 +59,11 @@ export function SiteFooter() {
     <footer className="mt-24 border-t">
       <div className="container-page flex flex-col gap-2 py-8 text-sm text-muted-foreground md:flex-row md:justify-between">
         <span>© 2026 Passe. Ingressos com segurança.</span>
-        <span>Taxa de serviço transparente · 2 ingressos por CPF</span>
+        <nav className="flex flex-wrap gap-x-5 gap-y-1">
+          <Link to="/termos" className="hover:text-foreground">Termos de Uso</Link>
+          <Link to="/privacidade" className="hover:text-foreground">Privacidade</Link>
+          <span>Taxa de serviço transparente</span>
+        </nav>
       </div>
     </footer>
   );

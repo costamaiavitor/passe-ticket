@@ -256,7 +256,7 @@ export async function tx<T>(fn: () => Promise<T>): Promise<T> {
 
 export const now = () => new Date().toISOString();
 
-function isConnectionError(e: unknown) {
+export function isConnectionError(e: unknown) {
   const msg = e instanceof Error ? e.message : "";
   const code = (e as { code?: string } | null)?.code ?? "";
   return /Connection terminated|timeout|ECONNRESET|socket hang up/i.test(msg) || ["57P01", "08006", "08003", "08P01"].includes(code);

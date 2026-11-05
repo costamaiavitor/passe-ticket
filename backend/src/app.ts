@@ -2,6 +2,7 @@ import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { fileURLToPath } from "node:url";
 import { config } from "./config.js";
+import { isConnectionError } from "./db.js";
 import { HttpError } from "./lib/errors.js";
 import { adminRouter } from "./routes/admin.js";
 import { authRouter } from "./routes/auth.js";
@@ -50,7 +51,10 @@ export function createApp() {
       return void res.status(400).json({ code: "INVALID_JSON", message: "JSON inválido." });
     }
     console.error(err);
-    res.status(500).json({ code: "INTERNAL", message: "Erro interno. Tente novamente." });
+    if (isConnectionError(err)) {
+      return void res.status(503).json({ code: "UNAVAILABLE", message: "O sistema está com uma instabilidade rápida. Tente de novo em alguns segundos." });
+    }
+    res.status(500).json({ code: "INTERNAL", message: "Algo deu errado do nosso lado. Tente de novo em instantes." });
   });
   return app;
 }

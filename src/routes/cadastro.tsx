@@ -41,6 +41,9 @@ function Register() {
         <Field label="Senha" name="password" type="password" required minLength={8} autoComplete="new-password" />
         {error && <p className="text-sm text-destructive">{error}</p>}
         <SubmitButton loading={loading}>Criar conta</SubmitButton>
+        <p className="text-xs text-muted-foreground">
+          Ao criar a conta você concorda com os <Link to="/termos" className="underline">Termos de Uso</Link> e a <Link to="/privacidade" className="underline">Política de Privacidade</Link>.
+        </p>
       </form>
     </AuthShell>
   );

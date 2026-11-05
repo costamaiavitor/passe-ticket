@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { config } from "../config.js";
 import { all, now, one, run, tx } from "../db.js";
 import { isValidCpf, onlyDigits } from "../lib/cpf.js";
-import { badRequest, conflict, forbidden, notFound } from "../lib/errors.js";
+import { badRequest, conflict, forbidden, HttpError, notFound } from "../lib/errors.js";
 import { payments, type PaymentInfo } from "../payments.js";
 import { batchStatus, type BatchRow, type EventRow } from "./events.js";
 
@@ -101,7 +101,11 @@ export async function createOrder(userId: string, input: { eventId: string; batc
     await run("UPDATE orders SET payment_id = ?, payment_data = ? WHERE id = ?", p.id, JSON.stringify(p.info), order.id);
   } catch (e) {
     await releaseOrder(order.id, "cancelled");
-    throw e;
+    if (e instanceof HttpError) throw e;
+    // O motivo técnico fica no log (Vercel → Logs); o cliente recebe uma mensagem que dá para entender.
+    console.error("Falha ao gerar o pagamento do pedido", order.id, e);
+    throw new HttpError(502, "PAYMENT_UNAVAILABLE",
+      "Não conseguimos gerar o pagamento agora. Nada foi cobrado. Tente de novo em alguns minutos.");
   }
   return (await one<OrderRow>("SELECT * FROM orders WHERE id = ?", order.id))!;
 }
