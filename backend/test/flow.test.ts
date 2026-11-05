@@ -1,6 +1,7 @@
 // Fluxo completo: cadastro → compra → pagamento → QR → portaria → QR desativado.
 process.env["NODE_ENV"] = "test";
 process.env["PAYMENT_PROVIDER"] = "mock";
+process.env["GOOGLE_CLIENT_ID"] = "test-client.apps.googleusercontent.com";
 
 import assert from "node:assert/strict";
 import type { AddressInfo } from "node:net";
@@ -9,6 +10,7 @@ import { after, before, describe, it } from "node:test";
 const { createApp } = await import("../src/app.js");
 const { run, now } = await import("../src/db.js");
 const { hashPassword } = await import("../src/lib/crypto.js");
+const { google } = await import("../src/lib/google.js");
 
 let base = "";
 const server = createApp().listen(0);
@@ -179,5 +181,33 @@ describe("Passe API", () => {
     assert.equal(r1.status, 200);
     const reuse = await api("/auth/refresh", { body: { refreshToken: l.body.refreshToken } });
     assert.equal(reuse.status, 401);
+  });
+
+  it("entrar com Google cria a conta, reaproveita e-mail existente e recusa token inválido", async () => {
+    // Troca a conferência real do Google por uma falsa: "ok:<sub>:<email>" é aceito, o resto não.
+    google.verifyIdToken = async (t: string) => {
+      const [tag, sub, email] = t.split(":");
+      return tag === "ok" && sub && email ? { sub, email, name: "Pessoa Google" } : null;
+    };
+    const bad = await api("/auth/google", { body: { credential: "x".repeat(30) } });
+    assert.equal(bad.status, 401);
+
+    const novo = await api("/auth/google", { body: { credential: `ok:g-111:nova@t.dev:${"x".repeat(20)}` } });
+    assert.equal(novo.status, 200, JSON.stringify(novo.body));
+    assert.equal(novo.body.user.email, "nova@t.dev");
+    const again = await api("/auth/google", { body: { credential: `ok:g-111:nova@t.dev:${"x".repeat(20)}` } });
+    assert.equal(again.body.user.id, novo.body.user.id);
+
+    // E-mail que já tinha conta com senha: entra na mesma conta, e a senha continua funcionando.
+    const linked = await api("/auth/google", { body: { credential: `ok:g-222:f@t.dev:${"x".repeat(20)}` } });
+    assert.equal(linked.status, 200);
+    assert.equal((await api("/auth/login", { body: { email: "f@t.dev", password: "senha12345" } })).body.user.id, linked.body.user.id);
+
+    // Outra conta Google tentando o mesmo e-mail é recusada.
+    const other = await api("/auth/google", { body: { credential: `ok:g-999:f@t.dev:${"x".repeat(20)}` } });
+    assert.equal(other.status, 409);
+
+    // Conta criada pelo Google não entra com senha vazia.
+    assert.equal((await api("/auth/login", { body: { email: "nova@t.dev", password: "" } })).status, 401);
   });
 });

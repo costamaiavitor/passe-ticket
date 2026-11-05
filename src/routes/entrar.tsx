@@ -1,4 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useCallback } from "react";
+import { GoogleButton } from "@/components/google-button";
 import { AuthShell, Field, SubmitButton, useSubmit } from "@/components/auth-form";
 import { login } from "@/services/auth";
 
@@ -25,9 +27,11 @@ function Login() {
     await login(String(fd.get("email")), String(fd.get("password")));
     navigate({ to: redirect ?? "/" });
   });
+  const goNext = useCallback(() => navigate({ to: redirect ?? "/" }), [navigate, redirect]);
   return (
     <AuthShell title="Entrar" subtitle="Bem-vindo de volta." footer={<>Não tem conta? <Link to="/cadastro" search={redirect ? { redirect } : {}} className="text-foreground underline">Criar conta</Link></>}>
-      <form onSubmit={onSubmit} className="space-y-4">
+      <GoogleButton onSuccess={goNext} />
+      <form onSubmit={onSubmit} className="mt-4 space-y-4">
         <Field label="E-mail" name="email" type="email" required autoComplete="email" />
         <Field label="Senha" name="password" type="password" required autoComplete="current-password" />
         {error && <p className="text-sm text-destructive">{error}</p>}

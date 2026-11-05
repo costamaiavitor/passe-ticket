@@ -30,6 +30,14 @@ export async function register(data: { name: string; email: string; cpf: string;
   return { user: r.user };
 }
 
+/** Entrar com Google: a API confere o token do Google e devolve a sessão do Passe. */
+export async function loginWithGoogle(credential: string) {
+  const r = await http<AuthResponse>("/auth/google", { method: "POST", body: JSON.stringify({ credential }) });
+  setAccessToken(r.accessToken);
+  setSession({ user: r.user, ready: true });
+  return r.user;
+}
+
 export async function logout() {
   if (!USE_MOCKS) await http("/auth/logout", { method: "POST" }).catch(() => undefined);
   setAccessToken(null);

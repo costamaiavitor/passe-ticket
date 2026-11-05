@@ -1,4 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useCallback } from "react";
+import { GoogleButton } from "@/components/google-button";
 import { AuthShell, Field, SubmitButton, useSubmit } from "@/components/auth-form";
 import { register } from "@/services/auth";
 
@@ -28,9 +30,11 @@ function Register() {
     });
     navigate({ to: redirect ?? "/" });
   });
+  const goNext = useCallback(() => navigate({ to: redirect ?? "/" }), [navigate, redirect]);
   return (
     <AuthShell title="Criar conta" subtitle="Leva menos de um minuto." footer={<>Já tem conta? <Link to="/entrar" search={redirect ? { redirect } : {}} className="text-foreground underline">Entrar</Link></>}>
-      <form onSubmit={onSubmit} className="space-y-4">
+      <GoogleButton onSuccess={goNext} />
+      <form onSubmit={onSubmit} className="mt-4 space-y-4">
         <Field label="Nome completo" name="name" required autoComplete="name" />
         <Field label="E-mail" name="email" type="email" required autoComplete="email" />
         <Field label="CPF" name="cpf" required inputMode="numeric" pattern="\d{3}\.?\d{3}\.?\d{3}-?\d{2}" placeholder="000.000.000-00" />

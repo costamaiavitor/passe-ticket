@@ -118,6 +118,10 @@ CREATE TABLE IF NOT EXISTS checkins (
   at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS checkins_event ON checkins(event_id, at);
+
+-- Login com Google (contas antigas ganham a coluna automaticamente).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS google_sub TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS users_google ON users(google_sub) WHERE google_sub IS NOT NULL;
 `;
 
 type Param = string | number | boolean | null;

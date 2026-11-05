@@ -32,6 +32,8 @@ export const config = {
   paymentProvider: (env["PAYMENT_PROVIDER"] ?? "mock") as "mock" | "mercadopago",
   mpAccessToken: env["MP_ACCESS_TOKEN"] ?? "",
   mpWebhookSecret: env["MP_WEBHOOK_SECRET"] ?? "",
+  // Login com Google: o "ID do cliente" OAuth (é público; o mesmo valor vai no site como VITE_GOOGLE_CLIENT_ID).
+  googleClientId: env["GOOGLE_CLIENT_ID"] ?? "",
   // Modo demonstração: libera o botão "Simular pagamento" no site publicado.
   // Qualquer visitante consegue ingresso sem pagar — nunca ligue isso para vender de verdade.
   allowSimulatedPayments: env["ALLOW_SIMULATED_PAYMENTS"] === "true",
