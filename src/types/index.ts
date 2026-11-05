@@ -109,3 +109,12 @@ export interface CheckinStats {
   remaining: number;
   recent: Array<{ result: ScanResultCode; at: string; holder_name: string | null }>;
 }
+
+// ---- Área do organizador ----
+export interface OrganizerEvent extends EventDetail {
+  status: "draft" | "published" | "cancelled";
+  maxTicketsPerCpf: number;
+  stats: { ticketsSold: number; revenue: number; checkedIn: number };
+}
+
+export interface StaffMember { id: string; name: string; email: string }

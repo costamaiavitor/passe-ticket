@@ -94,7 +94,7 @@ function EventPage() {
           <p className="mt-2 text-sm text-muted-foreground">por {ev.organizer.name}</p>
           <div className="mt-6 flex flex-wrap gap-x-8 gap-y-3 text-sm">
             <span className="flex items-center gap-2"><Calendar className="size-4 text-primary" />{fmtDate(ev.startsAt)} · {fmtTime(ev.startsAt)}</span>
-            <span className="flex items-center gap-2"><MapPin className="size-4 text-primary" />{ev.venue} — {ev.address}, {ev.city}</span>
+            <span className="flex items-center gap-2"><MapPin className="size-4 text-primary" />{ev.venue}{ev.address ? ` — ${ev.address}` : ""}, {ev.city}</span>
           </div>
           <p className="mt-8 max-w-2xl leading-relaxed text-muted-foreground">{ev.description}</p>
 

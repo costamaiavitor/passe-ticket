@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { LogOut, ScanLine, Search, Ticket } from "lucide-react";
+import { CalendarPlus, LogOut, ScanLine, Search, Ticket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { logout } from "@/services/auth";
 import { hasRole, useSession } from "@/services/session";
@@ -9,7 +9,7 @@ export function SiteHeader() {
   const navigate = useNavigate();
   return (
     <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
-      <div className="flex h-16 w-full items-center gap-10 px-6 lg:px-10">
+      <div className="flex h-16 w-full items-center gap-4 px-4 sm:gap-10 sm:px-6 lg:px-10">
         <Link to="/" className="flex items-center gap-2 font-semibold tracking-tight">
           <span className="grid size-7 place-items-center rounded-md bg-primary text-primary-foreground">
             <Ticket className="size-4" />
@@ -24,10 +24,16 @@ export function SiteHeader() {
           <Link to="/eventos" search={{ category: "teatro" }} className="hidden transition-colors hover:text-foreground lg:inline">Teatro</Link>
           <Link to="/eventos" search={{ category: "esportes" }} className="hidden transition-colors hover:text-foreground lg:inline">Esportes</Link>
         </nav>
-        <div className="ml-auto flex items-center gap-3">
+        <div className="ml-auto flex items-center gap-1.5 sm:gap-3">
           <Button asChild variant="ghost" size="icon" aria-label="Buscar eventos"><Link to="/eventos"><Search /></Link></Button>
           {user ? (
             <>
+              <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex">
+                <Link to="/organizador"><CalendarPlus />{hasRole(user, "organizer") ? "Meus eventos" : "Criar evento"}</Link>
+              </Button>
+              <Button asChild variant="ghost" size="icon" className="sm:hidden" aria-label={hasRole(user, "organizer") ? "Meus eventos" : "Criar evento"}>
+                <Link to="/organizador"><CalendarPlus /></Link>
+              </Button>
               {hasRole(user, "staff", "organizer") && (
                 <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex"><Link to="/portaria"><ScanLine />Portaria</Link></Button>
               )}
@@ -37,7 +43,7 @@ export function SiteHeader() {
             </>
           ) : (
             <>
-              <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex"><Link to="/cadastro">Criar evento</Link></Button>
+              <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex"><Link to="/cadastro" search={{ redirect: "/organizador" }}>Criar evento</Link></Button>
               <Button asChild variant="ghost" size="sm"><Link to="/entrar">Entrar</Link></Button>
               <Button asChild size="sm"><Link to="/cadastro">Criar conta</Link></Button>
             </>
