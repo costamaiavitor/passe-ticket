@@ -61,7 +61,8 @@ const mercadopago: PaymentProvider = {
         payer: { email: payerEmail },
         external_reference: orderId,
         date_of_expiration: expiresAt,
-        notification_url: `${config.publicUrl}/api/v1/webhooks/mercadopago`,
+        // O Mercado Pago só aceita aviso em endereço público com https; sem ele, o checkout confirma pelo polling.
+        ...(config.publicUrl.startsWith("https://") ? { notification_url: `${config.publicUrl}/api/v1/webhooks/mercadopago` } : {}),
       }),
     });
     const td = p.point_of_interaction?.transaction_data ?? {};

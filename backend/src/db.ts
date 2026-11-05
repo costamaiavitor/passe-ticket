@@ -141,7 +141,15 @@ async function pgDriver(url: string): Promise<Driver> {
   const { default: pg } = await import("pg");
   pg.types.setTypeParser(20, toNumber);
   pg.types.setTypeParser(1700, toNumber);
-  const pool = new pg.Pool({ connectionString: url, max: 5, idleTimeoutMillis: 10_000 });
+  const pool = new pg.Pool({
+    // sslmode=require já era tratado como verify-full; deixar explícito tira o aviso do driver.
+    connectionString: url.replace(/sslmode=(require|prefer|verify-ca)/, "sslmode=verify-full"),
+    max: 5,
+    idleTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 15_000,
+  });
+  // O Neon derruba conexões paradas quando "dorme". Sem este handler, o erro derrubaria o processo inteiro.
+  pool.on("error", (e) => console.error("Postgres: conexão ociosa encerrada:", e.message));
   const query: Query = async (text, params) => {
     const r = await pool.query(text, params);
     return { rows: r.rows, rowCount: r.rowCount ?? 0 };
@@ -192,18 +200,24 @@ async function connect(): Promise<Driver> {
   return d;
 }
 
-let driver: Promise<Driver> = connect();
+// Conecta na primeira consulta. Se falhar (banco acordando, rede), a próxima consulta tenta de novo.
+let driver: Promise<Driver> | null = null;
+function getDriver(): Promise<Driver> {
+  driver ??= connect().catch((e) => { driver = null; throw e; });
+  return driver;
+}
 
 /** Fecha a conexão (scripts como o seed precisam disso para terminar). */
 export async function closeDatabase() {
-  await (await driver).close();
+  if (driver) await (await driver).close();
+  driver = null;
 }
 
 /** Só para testes: troca o banco por um novo, vazio. */
 export async function resetDatabase() {
-  await (await driver).close();
-  driver = connect();
-  await driver;
+  if (driver) await (await driver).close();
+  driver = null;
+  await getDriver();
 }
 
 /** Converte os "?" das consultas para $1, $2... (ignora "?" dentro de strings). */
@@ -219,7 +233,15 @@ function toPg(sql: string) {
 const txQuery = new AsyncLocalStorage<Query>();
 async function q(sql: string, params: Param[]) {
   const inTx = txQuery.getStore();
-  return (inTx ?? (await driver).query)(toPg(sql), params);
+  const text = toPg(sql);
+  if (inTx) return inTx(text, params);
+  try {
+    return await (await getDriver()).query(text, params);
+  } catch (e) {
+    // Fora de transação, uma queda de conexão é repetida uma vez (o pool abre outra conexão).
+    if (!isConnectionError(e)) throw e;
+    return (await getDriver()).query(text, params);
+  }
 }
 
 export const one = async <T>(sql: string, ...p: Param[]) => (await q(sql, p)).rows[0] as T | undefined;
@@ -229,7 +251,13 @@ export const run = async (sql: string, ...p: Param[]) => ({ changes: (await q(sq
 /** Transação: tudo dentro de fn usa a mesma conexão. Use SELECT ... FOR UPDATE para travar linhas disputadas. */
 export async function tx<T>(fn: () => Promise<T>): Promise<T> {
   if (txQuery.getStore()) return fn(); // já dentro de uma transação
-  return (await driver).transaction((query) => txQuery.run(query, fn));
+  return (await getDriver()).transaction((query) => txQuery.run(query, fn));
 }
 
 export const now = () => new Date().toISOString();
+
+function isConnectionError(e: unknown) {
+  const msg = e instanceof Error ? e.message : "";
+  const code = (e as { code?: string } | null)?.code ?? "";
+  return /Connection terminated|timeout|ECONNRESET|socket hang up/i.test(msg) || ["57P01", "08006", "08003", "08P01"].includes(code);
+}

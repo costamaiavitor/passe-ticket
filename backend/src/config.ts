@@ -13,8 +13,13 @@ export const config = {
   isProd,
   isTest: env["NODE_ENV"] === "test",
   port: Number(env["PORT"] ?? 3333),
-  // No Render, RENDER_EXTERNAL_URL já vem preenchida com a URL pública do serviço.
-  publicUrl: (env["PUBLIC_URL"] || env["RENDER_EXTERNAL_URL"] || `http://localhost:${env["PORT"] ?? 3333}`).replace(/\/$/, ""),
+  // Endereço público da API. Na Vercel vem de VERCEL_PROJECT_PRODUCTION_URL (ex.: passe-ticket.vercel.app).
+  publicUrl: (
+    env["PUBLIC_URL"] ||
+    env["RENDER_EXTERNAL_URL"] ||
+    (env["VERCEL_PROJECT_PRODUCTION_URL"] ? `https://${env["VERCEL_PROJECT_PRODUCTION_URL"]}` : "") ||
+    `http://localhost:${env["PORT"] ?? 3333}`
+  ).replace(/\/$/, ""),
   corsOrigins: (env["CORS_ORIGINS"] ?? "http://localhost:8080,http://localhost:5173,http://localhost:3000")
     .split(",").map((s) => s.trim()).filter(Boolean),
   // Postgres (Neon). Sem ela, usa o Postgres embutido (PGlite) na pasta localDataDir.
