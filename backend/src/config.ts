@@ -32,10 +32,16 @@ export const config = {
   paymentProvider: (env["PAYMENT_PROVIDER"] ?? "mock") as "mock" | "mercadopago",
   mpAccessToken: env["MP_ACCESS_TOKEN"] ?? "",
   mpWebhookSecret: env["MP_WEBHOOK_SECRET"] ?? "",
+  // Modo demonstração: libera o botão "Simular pagamento" no site publicado.
+  // Qualquer visitante consegue ingresso sem pagar — nunca ligue isso para vender de verdade.
+  allowSimulatedPayments: env["ALLOW_SIMULATED_PAYMENTS"] === "true",
 };
 
+if (config.isProd && config.paymentProvider === "mock" && !config.allowSimulatedPayments) {
+  throw new Error("PAYMENT_PROVIDER=mock não é permitido em produção (use ALLOW_SIMULATED_PAYMENTS=true só para demonstração)");
+}
 if (config.isProd && config.paymentProvider === "mock") {
-  throw new Error("PAYMENT_PROVIDER=mock não é permitido em produção");
+  console.warn("ATENÇÃO: modo demonstração — pagamentos simulados liberados, ninguém paga de verdade.");
 }
 if (config.paymentProvider === "mercadopago" && !config.mpAccessToken) {
   throw new Error("Defina MP_ACCESS_TOKEN para usar o Mercado Pago");
