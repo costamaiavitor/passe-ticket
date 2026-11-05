@@ -13,7 +13,8 @@ export const config = {
   isProd,
   isTest: env["NODE_ENV"] === "test",
   port: Number(env["PORT"] ?? 3333),
-  publicUrl: (env["PUBLIC_URL"] ?? `http://localhost:${env["PORT"] ?? 3333}`).replace(/\/$/, ""),
+  // No Render, RENDER_EXTERNAL_URL já vem preenchida com a URL pública do serviço.
+  publicUrl: (env["PUBLIC_URL"] || env["RENDER_EXTERNAL_URL"] || `http://localhost:${env["PORT"] ?? 3333}`).replace(/\/$/, ""),
   corsOrigins: (env["CORS_ORIGINS"] ?? "http://localhost:8080,http://localhost:5173,http://localhost:3000")
     .split(",").map((s) => s.trim()).filter(Boolean),
   databasePath: env["DATABASE_PATH"] ?? "./data/passe.db",

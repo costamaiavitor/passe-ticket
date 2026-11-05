@@ -1,0 +1,37 @@
+# Blueprint do Render para a API do Passe (pasta backend/).
+# No Render: New > Blueprint > escolha este repositório. Ele pede os valores marcados com "sync: false".
+services:
+  - type: web
+    name: passe-api
+    runtime: node
+    rootDir: backend
+    plan: starter # disco persistente exige plano pago
+    region: virginia
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    disk:
+      name: passe-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "22.18.0"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_PATH
+        value: /var/data/passe.db
+      - key: JWT_SECRET
+        generateValue: true
+      - key: QR_SECRET
+        generateValue: true # não troque depois de vender: todos os QR emitidos deixariam de valer
+      - key: PAYMENT_PROVIDER
+        value: mercadopago
+      - key: MP_ACCESS_TOKEN
+        sync: false # credencial do Mercado Pago (de teste começa com TEST-)
+      - key: MP_WEBHOOK_SECRET
+        sync: false # assinatura secreta do webhook (painel do Mercado Pago)
+      - key: CORS_ORIGINS
+        sync: false # URL do site na Vercel, ex.: https://passe-ticket.vercel.app
+      - key: ADMIN_EMAILS
+        sync: false # e-mail(s) que viram administradores ao cadastrar
