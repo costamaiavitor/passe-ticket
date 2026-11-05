@@ -89,7 +89,9 @@ function EventPage() {
       </div>
       <main className="container-page -mt-24 relative grid gap-10 lg:grid-cols-[1fr_380px]">
         <div>
-          <AvailabilityBadge value={ev.availability} />
+          {ev.status === "cancelled" ? (
+            <span className="rounded-full bg-destructive/15 px-2.5 py-1 text-xs font-medium text-destructive">Evento cancelado</span>
+          ) : <AvailabilityBadge value={ev.availability} />}
           <h1 className="mt-3 text-3xl font-semibold tracking-tight md:text-5xl">{ev.title}</h1>
           <p className="mt-2 text-sm text-muted-foreground">por {ev.organizer.name}</p>
           <div className="mt-6 flex flex-wrap gap-x-8 gap-y-3 text-sm">

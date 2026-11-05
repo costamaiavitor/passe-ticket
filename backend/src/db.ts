@@ -125,6 +125,28 @@ CREATE UNIQUE INDEX IF NOT EXISTS users_google ON users(google_sub) WHERE google
 
 -- Tipo de ingresso (Pista, Camarote…): lotes do mesmo tipo abrem um depois do outro.
 ALTER TABLE batches ADD COLUMN IF NOT EXISTS ticket_type TEXT;
+
+-- Pagamentos com cartão (cada tentativa) e qual pagamento quitou o pedido.
+CREATE TABLE IF NOT EXISTS order_payments (
+  id TEXT PRIMARY KEY,
+  order_id TEXT NOT NULL REFERENCES orders(id),
+  provider TEXT NOT NULL,
+  method TEXT NOT NULL,
+  status TEXT NOT NULL,
+  status_detail TEXT NOT NULL DEFAULT '',
+  installments INTEGER,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS order_payments_order ON order_payments(order_id);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS paid_payment_id TEXT;
+-- Novo status "refunded" (estorno/contestação). Troca a regra antiga uma única vez.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'orders_status_v2') THEN
+    ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
+    ALTER TABLE orders ADD CONSTRAINT orders_status_v2
+      CHECK (status IN ('pending','paid','expired','cancelled','refund_required','refunded'));
+  END IF;
+END $$;
 `;
 
 type Param = string | number | boolean | null;

@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { config } from "../config.js";
 import { all, now, one } from "../db.js";
-import { approveOrder, cancelOwnOrder, createOrder, releaseOrder, syncPayment, toOrder, type OrderRow } from "../domain/orders.js";
+import { approveOrder, cancelOwnOrder, createOrder, MAX_INSTALLMENTS, payWithCard, releaseOrder, syncPayment, toOrder, type OrderRow } from "../domain/orders.js";
 import { forbidden, HttpError, notFound } from "../lib/errors.js";
 import { parse, rateLimit, requireAuth, user } from "../lib/http.js";
 
@@ -47,6 +47,27 @@ ordersRouter.get("/:id", async (req, res) => {
 ordersRouter.post("/:id/cancel", async (req, res) => {
   await cancelOwnOrder(user(req).id, req.params.id);
   res.json(await toOrder(await own(user(req).id, req.params.id)));
+});
+
+/** Pagamento com cartão: o navegador manda só o token do cartão (gerado pelo formulário seguro do Mercado Pago). */
+const cardSchema = z.object({
+  token: z.string().min(8).max(200),
+  paymentMethodId: z.string().min(2).max(40),
+  issuerId: z.union([z.string(), z.number()]).transform(String).optional(),
+  installments: z.coerce.number().int().min(1).max(MAX_INSTALLMENTS),
+  payer: z.object({
+    email: z.string().email().optional(),
+    identification: z.object({ type: z.string().max(10), number: z.string().max(20) }).optional(),
+  }).optional(),
+});
+
+ordersRouter.post("/:id/card", rateLimit({ windowMs: 60_000, max: 10, key: (r) => `card:${r.auth?.id}` }), async (req, res) => {
+  const d = parse(cardSchema, req.body);
+  const o = await payWithCard(user(req).id, String(req.params.id), {
+    token: d.token, paymentMethodId: d.paymentMethodId, issuerId: d.issuerId, installments: d.installments,
+    identification: d.payer?.identification, payerEmail: d.payer?.email,
+  });
+  res.json(await toOrder(o));
 });
 
 /** Só no modo de pagamento simulado (desenvolvimento): finge que o Pix foi pago. */

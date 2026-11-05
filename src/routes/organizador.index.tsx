@@ -2,11 +2,15 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { CalendarPlus, ExternalLink, MapPin, QrCode, Trash2, Users } from "lucide-react";
+import { toast } from "sonner";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { RequireAuth } from "@/components/require-auth";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { addStaff, becomeOrganizer, myEventsQuery, removeStaff, staffQuery } from "@/services/organizer";
+import {
+  AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { addStaff, becomeOrganizer, myEventsQuery, removeEvent, removeStaff, staffQuery } from "@/services/organizer";
 import { hasRole } from "@/services/session";
 import { brl, fmtDate, fmtTime } from "@/utils/format";
 import { cn } from "@/lib/utils";
@@ -93,6 +97,7 @@ const STATUS: Record<OrganizerEvent["status"], { label: string; cls: string }> =
 
 function OrganizerEventCard({ ev }: { ev: OrganizerEvent }) {
   const [staffOpen, setStaffOpen] = useState(false);
+  const [removeOpen, setRemoveOpen] = useState(false);
   const capacity = ev.batches.reduce((s, b) => s + b.total, 0);
   const pct = capacity ? Math.min(100, Math.round((ev.stats.ticketsSold / capacity) * 100)) : 0;
   const st = STATUS[ev.status];
@@ -120,13 +125,56 @@ function OrganizerEventCard({ ev }: { ev: OrganizerEvent }) {
         </div>
 
         <div className="mt-5 grid grid-cols-2 gap-2">
-          <Button variant="outline" size="sm" onClick={() => setStaffOpen(true)}><Users />Portaria</Button>
+          <Button variant="outline" size="sm" onClick={() => setStaffOpen(true)}><Users />Equipe</Button>
           <Button asChild variant="outline" size="sm"><Link to="/eventos/$id" params={{ id: ev.slug }}><ExternalLink />Ver página</Link></Button>
         </div>
-        <Button asChild variant="ghost" size="sm" className="mt-2 w-full"><Link to="/portaria"><QrCode />Abrir leitor da portaria</Link></Button>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <Button asChild variant="ghost" size="sm"><Link to="/portaria"><QrCode />Leitor</Link></Button>
+          {ev.status !== "cancelled" && (
+            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setRemoveOpen(true)}><Trash2 />Remover</Button>
+          )}
+        </div>
       </div>
       <StaffDialog eventId={ev.id} title={ev.title} open={staffOpen} onOpenChange={setStaffOpen} />
+      <RemoveDialog ev={ev} open={removeOpen} onOpenChange={setRemoveOpen} />
     </article>
+  );
+}
+
+function RemoveDialog({ ev, open, onOpenChange }: { ev: OrganizerEvent; open: boolean; onOpenChange: (o: boolean) => void }) {
+  const qc = useQueryClient();
+  const sold = ev.stats.ticketsSold;
+  const m = useMutation({
+    mutationFn: () => removeEvent(ev.id),
+    onSuccess: (r) => {
+      void qc.invalidateQueries({ queryKey: ["organizer-events"] });
+      void qc.invalidateQueries({ queryKey: ["events"] });
+      onOpenChange(false);
+      if (r.deleted) toast.success("Evento removido.");
+      else if (r.refundFailed) toast.error(`Evento cancelado. ${r.refunded} compra(s) estornada(s), mas ${r.refundFailed} precisa(m) de estorno manual no Mercado Pago.`);
+      else toast.success(`Evento cancelado e ${r.refunded} compra(s) estornada(s).`);
+    },
+  });
+  return (
+    <AlertDialog open={open} onOpenChange={(o) => !m.isPending && onOpenChange(o)}>
+      <AlertDialogContent className="max-w-md">
+        <AlertDialogHeader>
+          <AlertDialogTitle>{sold ? "Cancelar este evento?" : "Remover este evento?"}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {sold
+              ? <>“{ev.title}” já tem <strong className="text-foreground">{sold} ingresso(s) vendido(s)</strong>. O evento sai do site, todos os compradores recebem o dinheiro de volta (estorno no Mercado Pago) e os ingressos deixam de valer. Isso não pode ser desfeito.</>
+              : <>“{ev.title}” ainda não tem ingressos vendidos. Ele será apagado do site, junto com os lotes. Isso não pode ser desfeito.</>}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        {m.error && <p className="text-sm text-destructive">{m.error.message}</p>}
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={m.isPending}>Voltar</AlertDialogCancel>
+          <Button variant="destructive" disabled={m.isPending} onClick={() => m.mutate()}>
+            {m.isPending ? "Aguarde…" : sold ? "Cancelar e estornar" : "Remover evento"}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 

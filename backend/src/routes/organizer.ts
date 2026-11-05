@@ -3,6 +3,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { all, now, one, run, tx } from "../db.js";
 import { toEventDetail, type BatchRow, type EventRow } from "../domain/events.js";
+import { removeEvent } from "../domain/orders.js";
 import { maskCpf } from "../lib/cpf.js";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
 import { assertEventOwner, parse, requireRole, user } from "../lib/http.js";
@@ -143,6 +144,13 @@ organizerRouter.get("/events/:id/tickets", async (req, res) => {
      FROM tickets t JOIN batches b ON b.id = t.batch_id JOIN users u ON u.id = t.owner_id
      WHERE t.event_id = ? AND t.status IN ('valid','used') ORDER BY t.holder_name`, req.params.id,
   )).map((t) => ({ id: t.id, holderName: t.holder_name, holderCpf: maskCpf(t.holder_cpf), status: t.status, checkedInAt: t.checked_in_at, batchName: t.batch, ownerEmail: t.email })));
+});
+
+/** Remove o evento: apaga se não houver vendas; com vendas, cancela e estorna os compradores. */
+organizerRouter.delete("/events/:id", async (req, res) => {
+  const id = String(req.params.id);
+  await assertEventOwner(user(req), id);
+  res.json(await removeEvent(id));
 });
 
 // ---- Equipe da portaria ----

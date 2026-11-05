@@ -233,4 +233,87 @@ describe("Passe API", () => {
     assert.equal(ev.batches.find((b: { id: string }) => b.id === l1.id).status, "soldout");
     assert.equal(ev.batches.find((b: { id: string }) => b.id === l2.id).status, "active");
   });
+
+  it("cartão: recusa com mensagem clara, aprova, cancela o Pix e estorna pagamento em dobro", async () => {
+    const { mockStatuses } = await import("../src/payments.js");
+    const future = new Date(Date.now() + 10 * 86400_000).toISOString();
+    const created = await api("/organizer/events", { token: tokens.org, body: {
+      title: "Festa Cartão", category: "festas", startsAt: future, venue: "Galpão", city: "Fortaleza", maxTicketsPerCpf: 5,
+      batches: [{ name: "Pista", price: 5000, total: 10, salesStart: new Date(Date.now() - 1000).toISOString(), salesEnd: future }],
+    } });
+    assert.equal(created.status, 201, JSON.stringify(created.body));
+    const evId = created.body.id, bId = created.body.batches[0].id;
+    const newOrder = async () => {
+      const r = await api("/orders", { token: tokens.other, body: { eventId: evId, batchId: bId, holders: [{ name: "Ciclano Silva", cpf: CPF_B }] } });
+      assert.equal(r.status, 201, JSON.stringify(r.body));
+      return r.body.id as string;
+    };
+    const card = (token: string, installments = 1) => ({ token, paymentMethodId: "master", installments });
+
+    // Recusado: mensagem em português e o pedido continua aguardando pagamento.
+    const o1 = await newOrder();
+    const rej = await api(`/orders/${o1}/card`, { token: tokens.other, body: card("reject-xxxx") });
+    assert.equal(rej.status, 402);
+    assert.match(rej.body.message, /Saldo ou limite insuficiente/);
+    assert.equal((await api(`/orders/${o1}`, { token: tokens.other })).body.status, "pending");
+
+    // Valor nunca vem do navegador; parcelamento acima de 12x é recusado.
+    assert.equal((await api(`/orders/${o1}/card`, { token: tokens.other, body: card("approve-xxxx", 13) })).status, 400);
+
+    // Aprovado: ingresso emitido e o Pix em aberto é cancelado.
+    const ok = await api(`/orders/${o1}/card`, { token: tokens.other, body: card("approve-xxxx", 3) });
+    assert.equal(ok.status, 200, JSON.stringify(ok.body));
+    assert.equal(ok.body.status, "paid");
+    const { one } = await import("../src/db.js");
+    const row = (await one<{ payment_id: string }>("SELECT payment_id FROM orders WHERE id = ?", o1))!;
+    assert.equal(mockStatuses.get(row.payment_id), "cancelled");
+
+    // Cartão em análise + Pix pago ao mesmo tempo: quando o cartão aprova, ele é estornado sozinho.
+    const o2 = await newOrder();
+    const pend = await api(`/orders/${o2}/card`, { token: tokens.other, body: card("pending-xxxx") });
+    assert.equal(pend.body.status, "pending");
+    assert.equal(pend.body.cardPending, true);
+    const pix2 = (await one<{ payment_id: string }>("SELECT payment_id FROM orders WHERE id = ?", o2))!.payment_id;
+    mockStatuses.set(pix2, "approved");
+    assert.equal((await api(`/orders/${o2}`, { token: tokens.other })).body.status, "paid");
+    const cardRow = (await one<{ id: string }>("SELECT id FROM order_payments WHERE order_id = ?", o2))!;
+    mockStatuses.set(cardRow.id, "approved");
+    const { findOrderByPayment, syncPayment } = await import("../src/domain/orders.js");
+    await syncPayment((await findOrderByPayment(cardRow.id))!, { checkRefund: true });
+    assert.equal(mockStatuses.get(cardRow.id), "refunded");
+    assert.equal((await one<{ status: string }>("SELECT status FROM order_payments WHERE id = ?", cardRow.id))!.status, "refunded");
+
+    // Estorno/contestação do pagamento que quitou: ingressos cancelados.
+    mockStatuses.set(pix2, "refunded");
+    await syncPayment((await findOrderByPayment(pix2))!, { checkRefund: true });
+    assert.equal((await api(`/orders/${o2}`, { token: tokens.other })).body.status, "refunded");
+    const t2 = (await one<{ status: string }>("SELECT status FROM tickets WHERE order_id = ?", o2))!;
+    assert.equal(t2.status, "cancelled");
+  });
+
+  it("remover evento: apaga sem vendas; com vendas cancela e estorna", async () => {
+    const list = (await api("/organizer/events", { token: tokens.org })).body as Array<{ id: string; title: string }>;
+    const semVendas = list.find((e) => e.title === "Festa Lotes")!;   // só tem pedido pendente
+    const comVendas = list.find((e) => e.title === "Festa Cartão")!;  // tem pedido pago no cartão
+
+    // Só o dono (ou admin) pode remover.
+    assert.equal((await api(`/organizer/events/${semVendas.id}`, { method: "DELETE", token: tokens.buyer })).status, 403);
+
+    const del = await api(`/organizer/events/${semVendas.id}`, { method: "DELETE", token: tokens.org });
+    assert.equal(del.status, 200, JSON.stringify(del.body));
+    assert.equal(del.body.deleted, true);
+    assert.equal((await api(`/events/${semVendas.id}`)).status, 404);
+
+    const cancel = await api(`/organizer/events/${comVendas.id}`, { method: "DELETE", token: tokens.org });
+    assert.equal(cancel.status, 200, JSON.stringify(cancel.body));
+    assert.equal(cancel.body.deleted, false);
+    assert.equal(cancel.body.refunded, 1);
+    assert.equal(cancel.body.refundFailed, 0);
+    const { all } = await import("../src/db.js");
+    const tickets = await all<{ status: string }>("SELECT status FROM tickets WHERE event_id = ?", comVendas.id);
+    assert.ok(tickets.every((t) => t.status === "cancelled"));
+    // Evento cancelado não aparece na lista pública e não vende mais.
+    const pub = (await api("/events")).body as Array<{ id: string }>;
+    assert.ok(!pub.some((e) => e.id === comVendas.id));
+  });
 });

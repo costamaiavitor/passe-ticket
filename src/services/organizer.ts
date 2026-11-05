@@ -51,6 +51,10 @@ async function listMyEvents(): Promise<OrganizerEvent[]> {
 }
 export const myEventsQuery = () => queryOptions({ queryKey: ["organizer-events"], queryFn: listMyEvents });
 
+/** Remove o evento: apaga se não houver vendas; com vendas, cancela e estorna os compradores. */
+export const removeEvent = (eventId: string) =>
+  http<{ deleted: boolean; refunded: number; refundFailed: number }>(`/organizer/events/${encodeURIComponent(eventId)}`, { method: "DELETE" });
+
 // ---- Equipe da portaria ----
 const staffPath = (eventId: string) => `/organizer/events/${encodeURIComponent(eventId)}/staff`;
 

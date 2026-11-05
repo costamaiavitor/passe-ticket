@@ -1,6 +1,5 @@
 import { Router } from "express";
-import { one } from "../db.js";
-import { syncPayment, type OrderRow } from "../domain/orders.js";
+import { findOrderByPayment, syncPayment } from "../domain/orders.js";
 import { verifyMercadoPagoSignature } from "../payments.js";
 
 export const webhooksRouter = Router();
@@ -10,7 +9,8 @@ webhooksRouter.post("/mercadopago", async (req, res) => {
   const dataId = String(req.query["data.id"] ?? req.body?.data?.id ?? "");
   if (!dataId) return void res.status(200).end();
   if (!verifyMercadoPagoSignature(req.headers, dataId)) return void res.status(401).end();
-  const o = await one<OrderRow>("SELECT * FROM orders WHERE payment_provider = 'mercadopago' AND payment_id = ?", dataId);
-  if (o) await syncPayment(o);
+  const o = await findOrderByPayment(dataId);
+  // checkRefund: o webhook também avisa estornos e contestações de pedidos já pagos.
+  if (o) await syncPayment(o, { checkRefund: true });
   res.status(200).end();
 });

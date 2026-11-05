@@ -3,16 +3,18 @@ import { config } from "../config.js";
 import { all, now, one, run, tx } from "../db.js";
 import { isValidCpf, onlyDigits } from "../lib/cpf.js";
 import { badRequest, conflict, forbidden, HttpError, notFound } from "../lib/errors.js";
-import { payments, type PaymentInfo } from "../payments.js";
+import { payments, type CardPaymentInput, type PaymentInfo } from "../payments.js";
 import { batchStatuses, type BatchRow, type EventRow } from "./events.js";
 
 export interface OrderRow {
   id: string; user_id: string; event_id: string; batch_id: string; quantity: number; unit_price: number;
   subtotal: number; fee: number; total: number;
-  status: "pending" | "paid" | "expired" | "cancelled" | "refund_required";
+  status: "pending" | "paid" | "expired" | "cancelled" | "refund_required" | "refunded";
   payment_provider: string; payment_id: string | null; payment_data: string; expires_at: string;
-  paid_at: string | null; created_at: string;
+  paid_at: string | null; created_at: string; paid_payment_id: string | null;
 }
+
+interface OrderPaymentRow { id: string; order_id: string; method: string; status: string; status_detail: string }
 
 export const platformFee = (subtotal: number) => Math.round(subtotal * config.feeRate);
 
@@ -24,6 +26,10 @@ export async function toOrder(o: OrderRow) {
     eventStartsAt: ev?.starts_at ?? "", batchId: o.batch_id, batchName: b?.name ?? "", quantity: o.quantity,
     unitPrice: o.unit_price, subtotal: o.subtotal, fee: o.fee, total: o.total,
     payment: o.status === "pending" ? (JSON.parse(o.payment_data) as PaymentInfo) : null,
+    // Cartão em análise pelo Mercado Pago: o checkout mostra "pagamento em análise" e continua consultando.
+    cardPending: o.status === "pending"
+      ? !!(await one("SELECT 1 FROM order_payments WHERE order_id = ? AND method = 'card' AND status = 'pending'", o.id))
+      : false,
     paymentProvider: o.payment_provider, expiresAt: o.expires_at, paidAt: o.paid_at, createdAt: o.created_at,
   };
 }
@@ -112,12 +118,12 @@ export async function createOrder(userId: string, input: { eventId: string; batc
   return (await one<OrderRow>("SELECT * FROM orders WHERE id = ?", order.id))!;
 }
 
-/** Pagamento confirmado: emite os ingressos (QR fica válido). Idempotente. */
-export function approveOrder(orderId: string) {
+/** Pagamento confirmado: emite os ingressos (QR fica válido). Idempotente. Guarda qual pagamento quitou o pedido. */
+export function approveOrder(orderId: string, paymentId: string | null = null) {
   return tx(async () => {
     const o = await one<OrderRow>("SELECT * FROM orders WHERE id = ? FOR UPDATE", orderId);
     if (!o) throw notFound("Pedido não encontrado.");
-    if (o.status === "paid") return o;
+    if (o.status === "paid" || o.status === "refunded" || o.status === "refund_required") return o;
     const t = now();
     if (o.status === "pending") {
       await run("UPDATE batches SET reserved = reserved - ?, sold = sold + ? WHERE id = ?", o.quantity, o.quantity, o.batch_id);
@@ -130,9 +136,9 @@ export function approveOrder(orderId: string) {
       }
       await run("UPDATE batches SET sold = sold + ? WHERE id = ?", o.quantity, o.batch_id);
     }
-    await run("UPDATE orders SET status = 'paid', paid_at = ? WHERE id = ?", t, o.id);
+    await run("UPDATE orders SET status = 'paid', paid_at = ?, paid_payment_id = ? WHERE id = ?", t, paymentId, o.id);
     await run("UPDATE tickets SET status = 'valid' WHERE order_id = ?", o.id);
-    return { ...o, status: "paid" as const, paid_at: t };
+    return { ...o, status: "paid" as const, paid_at: t, paid_payment_id: paymentId };
   });
 }
 
@@ -161,11 +167,176 @@ export async function cancelOwnOrder(userId: string, orderId: string) {
   await releaseOrder(o.id, "cancelled");
 }
 
-/** Reconsulta o provedor e atualiza o pedido. Usado pelo webhook e pelo polling do checkout. */
-export async function syncPayment(o: OrderRow) {
-  if (!o.payment_id || o.payment_provider !== payments.name || o.status === "paid") return o;
-  const s = await payments.status(o.payment_id);
-  if (s === "approved") await approveOrder(o.id);
-  else if ((s === "rejected" || s === "cancelled") && o.status === "pending") await releaseOrder(o.id, "cancelled");
+/**
+ * Um pagamento foi aprovado. Emite os ingressos; se o pedido já tinha sido pago por OUTRO pagamento
+ * (ex.: pagou o Pix e o cartão), ou se não havia mais estoque, devolve o dinheiro automaticamente.
+ */
+async function confirmPayment(orderId: string, paymentId: string) {
+  const r = await approveOrder(orderId, paymentId);
+  const duplicate = r.status === "paid" && !!r.paid_payment_id && r.paid_payment_id !== paymentId;
+  if (duplicate || r.status === "refund_required") {
+    try {
+      await payments.refund(paymentId);
+      await run("UPDATE order_payments SET status = 'refunded' WHERE id = ?", paymentId);
+      if (r.status === "refund_required") await run("UPDATE orders SET status = 'refunded' WHERE id = ?", orderId);
+      console.warn(`Pagamento ${paymentId} do pedido ${orderId} estornado automaticamente (${duplicate ? "pago em dobro" : "sem estoque"}).`);
+    } catch (e) {
+      console.error(`ATENÇÃO: estorne manualmente o pagamento ${paymentId} do pedido ${orderId}:`, e);
+    }
+    return;
+  }
+  // Pagou no cartão: cancela o Pix que ficou em aberto para ninguém pagar duas vezes.
+  if (r.payment_id && r.payment_id !== paymentId) await payments.cancel(r.payment_id).catch(() => undefined);
+}
+
+/** Estorno ou contestação depois de pago: cancela os ingressos e devolve as vagas ao lote. */
+async function markRefunded(orderId: string) {
+  await tx(async () => {
+    const o = await one<OrderRow>("SELECT * FROM orders WHERE id = ? FOR UPDATE", orderId);
+    if (!o || o.status !== "paid") return;
+    await run("UPDATE orders SET status = 'refunded' WHERE id = ?", o.id);
+    await run("UPDATE tickets SET status = 'cancelled' WHERE order_id = ?", o.id);
+    await run("UPDATE batches SET sold = sold - ? WHERE id = ?", o.quantity, o.batch_id);
+  });
+}
+
+/** Reconsulta o provedor (Pix e cartões em análise) e atualiza o pedido. Usado pelo webhook e pelo polling do checkout. */
+export async function syncPayment(o: OrderRow, opts: { checkRefund?: boolean } = {}) {
+  if (o.payment_provider !== payments.name) return o;
+  if (o.status !== "pending" && o.status !== "paid") return o;
+
+  // Cartões em análise: resolvidos mesmo se o pedido já foi pago por outro meio
+  // (aí o confirmPayment estorna a cobrança repetida).
+  const cards = await all<OrderPaymentRow>("SELECT * FROM order_payments WHERE order_id = ? AND status = 'pending'", o.id);
+  for (const c of cards) {
+    const s = await payments.status(c.id);
+    if (s === "pending") continue;
+    await run("UPDATE order_payments SET status = ? WHERE id = ?", s === "approved" ? "approved" : "rejected", c.id);
+    if (s === "approved") await confirmPayment(o.id, c.id);
+  }
+
+  if (o.status === "paid") {
+    if (opts.checkRefund) {
+      // Webhook: estorno/contestação do pagamento que quitou o pedido → cancela os ingressos.
+      if (o.paid_payment_id && (await payments.status(o.paid_payment_id)) === "refunded") await markRefunded(o.id);
+      // Pix pago depois que o cartão já tinha quitado (os dois ao mesmo tempo) → estorna o Pix.
+      else if (o.payment_id && o.payment_id !== o.paid_payment_id && (await payments.status(o.payment_id)) === "approved")
+        await confirmPayment(o.id, o.payment_id);
+    }
+    return (await one<OrderRow>("SELECT * FROM orders WHERE id = ?", o.id))!;
+  }
+
+  if (o.payment_id) {
+    const s = await payments.status(o.payment_id);
+    if (s === "approved") await confirmPayment(o.id, o.payment_id);
+    else if ((s === "rejected" || s === "cancelled") && !cards.length) {
+      const cur = (await one<OrderRow>("SELECT * FROM orders WHERE id = ?", o.id))!;
+      if (cur.status === "pending") await releaseOrder(o.id, "cancelled");
+    }
+  }
   return (await one<OrderRow>("SELECT * FROM orders WHERE id = ?", o.id))!;
+}
+
+// Motivos de recusa do cartão (Mercado Pago), em português simples.
+const CARD_REJECTIONS: Record<string, string> = {
+  cc_rejected_insufficient_amount: "Saldo ou limite insuficiente. Tente outro cartão ou pague com Pix.",
+  cc_rejected_bad_filled_security_code: "Código de segurança (CVV) incorreto. Confira e tente de novo.",
+  cc_rejected_bad_filled_date: "Data de validade incorreta. Confira e tente de novo.",
+  cc_rejected_bad_filled_card_number: "Número do cartão incorreto. Confira e tente de novo.",
+  cc_rejected_bad_filled_other: "Algum dado do cartão está incorreto. Confira e tente de novo.",
+  cc_rejected_call_for_authorize: "O banco precisa autorizar esta compra. Ligue para o seu banco e tente de novo.",
+  cc_rejected_card_disabled: "Este cartão está desativado. Ligue para o banco ou use outro cartão.",
+  cc_rejected_duplicated_payment: "Você já fez um pagamento igual agora há pouco. Confira em Meus ingressos.",
+  cc_rejected_high_risk: "O pagamento foi recusado por segurança. Tente outro cartão ou pague com Pix.",
+  cc_rejected_max_attempts: "Muitas tentativas com este cartão. Use outro cartão ou pague com Pix.",
+  cc_rejected_blacklist: "Este cartão não pode ser usado. Tente outro cartão ou pague com Pix.",
+};
+
+export const MAX_INSTALLMENTS = 12;
+
+export type CardInput = Pick<CardPaymentInput, "token" | "paymentMethodId" | "issuerId" | "installments" | "identification"> & {
+  payerEmail?: string | undefined;
+};
+
+/** Paga um pedido pendente com cartão. O valor cobrado vem sempre do servidor, nunca do navegador. */
+export async function payWithCard(userId: string, orderId: string, input: CardInput) {
+  const o = await one<OrderRow>("SELECT * FROM orders WHERE id = ?", orderId);
+  if (!o) throw notFound("Pedido não encontrado.");
+  if (o.user_id !== userId) throw forbidden();
+  if (o.status === "paid") return o;
+  if (o.status !== "pending") throw conflict("ORDER_NOT_PENDING", "Este pedido não está mais aguardando pagamento.");
+  if (o.expires_at < now()) throw conflict("ORDER_EXPIRED", "O tempo para pagar este pedido acabou. Faça o pedido de novo.");
+  if (await one("SELECT 1 FROM order_payments WHERE order_id = ? AND method = 'card' AND status = 'pending'", o.id))
+    throw conflict("CARD_IN_REVIEW", "Já existe um pagamento com cartão em análise para este pedido. Aguarde alguns instantes.");
+  if (!Number.isInteger(input.installments) || input.installments < 1 || input.installments > MAX_INSTALLMENTS)
+    throw badRequest("INVALID_INSTALLMENTS", "Parcelamento inválido.");
+
+  const user = (await one<{ email: string }>("SELECT email FROM users WHERE id = ?", userId))!;
+  const ev = await one<{ title: string }>("SELECT title FROM events WHERE id = ?", o.event_id);
+  let r;
+  try {
+    r = await payments.createCard({
+      token: input.token, paymentMethodId: input.paymentMethodId, issuerId: input.issuerId,
+      installments: input.installments, identification: input.identification,
+      orderId: o.id, amountCents: o.total, description: `Ingresso — ${ev?.title ?? "Passe"}`,
+      payerEmail: input.payerEmail || user.email,
+    });
+  } catch (e) {
+    console.error("Falha ao cobrar no cartão o pedido", o.id, e);
+    throw new HttpError(502, "PAYMENT_UNAVAILABLE", "Não conseguimos processar o cartão agora. Nada foi cobrado. Tente de novo ou pague com Pix.");
+  }
+  await run(
+    "INSERT INTO order_payments (id, order_id, provider, method, status, status_detail, installments, created_at) VALUES (?,?,?,?,?,?,?,?)",
+    r.id, o.id, payments.name, "card", r.status, r.statusDetail, input.installments, now(),
+  );
+  if (r.status === "rejected")
+    throw new HttpError(402, "CARD_REJECTED", CARD_REJECTIONS[r.statusDetail] ?? "O cartão foi recusado. Tente outro cartão ou pague com Pix.");
+  if (r.status === "approved") await confirmPayment(o.id, r.id);
+  return (await one<OrderRow>("SELECT * FROM orders WHERE id = ?", o.id))!;
+}
+
+/** Acha o pedido de um pagamento (Pix guardado no pedido ou cartão na tabela de tentativas). Usado pelo webhook. */
+export async function findOrderByPayment(paymentId: string) {
+  return (await one<OrderRow>("SELECT * FROM orders WHERE payment_provider = ? AND (payment_id = ? OR id IN (SELECT order_id FROM order_payments WHERE id = ?))",
+    payments.name, paymentId, paymentId));
+}
+
+/**
+ * Remove um evento do organizador.
+ * - Sem nenhum ingresso pago: apaga tudo (evento, lotes, pedidos em aberto).
+ * - Com vendas: cancela o evento (some do site), estorna cada compra paga e cancela os ingressos.
+ */
+export async function removeEvent(eventId: string) {
+  const pending = await all<OrderRow>("SELECT * FROM orders WHERE event_id = ? AND status = 'pending'", eventId);
+  for (const o of pending) {
+    if (o.payment_id) await payments.cancel(o.payment_id).catch(() => undefined);
+    await releaseOrder(o.id, "cancelled");
+  }
+
+  const paid = await all<OrderRow>("SELECT * FROM orders WHERE event_id = ? AND status = 'paid'", eventId);
+  if (!paid.length) {
+    await tx(async () => {
+      await run("DELETE FROM checkins WHERE event_id = ?", eventId);
+      await run("DELETE FROM tickets WHERE event_id = ?", eventId);
+      await run("DELETE FROM order_payments WHERE order_id IN (SELECT id FROM orders WHERE event_id = ?)", eventId);
+      await run("DELETE FROM orders WHERE event_id = ?", eventId);
+      await run("DELETE FROM events WHERE id = ?", eventId); // lotes e equipe saem junto (ON DELETE CASCADE)
+    });
+    return { deleted: true, refunded: 0, refundFailed: 0 };
+  }
+
+  await run("UPDATE events SET status = 'cancelled' WHERE id = ?", eventId);
+  let refunded = 0, refundFailed = 0;
+  for (const o of paid) {
+    const paymentId = o.paid_payment_id ?? o.payment_id;
+    try {
+      if (paymentId && o.total > 0) await payments.refund(paymentId);
+      await markRefunded(o.id);
+      refunded++;
+    } catch (e) {
+      refundFailed++;
+      console.error(`ATENÇÃO: estorne manualmente o pedido ${o.id} (pagamento ${paymentId}) do evento cancelado ${eventId}:`, e);
+    }
+  }
+  return { deleted: false, refunded, refundFailed };
 }

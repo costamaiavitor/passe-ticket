@@ -1,4 +1,4 @@
-import { createHmac, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomUUID } from "node:crypto";
 import { config } from "./config.js";
 
 export interface PaymentInfo {
@@ -12,11 +12,33 @@ export interface PaymentInfo {
 
 export interface CreatedPayment { id: string; info: PaymentInfo }
 
+export type PaymentStatus = "approved" | "pending" | "rejected" | "cancelled" | "refunded";
+
+export interface CardPaymentInput {
+  orderId: string;
+  amountCents: number;
+  description: string;
+  payerEmail: string;
+  /** Token do cartão gerado pelo formulário seguro do Mercado Pago no navegador (o número do cartão nunca chega aqui). */
+  token: string;
+  paymentMethodId: string;
+  issuerId?: string | undefined;
+  installments: number;
+  identification?: { type: string; number: string } | undefined;
+}
+
+export interface CardPaymentResult { id: string; status: "approved" | "pending" | "rejected"; statusDetail: string }
+
 export interface PaymentProvider {
   name: string;
   create(input: { orderId: string; amountCents: number; description: string; payerEmail: string; expiresAt: string }): Promise<CreatedPayment>;
+  createCard(input: CardPaymentInput): Promise<CardPaymentResult>;
   /** Consulta o status real no provedor (nunca confie só no corpo do webhook). */
-  status(paymentId: string): Promise<"approved" | "pending" | "rejected" | "cancelled" | "refunded">;
+  status(paymentId: string): Promise<PaymentStatus>;
+  /** Cancela um pagamento ainda não pago (ex.: o Pix, quando o cliente pagou no cartão). */
+  cancel(paymentId: string): Promise<void>;
+  /** Devolve o dinheiro de um pagamento aprovado (ex.: pedido pago duas vezes). */
+  refund(paymentId: string): Promise<void>;
 }
 
 const mock: PaymentProvider = {
@@ -24,10 +46,22 @@ const mock: PaymentProvider = {
   async create({ orderId }) {
     return { id: `mock_${randomUUID()}`, info: { method: "pix", pixCode: `00020126PIXSIMULADO${orderId}` } };
   },
-  async status() {
-    return "pending";
+  // Cartão simulado (testes/desenvolvimento): token "approve" aprova, "pending" fica em análise, o resto é recusado.
+  async createCard({ token }) {
+    const id = `mockcard_${randomUUID()}`;
+    if (token.startsWith("approve")) return { id, status: "approved", statusDetail: "accredited" };
+    if (token.startsWith("pending")) return { id, status: "pending", statusDetail: "pending_contingency" };
+    return { id, status: "rejected", statusDetail: "cc_rejected_insufficient_amount" };
   },
+  async status(id) {
+    return mockStatuses.get(id) ?? "pending";
+  },
+  async cancel(id) { mockStatuses.set(id, "cancelled"); },
+  async refund(id) { mockStatuses.set(id, "refunded"); },
 };
+
+/** Só para testes: muda o status de um pagamento simulado. */
+export const mockStatuses = new Map<string, PaymentStatus>();
 
 // ---- Mercado Pago (Pix) — https://www.mercadopago.com.br/developers/pt/reference/payments/_payments/post
 const MP = "https://api.mercadopago.com";
@@ -45,6 +79,7 @@ async function mpFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
 interface MpPayment {
   id: number;
   status: string;
+  status_detail?: string;
   point_of_interaction?: { transaction_data?: { qr_code?: string; qr_code_base64?: string; ticket_url?: string } };
 }
 
@@ -70,6 +105,33 @@ const mercadopago: PaymentProvider = {
       id: String(p.id),
       info: { method: "pix", pixCode: td.qr_code ?? "", ...(td.qr_code_base64 ? { pixQrBase64: td.qr_code_base64 } : {}), ...(td.ticket_url ? { ticketUrl: td.ticket_url } : {}) },
     };
+  },
+  async createCard(i) {
+    const p = await mpFetch<MpPayment>("/v1/payments", {
+      method: "POST",
+      // Mesma tentativa (mesmo token) nunca cobra duas vezes.
+      headers: { "X-Idempotency-Key": `${i.orderId}-${createHash("sha256").update(i.token).digest("hex").slice(0, 24)}` },
+      body: JSON.stringify({
+        transaction_amount: i.amountCents / 100,
+        token: i.token,
+        description: i.description,
+        installments: i.installments,
+        payment_method_id: i.paymentMethodId,
+        ...(i.issuerId ? { issuer_id: Number(i.issuerId) || i.issuerId } : {}),
+        payer: { email: i.payerEmail, ...(i.identification ? { identification: i.identification } : {}) },
+        external_reference: i.orderId,
+        statement_descriptor: "PASSE",
+        ...(config.publicUrl.startsWith("https://") ? { notification_url: `${config.publicUrl}/api/v1/webhooks/mercadopago` } : {}),
+      }),
+    });
+    const status = p.status === "approved" ? "approved" : p.status === "rejected" || p.status === "cancelled" ? "rejected" : "pending";
+    return { id: String(p.id), status, statusDetail: p.status_detail ?? "" };
+  },
+  async cancel(id) {
+    await mpFetch(`/v1/payments/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify({ status: "cancelled" }) });
+  },
+  async refund(id) {
+    await mpFetch(`/v1/payments/${encodeURIComponent(id)}/refunds`, { method: "POST", headers: { "X-Idempotency-Key": `refund-${id}` }, body: "{}" });
   },
   async status(id) {
     const p = await mpFetch<MpPayment>(`/v1/payments/${encodeURIComponent(id)}`);

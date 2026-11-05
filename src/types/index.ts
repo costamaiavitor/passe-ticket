@@ -36,6 +36,7 @@ export interface EventDetail extends EventSummary {
   transferPolicy: { maxTransfers: number; deadline: string };
   refundPolicy: string;
   maxTicketsPerCpf?: number;
+  status?: "draft" | "published" | "cancelled";
   batches: Batch[];
 }
 
@@ -59,7 +60,7 @@ export interface Holder { name: string; cpf: string }
 
 export interface Order {
   id: string;
-  status: "pending" | "paid" | "expired" | "cancelled" | "refund_required";
+  status: "pending" | "paid" | "expired" | "cancelled" | "refund_required" | "refunded";
   eventId: string;
   eventTitle: string;
   eventSlug: string;
@@ -73,6 +74,8 @@ export interface Order {
   total: number;
   payment: { method: "pix"; pixCode: string; pixQrBase64?: string; ticketUrl?: string } | null;
   paymentProvider: string;
+  /** Pagamento no cartão em análise pelo Mercado Pago. */
+  cardPending?: boolean;
   expiresAt: string;
   paidAt: string | null;
   createdAt: string;
