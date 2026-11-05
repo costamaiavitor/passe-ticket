@@ -9,7 +9,10 @@ export interface EventRow {
 export interface BatchRow {
   id: string; event_id: string; name: string; price: number; total: number; sold: number; reserved: number;
   sales_start: string; sales_end: string; status: "active" | "paused" | "closed"; position: number;
+  ticket_type: string | null;
 }
+
+export type PublicBatchStatus = "active" | "paused" | "closed" | "soldout" | "upcoming";
 
 /** Status público do lote, como o frontend espera. */
 export function batchStatus(b: BatchRow, at = new Date().toISOString()) {
@@ -20,12 +23,30 @@ export function batchStatus(b: BatchRow, at = new Date().toISOString()) {
   return "active" as const;
 }
 
-export function toBatch(b: BatchRow) {
+/**
+ * Virada automática de lote: dentro do mesmo tipo de ingresso, na ordem de cadastro, um lote só abre
+ * depois que todos os anteriores esgotaram ou encerraram. Os seguintes ficam "upcoming" (em breve).
+ * Lotes sem tipo são independentes, como antes.
+ */
+export function batchStatuses(batches: BatchRow[], at = new Date().toISOString()) {
+  const result = new Map<string, PublicBatchStatus>();
+  const blocked = new Set<string>();
+  for (const b of [...batches].sort((x, y) => x.position - y.position)) {
+    const base = batchStatus(b, at);
+    const group = b.ticket_type?.trim().toLowerCase();
+    const st: PublicBatchStatus = group && blocked.has(group) && (base === "active" || base === "paused") ? "upcoming" : base;
+    result.set(b.id, st);
+    if (group && base !== "soldout" && base !== "closed") blocked.add(group);
+  }
+  return result;
+}
+
+export function toBatch(b: BatchRow, status: PublicBatchStatus = batchStatus(b)) {
   return {
-    id: b.id, name: b.name, price: b.price, total: b.total,
+    id: b.id, name: b.name, price: b.price, total: b.total, ticketType: b.ticket_type,
     // "sold" público inclui reservas em andamento: é o que não está mais disponível.
     sold: b.sold + b.reserved,
-    salesStart: b.sales_start, salesEnd: b.sales_end, status: batchStatus(b),
+    salesStart: b.sales_start, salesEnd: b.sales_end, status,
   };
 }
 
@@ -33,7 +54,8 @@ export const batchesOf = (eventId: string) =>
   all<BatchRow>("SELECT * FROM batches WHERE event_id = ? ORDER BY position, price", eventId);
 
 function summary(e: EventRow, batches: BatchRow[]) {
-  const open = batches.filter((b) => batchStatus(b) === "active");
+  const statuses = batchStatuses(batches);
+  const open = batches.filter((b) => statuses.get(b.id) === "active");
   const left = open.reduce((s, b) => s + b.total - b.sold - b.reserved, 0);
   const cap = open.reduce((s, b) => s + b.total, 0);
   const availability = left <= 0 ? "soldout" : left / cap <= 0.15 ? "few_left" : "available";
@@ -64,7 +86,7 @@ export async function toEventDetail(e: EventRow) {
     refundPolicy: e.refund_policy,
     maxTicketsPerCpf: e.max_per_cpf,
     status: e.status,
-    batches: batches.map(toBatch),
+    batches: (() => { const st = batchStatuses(batches); return batches.map((b) => toBatch(b, st.get(b.id))); })(),
   };
 }
 

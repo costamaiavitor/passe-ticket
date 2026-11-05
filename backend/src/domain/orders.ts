@@ -4,7 +4,7 @@ import { all, now, one, run, tx } from "../db.js";
 import { isValidCpf, onlyDigits } from "../lib/cpf.js";
 import { badRequest, conflict, forbidden, HttpError, notFound } from "../lib/errors.js";
 import { payments, type PaymentInfo } from "../payments.js";
-import { batchStatus, type BatchRow, type EventRow } from "./events.js";
+import { batchStatuses, type BatchRow, type EventRow } from "./events.js";
 
 export interface OrderRow {
   id: string; user_id: string; event_id: string; batch_id: string; quantity: number; unit_price: number;
@@ -51,8 +51,10 @@ export async function createOrder(userId: string, input: { eventId: string; batc
     if (ev.starts_at < now()) throw badRequest("EVENT_STARTED", "As vendas deste evento já foram encerradas.");
     const b = await one<BatchRow>("SELECT * FROM batches WHERE id = ? AND event_id = ? FOR UPDATE", input.batchId, ev.id);
     if (!b) throw notFound("Lote não encontrado.");
-    const st = batchStatus(b);
+    const siblings = await all<BatchRow>("SELECT * FROM batches WHERE event_id = ?", ev.id);
+    const st = batchStatuses(siblings).get(b.id);
     if (st === "soldout") throw conflict("SOLD_OUT", "Este lote esgotou.");
+    if (st === "upcoming") throw conflict("BATCH_UPCOMING", "Este lote abre quando o lote anterior esgotar.");
     if (st !== "active") throw conflict("BATCH_UNAVAILABLE", "Este lote não está à venda no momento.");
     if (b.total - b.sold - b.reserved < holders.length)
       throw conflict("NOT_ENOUGH_STOCK", `Restam apenas ${b.total - b.sold - b.reserved} ingressos neste lote.`);

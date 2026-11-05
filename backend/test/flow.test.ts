@@ -210,4 +210,27 @@ describe("Passe API", () => {
     // Conta criada pelo Google não entra com senha vazia.
     assert.equal((await api("/auth/login", { body: { email: "nova@t.dev", password: "" } })).status, 401);
   });
+
+  it("lotes do mesmo tipo viram sozinhos quando o anterior esgota", async () => {
+    const future = new Date(Date.now() + 10 * 86400_000).toISOString();
+    const start = new Date(Date.now() - 1000).toISOString();
+    const lot = (name: string, price: number) => ({ name, price, total: 1, salesStart: start, salesEnd: future, ticketType: "Pista" });
+    const created = await api("/organizer/events", { token: tokens.org, body: {
+      title: "Festa Lotes", category: "festas", startsAt: future, venue: "Galpão", city: "Fortaleza",
+      batches: [lot("Pista — 1º lote", 1000), lot("Pista — 2º lote", 2000)],
+    } });
+    assert.equal(created.status, 201, JSON.stringify(created.body));
+    const [l1, l2] = created.body.batches;
+    assert.equal(l1.status, "active");
+    assert.equal(l2.status, "upcoming");
+
+    const early = await api("/orders", { token: tokens.buyer, body: { eventId: created.body.id, batchId: l2.id, holders: [{ name: "Fulano de Tal", cpf: CPF_C }] } });
+    assert.equal(early.body.code, "BATCH_UPCOMING");
+
+    const o = await api("/orders", { token: tokens.buyer, body: { eventId: created.body.id, batchId: l1.id, holders: [{ name: "Fulano de Tal", cpf: CPF_C }] } });
+    assert.equal(o.status, 201, JSON.stringify(o.body));
+    const ev = (await api(`/events/${created.body.id}`)).body;
+    assert.equal(ev.batches.find((b: { id: string }) => b.id === l1.id).status, "soldout");
+    assert.equal(ev.batches.find((b: { id: string }) => b.id === l2.id).status, "active");
+  });
 });

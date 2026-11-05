@@ -96,7 +96,8 @@ function EventPage() {
             <span className="flex items-center gap-2"><Calendar className="size-4 text-primary" />{fmtDate(ev.startsAt)} · {fmtTime(ev.startsAt)}</span>
             <span className="flex items-center gap-2"><MapPin className="size-4 text-primary" />{ev.venue}{ev.address ? ` — ${ev.address}` : ""}, {ev.city}</span>
           </div>
-          <p className="mt-8 max-w-2xl leading-relaxed text-muted-foreground">{ev.description}</p>
+          {ev.description && <p className="mt-8 max-w-2xl whitespace-pre-line leading-relaxed text-muted-foreground">{ev.description}</p>}
+          <EventMap venue={ev.venue} address={ev.address} city={ev.city} />
 
           <div className="mt-10 divide-y border-y">
             <Policy icon={Info} title="Informações importantes">
@@ -104,9 +105,11 @@ function EventPage() {
             </Policy>
             <Policy icon={Repeat} title="Política de transferência">
               Até {ev.transferPolicy.maxTransfers} transferência(s) por ingresso, até {fmtDate(ev.transferPolicy.deadline)} às {fmtTime(ev.transferPolicy.deadline)}.
-              Limite de {MAX_TICKETS_PER_CPF} ingressos por CPF neste evento.
+              Limite de {ev.maxTicketsPerCpf ?? MAX_TICKETS_PER_CPF} ingressos por CPF neste evento.
             </Policy>
-            <Policy icon={Undo2} title="Política de reembolso">{ev.refundPolicy}</Policy>
+            <Policy icon={Undo2} title="Política de reembolso">
+              {ev.refundPolicy || "Cancelamento em até 7 dias após a compra, desde que antes do evento (Código de Defesa do Consumidor, art. 49). Se o evento for cancelado ou adiado, o reembolso é integral."}
+            </Policy>
           </div>
         </div>
 
@@ -116,13 +119,16 @@ function EventPage() {
             {ev.batches.map((b) => {
               const left = b.total - b.sold;
               const disabled = b.status !== "active" || left <= 0;
+              const label = b.status === "upcoming" ? "Em breve · abre quando o lote anterior esgotar"
+                : b.status === "soldout" || left <= 0 ? "Esgotado"
+                : b.status === "active" ? `${left} disponíveis` : "Vendas encerradas";
               return (
                 <button key={b.id} disabled={disabled || step === "holders"} onClick={() => { setBatchId(b.id); setQty(1); }}
                   className={cn("flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left transition-colors",
                     batchId === b.id ? "border-primary bg-primary/5" : "hover:border-muted-foreground/40",
                     disabled && "cursor-not-allowed opacity-50")}>
                   <div><p className="text-sm font-medium">{b.name}</p>
-                    <p className="text-xs text-muted-foreground">{disabled ? "Esgotado / encerrado" : `${left} disponíveis`}</p></div>
+                    <p className="text-xs text-muted-foreground">{label}</p></div>
                   <span className="text-sm font-medium">{brl(b.price)}</span>
                 </button>
               );
@@ -138,7 +144,7 @@ function EventPage() {
                   <Button size="icon" variant="outline" className="size-8" disabled={step === "holders"} onClick={() => setQty((q) => Math.min(maxQty, q + 1))} aria-label="Aumentar"><Plus /></Button>
                 </div>
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">Cada ingresso exige um titular com CPF próprio (máx. {MAX_TICKETS_PER_CPF} por CPF).</p>
+              <p className="mt-2 text-xs text-muted-foreground">Cada ingresso exige um titular com CPF próprio (máx. {ev.maxTicketsPerCpf ?? MAX_TICKETS_PER_CPF} por CPF).</p>
               <dl className="mt-5 space-y-1.5 border-t pt-4 text-sm">
                 <Row k="Subtotal" v={brl(subtotal)} />
                 <Row k="Taxa da plataforma (10%)" v={brl(fee)} />
@@ -158,6 +164,25 @@ function EventPage() {
       </main>
       <SiteFooter />
     </div>
+  );
+}
+
+/** Mapa do local (Google Maps incorporado, sem chave de API) + atalho para abrir no app de mapas. */
+function EventMap({ venue, address, city }: { venue: string; address: string; city: string }) {
+  const q = [venue, address, city].filter(Boolean).join(", ");
+  const enc = encodeURIComponent(q);
+  return (
+    <section className="mt-8 max-w-2xl overflow-hidden rounded-xl border bg-card">
+      <iframe title={`Mapa: ${q}`} src={`https://www.google.com/maps?q=${enc}&output=embed`} loading="lazy"
+        referrerPolicy="no-referrer-when-downgrade" className="h-56 w-full border-0 md:h-72" />
+      <div className="flex items-center justify-between gap-3 p-4">
+        <div className="min-w-0"><p className="truncate text-sm font-medium">{venue}</p>
+          <p className="truncate text-xs text-muted-foreground">{[address, city].filter(Boolean).join(" · ")}</p></div>
+        <Button asChild size="sm" variant="outline" className="shrink-0">
+          <a href={`https://www.google.com/maps/search/?api=1&query=${enc}`} target="_blank" rel="noreferrer"><MapPin />Abrir no mapa</a>
+        </Button>
+      </div>
+    </section>
   );
 }
 

@@ -18,6 +18,8 @@ const batchSchema = z.object({
   salesStart: iso,
   salesEnd: iso,
   status: z.enum(["active", "paused", "closed"]).default("active"),
+  // Tipo de ingresso (Pista, Camarote…). Lotes do mesmo tipo viram automaticamente, na ordem.
+  ticketType: z.string().trim().max(40).nullable().default(null),
 });
 const eventSchema = z.object({
   title: z.string().trim().min(3).max(140),
@@ -44,8 +46,8 @@ async function insertBatch(eventId: string, b: z.infer<typeof batchSchema>, posi
   if (b.salesEnd <= b.salesStart) throw badRequest("INVALID_DATES", `Lote "${b.name}": fim das vendas antes do início.`);
   const id = randomUUID();
   await run(
-    "INSERT INTO batches (id, event_id, name, price, total, sales_start, sales_end, status, position) VALUES (?,?,?,?,?,?,?,?,?)",
-    id, eventId, b.name, b.price, b.total, new Date(b.salesStart).toISOString(), new Date(b.salesEnd).toISOString(), b.status, position,
+    "INSERT INTO batches (id, event_id, name, price, total, sales_start, sales_end, status, position, ticket_type) VALUES (?,?,?,?,?,?,?,?,?,?)",
+    id, eventId, b.name, b.price, b.total, new Date(b.salesStart).toISOString(), new Date(b.salesEnd).toISOString(), b.status, position, b.ticketType || null,
   );
   return id;
 }

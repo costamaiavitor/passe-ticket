@@ -44,9 +44,17 @@ const CATEGORIES: EventCategory[] = ["festas", "shows", "teatro", "conferencias"
 const AGES = ["Livre", "14", "16", "18"];
 const TICKET_NAMES = ["Pista", "Camarote", "Open bar", "VIP", "Meia-entrada"];
 
-interface BatchForm { key: number; name: string; price: number; total: string }
+interface BatchForm { key: number; type: string; price: number; total: string }
 let nextKey = 1;
-const newBatch = (name = ""): BatchForm => ({ key: nextKey++, name, price: 0, total: "" });
+const newBatch = (type = ""): BatchForm => ({ key: nextKey++, type, price: 0, total: "" });
+
+/** Nome exibido do lote: "Pista — 2º lote" (o número conta os lotes anteriores do mesmo tipo). */
+function lotName(batches: BatchForm[], b: BatchForm) {
+  const t = b.type.trim();
+  if (!t) return "";
+  const n = batches.slice(0, batches.indexOf(b) + 1).filter((x) => x.type.trim().toLowerCase() === t.toLowerCase()).length;
+  return `${t} — ${n}º lote`;
+}
 
 const origin = () => (typeof window === "undefined" ? "" : window.location.origin);
 
@@ -66,7 +74,7 @@ function CreateEvent() {
   const [age, setAge] = useState("18");
   const [info, setInfo] = useState("");
   const [maxPerCpf, setMaxPerCpf] = useState(2);
-  const [batches, setBatches] = useState<BatchForm[]>([newBatch("Pista — 1º lote")]);
+  const [batches, setBatches] = useState<BatchForm[]>([newBatch("Pista")]);
   const [formError, setFormError] = useState<string | null>(null);
   const [created, setCreated] = useState<OrganizerEvent | null>(null);
 
@@ -90,9 +98,9 @@ function CreateEvent() {
     if (customCover.trim() && !/^https?:\/\/.+/i.test(customCover.trim())) return "O link da capa precisa começar com https://";
     if (!batches.length) return "Adicione pelo menos um tipo de ingresso.";
     for (const b of batches) {
-      if (!b.name.trim()) return "Dê um nome a cada ingresso (ex.: Pista — 1º lote).";
+      if (!b.type.trim()) return "Informe o tipo de cada ingresso (ex.: Pista, Camarote).";
       const n = Number(b.total);
-      if (!Number.isInteger(n) || n < 1) return `Informe quantos ingressos “${b.name}” terá.`;
+      if (!Number.isInteger(n) || n < 1) return `Informe quantos ingressos “${lotName(batches, b)}” terá.`;
     }
     return null;
   };
@@ -112,7 +120,8 @@ function CreateEvent() {
       venue: venue.trim(), city: city.trim(), address: address.trim(), description: description.trim(),
       importantInfo, maxTicketsPerCpf: maxPerCpf, maxTransfers: 1,
       batches: batches.map((b) => ({
-        name: b.name.trim(), price: b.price, total: Number(b.total), salesStart, salesEnd: new Date(startsAt).toISOString(),
+        name: lotName(batches, b), ticketType: b.type.trim(), price: b.price, total: Number(b.total),
+        salesStart, salesEnd: new Date(startsAt).toISOString(),
       })),
     });
   };
@@ -173,12 +182,12 @@ function CreateEvent() {
             </div>
           </Section>
 
-          <Section n={3} title="Ingressos" hint="Cada linha é um tipo de ingresso com preço e quantidade próprios.">
+          <Section n={3} title="Ingressos" hint="Lotes do mesmo tipo viram sozinhos: o 2º lote de Pista só abre quando o 1º esgotar.">
             <div className="space-y-3">
               {batches.map((b, i) => (
                 <div key={b.key} className="rounded-lg border bg-surface p-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-muted-foreground">Ingresso {i + 1}</span>
+                    <span className="text-xs font-medium">{lotName(batches, b) || `Ingresso ${i + 1}`}</span>
                     {batches.length > 1 && (
                       <button type="button" onClick={() => setBatches((bs) => bs.filter((x) => x.key !== b.key))}
                         className="grid size-8 place-items-center rounded-md text-muted-foreground hover:bg-elevated hover:text-destructive" aria-label="Remover ingresso">
@@ -186,11 +195,12 @@ function CreateEvent() {
                       </button>
                     )}
                   </div>
-                  <input value={b.name} onChange={(e) => updateBatch(b.key, { name: e.target.value })} placeholder="Nome (ex.: Camarote — 1º lote)" maxLength={60} className={cn(inputCls, "mt-1")} />
+                  <input value={b.type} onChange={(e) => updateBatch(b.key, { type: e.target.value })} placeholder="Tipo (ex.: Pista, Camarote)" maxLength={40} className={cn(inputCls, "mt-1")} />
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {TICKET_NAMES.map((t) => (
-                      <button key={t} type="button" onClick={() => updateBatch(b.key, { name: `${t} — ${lotOf(batches, t, b.key)}º lote` })}
-                        className="rounded-full border px-2.5 py-1 text-xs text-muted-foreground hover:border-primary/50 hover:text-foreground">{t}</button>
+                      <button key={t} type="button" onClick={() => updateBatch(b.key, { type: t })}
+                        className={cn("rounded-full border px-2.5 py-1 text-xs transition-colors",
+                          b.type === t ? "border-primary bg-primary/10 text-foreground" : "text-muted-foreground hover:border-primary/50 hover:text-foreground")}>{t}</button>
                     ))}
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-3">
@@ -211,7 +221,12 @@ function CreateEvent() {
                 </div>
               ))}
             </div>
-            <Button type="button" variant="outline" className="w-full" onClick={() => setBatches((bs) => [...bs, newBatch()])}><Plus />Adicionar ingresso ou lote</Button>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Button type="button" variant="outline" onClick={() => setBatches((bs) => [...bs, newBatch(bs[bs.length - 1]?.type ?? "")])}>
+                <Plus />Próximo lote{batches.length && batches[batches.length - 1]!.type.trim() ? ` de ${batches[batches.length - 1]!.type.trim()}` : ""}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setBatches((bs) => [...bs, newBatch()])}><Plus />Outro tipo de ingresso</Button>
+            </div>
           </Section>
 
           <Section n={4} title="Regras e informações">
@@ -328,8 +343,3 @@ function Chips({ options, value, onChange }: { options: { value: string; label: 
 
 /** "R$ 1.234,56" digitado → centavos. Os dígitos entram da direita, como numa maquininha. */
 const centsFrom = (v: string) => Math.min(Number(v.replace(/\D/g, "") || "0"), 99_999_99);
-
-/** Próximo número de lote para um tipo de ingresso (Pista — 1º lote, Pista — 2º lote…). */
-function lotOf(batches: BatchForm[], type: string, selfKey: number) {
-  return batches.filter((b) => b.key !== selfKey && b.name.startsWith(`${type} —`)).length + 1;
-}

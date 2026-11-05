@@ -122,6 +122,9 @@ CREATE INDEX IF NOT EXISTS checkins_event ON checkins(event_id, at);
 -- Login com Google (contas antigas ganham a coluna automaticamente).
 ALTER TABLE users ADD COLUMN IF NOT EXISTS google_sub TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS users_google ON users(google_sub) WHERE google_sub IS NOT NULL;
+
+-- Tipo de ingresso (Pista, Camarote…): lotes do mesmo tipo abrem um depois do outro.
+ALTER TABLE batches ADD COLUMN IF NOT EXISTS ticket_type TEXT;
 `;
 
 type Param = string | number | boolean | null;

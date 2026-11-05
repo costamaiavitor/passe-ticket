@@ -8,7 +8,9 @@ export interface Batch {
   sold: number;
   salesStart: string;
   salesEnd: string;
-  status: "active" | "paused" | "closed" | "soldout";
+  status: "active" | "paused" | "closed" | "soldout" | "upcoming";
+  /** Tipo de ingresso (Pista, Camarote…): lotes do mesmo tipo abrem um depois do outro. */
+  ticketType?: string | null;
 }
 
 export interface EventSummary {
@@ -33,6 +35,7 @@ export interface EventDetail extends EventSummary {
   importantInfo: string[];
   transferPolicy: { maxTransfers: number; deadline: string };
   refundPolicy: string;
+  maxTicketsPerCpf?: number;
   batches: Batch[];
 }
 
