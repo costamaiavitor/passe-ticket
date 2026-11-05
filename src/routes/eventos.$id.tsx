@@ -1,11 +1,13 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Calendar, MapPin, Minus, Plus, Info, Repeat, Undo2 } from "lucide-react";
-import { toast } from "sonner";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { AvailabilityBadge } from "@/components/availability-badge";
 import { Button } from "@/components/ui/button";
+import { HoldersForm } from "@/components/holders-form";
+import { createOrder } from "@/services/orders";
+import { useSession } from "@/services/session";
 import { eventQuery } from "@/services/events";
 import { ApiError } from "@/services/http";
 import { brl, fmtDate, fmtTime, MAX_TICKETS_PER_CPF, platformFee } from "@/utils/format";
@@ -53,6 +55,30 @@ function EventPage() {
   const maxQty = Math.min(10, remaining);
   const subtotal = (batch?.price ?? 0) * qty;
   const fee = platformFee(subtotal);
+  const { user } = useSession();
+  const navigate = useNavigate();
+  const [step, setStep] = useState<"select" | "holders">("select");
+  const [submitting, setSubmitting] = useState(false);
+  const [orderError, setOrderError] = useState<string | null>(null);
+
+  const goToHolders = () => {
+    if (!user) {
+      void navigate({ to: "/entrar", search: { redirect: `/eventos/${id}` } });
+      return;
+    }
+    setOrderError(null);
+    setStep("holders");
+  };
+  const placeOrder = async (holders: { name: string; cpf: string }[]) => {
+    if (!batch) return;
+    setSubmitting(true); setOrderError(null);
+    try {
+      const order = await createOrder({ eventId: ev.id, batchId: batch.id, holders });
+      navigate({ to: "/checkout/$orderId", params: { orderId: order.id } });
+    } catch (e) {
+      setOrderError(e instanceof Error ? e.message : "Não foi possível reservar.");
+    } finally { setSubmitting(false); }
+  };
 
   return (
     <div className="min-h-screen">
@@ -91,7 +117,7 @@ function EventPage() {
               const left = b.total - b.sold;
               const disabled = b.status !== "active" || left <= 0;
               return (
-                <button key={b.id} disabled={disabled} onClick={() => { setBatchId(b.id); setQty(1); }}
+                <button key={b.id} disabled={disabled || step === "holders"} onClick={() => { setBatchId(b.id); setQty(1); }}
                   className={cn("flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left transition-colors",
                     batchId === b.id ? "border-primary bg-primary/5" : "hover:border-muted-foreground/40",
                     disabled && "cursor-not-allowed opacity-50")}>
@@ -107,9 +133,9 @@ function EventPage() {
               <div className="mt-5 flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Quantidade</span>
                 <div className="flex items-center gap-3">
-                  <Button size="icon" variant="outline" className="size-8" onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label="Diminuir"><Minus /></Button>
+                  <Button size="icon" variant="outline" className="size-8" disabled={step === "holders"} onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label="Diminuir"><Minus /></Button>
                   <span className="w-4 text-center tabular-nums">{qty}</span>
-                  <Button size="icon" variant="outline" className="size-8" onClick={() => setQty((q) => Math.min(maxQty, q + 1))} aria-label="Aumentar"><Plus /></Button>
+                  <Button size="icon" variant="outline" className="size-8" disabled={step === "holders"} onClick={() => setQty((q) => Math.min(maxQty, q + 1))} aria-label="Aumentar"><Plus /></Button>
                 </div>
               </div>
               <p className="mt-2 text-xs text-muted-foreground">Cada ingresso exige um titular com CPF próprio (máx. {MAX_TICKETS_PER_CPF} por CPF).</p>
@@ -118,7 +144,12 @@ function EventPage() {
                 <Row k="Taxa da plataforma (10%)" v={brl(fee)} />
                 <Row k="Total" v={brl(subtotal + fee)} strong />
               </dl>
-              <Button className="mt-5 w-full" onClick={() => toast("Checkout será liberado na próxima etapa.")}>Continuar</Button>
+              {step === "select" ? (
+                <Button className="mt-5 w-full" onClick={goToHolders}>{user ? "Continuar" : "Entrar para comprar"}</Button>
+              ) : (
+                <HoldersForm key={`${batch.id}-${qty}`} qty={qty} defaultName={user?.name} loading={submitting} error={orderError}
+                  onBack={() => setStep("select")} onSubmit={placeOrder} />
+              )}
             </>
           ) : (
             <p className="mt-5 text-sm text-muted-foreground">Ingressos esgotados para este evento.</p>

@@ -1,9 +1,10 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { AuthShell, Field, SubmitButton, useSubmit } from "@/components/auth-form";
 import { register } from "@/services/auth";
 
 export const Route = createFileRoute("/cadastro")({
+  validateSearch: (s: Record<string, unknown>): { redirect?: string } =>
+    typeof s["redirect"] === "string" && s["redirect"].startsWith("/") ? { redirect: s["redirect"] } : {},
   head: () => ({
     meta: [
       { title: "Criar conta — Passe" },
@@ -18,18 +19,17 @@ export const Route = createFileRoute("/cadastro")({
 });
 
 function Register() {
-  const [done, setDone] = useState(false);
+  const navigate = useNavigate();
+  const { redirect } = Route.useSearch();
   const { error, loading, onSubmit } = useSubmit(async (fd) => {
     await register({
       name: String(fd.get("name")), email: String(fd.get("email")),
       cpf: String(fd.get("cpf")).replace(/\D/g, ""), password: String(fd.get("password")),
     });
-    setDone(true);
+    navigate({ to: redirect ?? "/" });
   });
-  if (done)
-    return <AuthShell title="Confirme seu e-mail" subtitle="Enviamos um link de confirmação para sua caixa de entrada." footer={<Link to="/entrar" className="text-foreground underline">Ir para o login</Link>}>{null}</AuthShell>;
   return (
-    <AuthShell title="Criar conta" subtitle="Leva menos de um minuto." footer={<>Já tem conta? <Link to="/entrar" className="text-foreground underline">Entrar</Link></>}>
+    <AuthShell title="Criar conta" subtitle="Leva menos de um minuto." footer={<>Já tem conta? <Link to="/entrar" search={redirect ? { redirect } : {}} className="text-foreground underline">Entrar</Link></>}>
       <form onSubmit={onSubmit} className="space-y-4">
         <Field label="Nome completo" name="name" required autoComplete="name" />
         <Field label="E-mail" name="email" type="email" required autoComplete="email" />

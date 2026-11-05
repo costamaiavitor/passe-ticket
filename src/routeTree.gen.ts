@@ -12,6 +12,9 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CadastroRouteImport } from './routes/cadastro'
 import { Route as EntrarRouteImport } from './routes/entrar'
+import { Route as IngressosRouteImport } from './routes/ingressos'
+import { Route as PortariaRouteImport } from './routes/portaria'
+import { Route as CheckoutOrderIdRouteImport } from './routes/checkout.$orderId'
 import { Route as EventosIndexRouteImport } from './routes/eventos.index'
 import { Route as EventosIdRouteImport } from './routes/eventos.$id'
 
@@ -30,6 +33,21 @@ const EntrarRoute = EntrarRouteImport.update({
   path: '/entrar',
   getParentRoute: () => rootRouteImport,
 } as any)
+const IngressosRoute = IngressosRouteImport.update({
+  id: '/ingressos',
+  path: '/ingressos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortariaRoute = PortariaRouteImport.update({
+  id: '/portaria',
+  path: '/portaria',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CheckoutOrderIdRoute = CheckoutOrderIdRouteImport.update({
+  id: '/checkout/$orderId',
+  path: '/checkout/$orderId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EventosIndexRoute = EventosIndexRouteImport.update({
   id: '/eventos/',
   path: '/eventos/',
@@ -45,6 +63,9 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/cadastro': typeof CadastroRoute
   '/entrar': typeof EntrarRoute
+  '/ingressos': typeof IngressosRoute
+  '/portaria': typeof PortariaRoute
+  '/checkout/$orderId': typeof CheckoutOrderIdRoute
   '/eventos/$id': typeof EventosIdRoute
   '/eventos/': typeof EventosIndexRoute
 }
@@ -52,6 +73,9 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/cadastro': typeof CadastroRoute
   '/entrar': typeof EntrarRoute
+  '/ingressos': typeof IngressosRoute
+  '/portaria': typeof PortariaRoute
+  '/checkout/$orderId': typeof CheckoutOrderIdRoute
   '/eventos/$id': typeof EventosIdRoute
   '/eventos': typeof EventosIndexRoute
 }
@@ -60,21 +84,52 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/cadastro': typeof CadastroRoute
   '/entrar': typeof EntrarRoute
+  '/ingressos': typeof IngressosRoute
+  '/portaria': typeof PortariaRoute
+  '/checkout/$orderId': typeof CheckoutOrderIdRoute
   '/eventos/$id': typeof EventosIdRoute
   '/eventos/': typeof EventosIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/cadastro' | '/entrar' | '/eventos/$id' | '/eventos/'
+  fullPaths:
+    | '/'
+    | '/cadastro'
+    | '/entrar'
+    | '/ingressos'
+    | '/portaria'
+    | '/checkout/$orderId'
+    | '/eventos/$id'
+    | '/eventos/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/cadastro' | '/entrar' | '/eventos/$id' | '/eventos'
-  id: '__root__' | '/' | '/cadastro' | '/entrar' | '/eventos/$id' | '/eventos/'
+  to:
+    | '/'
+    | '/cadastro'
+    | '/entrar'
+    | '/ingressos'
+    | '/portaria'
+    | '/checkout/$orderId'
+    | '/eventos/$id'
+    | '/eventos'
+  id:
+    | '__root__'
+    | '/'
+    | '/cadastro'
+    | '/entrar'
+    | '/ingressos'
+    | '/portaria'
+    | '/checkout/$orderId'
+    | '/eventos/$id'
+    | '/eventos/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CadastroRoute: typeof CadastroRoute
   EntrarRoute: typeof EntrarRoute
+  IngressosRoute: typeof IngressosRoute
+  PortariaRoute: typeof PortariaRoute
+  CheckoutOrderIdRoute: typeof CheckoutOrderIdRoute
   EventosIdRoute: typeof EventosIdRoute
   EventosIndexRoute: typeof EventosIndexRoute
 }
@@ -102,6 +157,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EntrarRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ingressos': {
+      id: '/ingressos'
+      path: '/ingressos'
+      fullPath: '/ingressos'
+      preLoaderRoute: typeof IngressosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/portaria': {
+      id: '/portaria'
+      path: '/portaria'
+      fullPath: '/portaria'
+      preLoaderRoute: typeof PortariaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/checkout/$orderId': {
+      id: '/checkout/$orderId'
+      path: '/checkout/$orderId'
+      fullPath: '/checkout/$orderId'
+      preLoaderRoute: typeof CheckoutOrderIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/eventos/': {
       id: '/eventos/'
       path: '/eventos'
@@ -123,6 +199,9 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CadastroRoute: CadastroRoute,
   EntrarRoute: EntrarRoute,
+  IngressosRoute: IngressosRoute,
+  PortariaRoute: PortariaRoute,
+  CheckoutOrderIdRoute: CheckoutOrderIdRoute,
   EventosIdRoute: EventosIdRoute,
   EventosIndexRoute: EventosIndexRoute,
 }

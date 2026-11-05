@@ -51,3 +51,61 @@ export interface AuthUser {
   email: string;
   roles: Array<"buyer" | "organizer" | "staff" | "admin">;
 }
+
+export interface Holder { name: string; cpf: string }
+
+export interface Order {
+  id: string;
+  status: "pending" | "paid" | "expired" | "cancelled" | "refund_required";
+  eventId: string;
+  eventTitle: string;
+  eventSlug: string;
+  eventStartsAt: string;
+  batchId: string;
+  batchName: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+  fee: number;
+  total: number;
+  payment: { method: "pix"; pixCode: string; pixQrBase64?: string; ticketUrl?: string } | null;
+  paymentProvider: string;
+  expiresAt: string;
+  paidAt: string | null;
+  createdAt: string;
+}
+
+export interface Ticket {
+  id: string;
+  orderId: string;
+  status: "valid" | "used";
+  holderName: string;
+  holderCpf: string;
+  event: { id: string; slug: string; title: string; startsAt: string; venue: string; city: string; coverUrl: string };
+  batchName: string;
+  /** Conteúdo do QR Code. null quando o ingresso já foi utilizado. */
+  qrPayload: string | null;
+  checkedInAt: string | null;
+  transfers: number;
+  canTransfer: boolean;
+}
+
+export type ScanResultCode = "ok" | "already_used" | "invalid" | "revoked" | "wrong_event" | "not_paid" | "cancelled";
+
+export interface ScanResult {
+  result: ScanResultCode;
+  ok: boolean;
+  message: string;
+  scannedAt: string;
+  checkedInAt?: string | null;
+  ticket: { id: string; holderName: string; holderCpf: string; batchName: string; eventTitle: string } | null;
+}
+
+export interface ScanEvent { id: string; title: string; startsAt: string; venue: string }
+
+export interface CheckinStats {
+  totalTickets: number;
+  checkedIn: number;
+  remaining: number;
+  recent: Array<{ result: ScanResultCode; at: string; holder_name: string | null }>;
+}

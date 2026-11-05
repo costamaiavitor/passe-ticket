@@ -1,8 +1,12 @@
-import { Link } from "@tanstack/react-router";
-import { Search, Ticket } from "lucide-react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { LogOut, ScanLine, Search, Ticket } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { logout } from "@/services/auth";
+import { hasRole, useSession } from "@/services/session";
 
 export function SiteHeader() {
+  const { user } = useSession();
+  const navigate = useNavigate();
   return (
     <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
       <div className="flex h-16 w-full items-center gap-10 px-6 lg:px-10">
@@ -22,9 +26,22 @@ export function SiteHeader() {
         </nav>
         <div className="ml-auto flex items-center gap-3">
           <Button asChild variant="ghost" size="icon" aria-label="Buscar eventos"><Link to="/eventos"><Search /></Link></Button>
-          <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex"><Link to="/cadastro">Criar evento</Link></Button>
-          <Button asChild variant="ghost" size="sm"><Link to="/entrar">Entrar</Link></Button>
-          <Button asChild size="sm"><Link to="/cadastro">Criar conta</Link></Button>
+          {user ? (
+            <>
+              {hasRole(user, "staff", "organizer") && (
+                <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex"><Link to="/portaria"><ScanLine />Portaria</Link></Button>
+              )}
+              <Button asChild size="sm"><Link to="/ingressos"><Ticket />Meus ingressos</Link></Button>
+              <Button variant="ghost" size="icon" aria-label="Sair" title={`Sair (${user.email})`}
+                onClick={async () => { await logout(); navigate({ to: "/" }); }}><LogOut /></Button>
+            </>
+          ) : (
+            <>
+              <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex"><Link to="/cadastro">Criar evento</Link></Button>
+              <Button asChild variant="ghost" size="sm"><Link to="/entrar">Entrar</Link></Button>
+              <Button asChild size="sm"><Link to="/cadastro">Criar conta</Link></Button>
+            </>
+          )}
         </div>
       </div>
     </header>

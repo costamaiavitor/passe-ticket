@@ -22,3 +22,8 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+## Backend
+
+A API fica em [`backend/`](backend/README.md) (Node + SQLite). Para usar o site com ela, rode o backend e
+defina `VITE_API_URL=http://localhost:3333` em `.env.local`. Sem `VITE_API_URL` o site roda em modo demonstração (dados simulados no navegador).

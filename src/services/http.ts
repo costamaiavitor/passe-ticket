@@ -14,7 +14,17 @@ type Listener = () => void;
 const expiredListeners = new Set<Listener>();
 export const onSessionExpired = (l: Listener) => { expiredListeners.add(l); return () => expiredListeners.delete(l); };
 
-export async function http<T>(path: string, init: RequestInit = {}): Promise<T> {
+let refreshing: Promise<boolean> | null = null;
+/** Renova o access token usando o cookie httpOnly de refresh. */
+export function refreshAccessToken(): Promise<boolean> {
+  refreshing ??= raw<{ accessToken: string }>("/auth/refresh", { method: "POST" })
+    .then((r) => { setAccessToken(r.accessToken); return true; })
+    .catch(() => { setAccessToken(null); return false; })
+    .finally(() => { refreshing = null; });
+  return refreshing;
+}
+
+async function raw<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!API_BASE) throw new ApiError(0, "NO_API", "Backend não configurado (defina VITE_API_URL).");
   let res: Response;
   try {
@@ -30,10 +40,22 @@ export async function http<T>(path: string, init: RequestInit = {}): Promise<T> 
   } catch {
     throw new ApiError(0, "NETWORK", "Erro de conexão. Verifique sua internet.");
   }
-  if (res.status === 401) expiredListeners.forEach((l) => l());
   const body = res.status === 204 ? null : await res.json().catch(() => null);
   if (!res.ok) {
     throw new ApiError(res.status, body?.code ?? "HTTP_ERROR", body?.message ?? `Erro ${res.status}`);
   }
   return body as T;
+}
+
+export async function http<T>(path: string, init: RequestInit = {}): Promise<T> {
+  try {
+    return await raw<T>(path, init);
+  } catch (e) {
+    // Access token expira em 15 min: tenta renovar uma vez e repete a chamada.
+    if (e instanceof ApiError && e.status === 401 && !path.startsWith("/auth/")) {
+      if (await refreshAccessToken()) return raw<T>(path, init);
+      expiredListeners.forEach((l) => l());
+    }
+    throw e;
+  }
 }

@@ -4,9 +4,10 @@
 - [x] 3. Detalhes do evento (lotes, quantidade, taxa 10%)
 - [x] 4. Cadastro e login (via API, VITE_API_URL)
 - [ ] 4b. Recuperação de senha, confirmação de e-mail, perfil
-- [ ] 5. Checkout (titular + CPF por ingresso, estados de pagamento)
-- [ ] 6. Área do comprador (ingressos, QR, pedidos, transferências)
+- [x] 5. Checkout (titular + CPF por ingresso, estados de pagamento) — Pix (Mercado Pago) no backend
+- [x] 6. Área do comprador: ingressos com QR único (transferência já existe na API, falta tela)
 - [ ] 7. Dashboard do organizador
 - [ ] 8. Eventos (wizard 5 etapas) e lotes
-- [ ] 9. Equipe e leitor de QR Code
+- [x] 9. Leitor de QR Code na portaria (equipe gerida pela API, falta tela no painel)
 - [ ] 10. Painel administrativo
+- [x] Backend Node em `backend/` (ver backend/README.md)

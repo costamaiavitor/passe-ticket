@@ -3,6 +3,8 @@ import { AuthShell, Field, SubmitButton, useSubmit } from "@/components/auth-for
 import { login } from "@/services/auth";
 
 export const Route = createFileRoute("/entrar")({
+  validateSearch: (s: Record<string, unknown>): { redirect?: string } =>
+    typeof s["redirect"] === "string" && s["redirect"].startsWith("/") ? { redirect: s["redirect"] } : {},
   head: () => ({
     meta: [
       { title: "Entrar — Passe" },
@@ -18,12 +20,13 @@ export const Route = createFileRoute("/entrar")({
 
 function Login() {
   const navigate = useNavigate();
+  const { redirect } = Route.useSearch();
   const { error, loading, onSubmit } = useSubmit(async (fd) => {
     await login(String(fd.get("email")), String(fd.get("password")));
-    navigate({ to: "/" });
+    navigate({ to: redirect ?? "/" });
   });
   return (
-    <AuthShell title="Entrar" subtitle="Bem-vindo de volta." footer={<>Não tem conta? <Link to="/cadastro" className="text-foreground underline">Criar conta</Link></>}>
+    <AuthShell title="Entrar" subtitle="Bem-vindo de volta." footer={<>Não tem conta? <Link to="/cadastro" search={redirect ? { redirect } : {}} className="text-foreground underline">Criar conta</Link></>}>
       <form onSubmit={onSubmit} className="space-y-4">
         <Field label="E-mail" name="email" type="email" required autoComplete="email" />
         <Field label="Senha" name="password" type="password" required autoComplete="current-password" />
