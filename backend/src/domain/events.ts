@@ -4,7 +4,7 @@ export interface EventRow {
   id: string; slug: string; organizer_id: string; title: string; category: string; cover_url: string;
   starts_at: string; venue: string; city: string; address: string; description: string; important_info: string;
   refund_policy: string; max_transfers: number; transfer_deadline: string | null; max_per_cpf: number;
-  featured: number; status: string; created_at: string;
+  featured: number; status: string; created_at: string; review_note?: string;
 }
 export interface BatchRow {
   id: string; event_id: string; name: string; price: number; total: number; sold: number; reserved: number;

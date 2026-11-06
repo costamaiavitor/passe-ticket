@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { CalendarPlus, LogOut, ScanLine, Search, Ticket } from "lucide-react";
+import { CalendarPlus, LogOut, ScanLine, Search, ShieldCheck, Ticket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { logout } from "@/services/auth";
 import { hasRole, useSession } from "@/services/session";
@@ -34,6 +34,9 @@ export function SiteHeader() {
               <Button asChild variant="ghost" size="icon" className="sm:hidden" aria-label={hasRole(user, "organizer") ? "Meus eventos" : "Criar evento"}>
                 <Link to="/organizador"><CalendarPlus /></Link>
               </Button>
+              {user.roles.includes("admin") && (
+                <Button asChild variant="ghost" size="icon" aria-label="Admin" title="Admin"><Link to="/admin"><ShieldCheck /></Link></Button>
+              )}
               {hasRole(user, "staff", "organizer") && (
                 <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex"><Link to="/portaria"><ScanLine />Portaria</Link></Button>
               )}

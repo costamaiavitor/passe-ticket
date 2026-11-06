@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { config } from "../config.js";
 import { all, now, one } from "../db.js";
-import { approveOrder, cancelOwnOrder, createOrder, MAX_INSTALLMENTS, payWithCard, releaseOrder, syncPayment, toOrder, type OrderRow } from "../domain/orders.js";
+import { approveOrder, cancelOwnOrder, createOrder, MAX_INSTALLMENTS, notifyPaid, payWithCard, releaseOrder, syncPayment, toOrder, type OrderRow } from "../domain/orders.js";
 import { forbidden, HttpError, notFound } from "../lib/errors.js";
 import { parse, rateLimit, requireAuth, user } from "../lib/http.js";
 
@@ -75,6 +75,6 @@ ordersRouter.post("/:id/simulate-payment", async (req, res) => {
   if (config.paymentProvider !== "mock") throw new HttpError(404, "NOT_FOUND", "Não encontrado.");
   const o = await own(user(req).id, req.params.id);
   if (o.status !== "pending") throw new HttpError(409, "ORDER_NOT_PENDING", "Pedido não está aguardando pagamento.");
-  await approveOrder(o.id);
+  if ((await approveOrder(o.id)).justPaid) await notifyPaid(o.id);
   res.json(await toOrder(await own(user(req).id, o.id)));
 });

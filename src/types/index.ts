@@ -36,7 +36,7 @@ export interface EventDetail extends EventSummary {
   transferPolicy: { maxTransfers: number; deadline: string };
   refundPolicy: string;
   maxTicketsPerCpf?: number;
-  status?: "draft" | "published" | "cancelled";
+  status?: "draft" | "review" | "published" | "rejected" | "cancelled";
   batches: Batch[];
 }
 
@@ -117,10 +117,25 @@ export interface CheckinStats {
 }
 
 // ---- Área do organizador ----
+export type EventStatus = "draft" | "review" | "published" | "rejected" | "cancelled";
+
 export interface OrganizerEvent extends EventDetail {
-  status: "draft" | "published" | "cancelled";
+  status: EventStatus;
   maxTicketsPerCpf: number;
-  stats: { ticketsSold: number; revenue: number; checkedIn: number };
+  reviewNote?: string;
+  /** revenue = valor dos ingressos vendidos (o que o organizador recebe); paidOut = já repassado. */
+  stats: { ticketsSold: number; revenue: number; checkedIn: number; paidOut: number; toReceive: number };
+}
+
+/** Evento aguardando aprovação (tela do admin). */
+export interface ReviewEvent extends EventDetail { createdAt: string; organizerEmail: string }
+
+/** Repasse por evento (tela do admin). */
+export interface PayoutRow {
+  eventId: string; title: string; slug: string; startsAt: string; status: string; tickets: number;
+  organizer: { id: string; name: string; email: string; pixKey: string; holder: string };
+  revenue: number; platformFees: number; paidOut: number; balance: number;
+  history: Array<{ id: string; amount: number; note: string; paidAt: string }>;
 }
 
 export interface StaffMember { id: string; name: string; email: string }

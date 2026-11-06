@@ -1,8 +1,11 @@
+import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import { z } from "zod";
-import { all, run } from "../db.js";
-import { notFound } from "../lib/errors.js";
-import { parse, requireRole } from "../lib/http.js";
+import { all, now, one, run } from "../db.js";
+import { toEventDetail, type EventRow } from "../domain/events.js";
+import { eventReviewedEmail, payoutEmail, sendEmail } from "../lib/email.js";
+import { badRequest, conflict, notFound } from "../lib/errors.js";
+import { parse, requireRole, user } from "../lib/http.js";
 
 export const adminRouter = Router();
 adminRouter.use(requireRole("admin"));
@@ -17,7 +20,98 @@ adminRouter.get("/users", async (req, res) => {
 
 adminRouter.patch("/users/:id/roles", async (req, res) => {
   const { roles } = parse(z.object({ roles: z.array(z.enum(["buyer", "organizer", "staff", "admin"])).min(1) }), req.body);
-  const r = await run("UPDATE users SET roles = ? WHERE id = ?", JSON.stringify([...new Set(roles)]), req.params.id);
+  const r = await run("UPDATE users SET roles = ? WHERE id = ?", JSON.stringify([...new Set(roles)]), String(req.params.id));
   if (!r.changes) throw notFound("Usuário não encontrado.");
   res.json({ ok: true });
+});
+
+// ---------------- Aprovação de eventos ----------------
+interface ReviewRow extends EventRow { organizer_name: string; organizer_email: string }
+
+/** Eventos aguardando aprovação (mais antigos primeiro). */
+adminRouter.get("/events/review", async (_req, res) => {
+  const rows = await all<ReviewRow>(
+    `SELECT e.*, u.name organizer_name, u.email organizer_email FROM events e JOIN users u ON u.id = e.organizer_id
+     WHERE e.status = 'review' ORDER BY e.created_at`,
+  );
+  res.json(await Promise.all(rows.map(async (e) => ({
+    ...(await toEventDetail(e)),
+    createdAt: e.created_at,
+    organizerEmail: e.organizer_email,
+    organizer: { id: e.organizer_id, name: e.organizer_name },
+  }))));
+});
+
+async function reviewEvent(eventId: string, approved: boolean, reason: string) {
+  const e = await one<ReviewRow>(
+    "SELECT e.*, u.name organizer_name, u.email organizer_email FROM events e JOIN users u ON u.id = e.organizer_id WHERE e.id = ?", eventId);
+  if (!e) throw notFound("Evento não encontrado.");
+  if (e.status !== "review") throw conflict("NOT_IN_REVIEW", "Este evento não está aguardando aprovação.");
+  await run("UPDATE events SET status = ?, review_note = ? WHERE id = ?", approved ? "published" : "rejected", reason, e.id);
+  await sendEmail(eventReviewedEmail(e.organizer_email, e.organizer_name, e.title, approved, reason, e.slug));
+}
+
+adminRouter.post("/events/:id/approve", async (req, res) => {
+  await reviewEvent(String(req.params.id), true, "");
+  res.json({ ok: true });
+});
+
+adminRouter.post("/events/:id/reject", async (req, res) => {
+  const { reason } = parse(z.object({ reason: z.string().trim().min(3).max(500) }), req.body);
+  await reviewEvent(String(req.params.id), false, reason);
+  res.json({ ok: true });
+});
+
+// ---------------- Repasses aos organizadores ----------------
+interface PayoutRow {
+  event_id: string; title: string; slug: string; starts_at: string; status: string;
+  organizer_id: string; organizer_name: string; organizer_email: string; payout_pix_key: string | null; payout_holder: string | null;
+  revenue: number; fees: number; paid_out: number; tickets: number;
+}
+
+/**
+ * Quanto cada organizador tem a receber, por evento. O organizador recebe o valor cheio dos ingressos
+ * (subtotal dos pedidos pagos); a taxa de 10% fica com o Passe e cobre as tarifas do Mercado Pago.
+ */
+adminRouter.get("/payouts", async (_req, res) => {
+  const rows = await all<PayoutRow>(
+    `SELECT e.id event_id, e.title, e.slug, e.starts_at, e.status, u.id organizer_id, u.name organizer_name, u.email organizer_email,
+            u.payout_pix_key, u.payout_holder,
+            COALESCE((SELECT SUM(subtotal) FROM orders WHERE event_id = e.id AND status = 'paid'), 0) revenue,
+            COALESCE((SELECT SUM(fee) FROM orders WHERE event_id = e.id AND status = 'paid'), 0) fees,
+            COALESCE((SELECT SUM(amount) FROM organizer_payouts WHERE event_id = e.id), 0) paid_out,
+            (SELECT COUNT(*) FROM tickets WHERE event_id = e.id AND status IN ('valid','used')) tickets
+     FROM events e JOIN users u ON u.id = e.organizer_id
+     WHERE EXISTS (SELECT 1 FROM orders WHERE event_id = e.id AND status = 'paid')
+        OR EXISTS (SELECT 1 FROM organizer_payouts WHERE event_id = e.id)
+     ORDER BY e.starts_at`,
+  );
+  const history = await all<{ id: string; event_id: string; amount: number; note: string; paid_at: string }>(
+    "SELECT id, event_id, amount, note, paid_at FROM organizer_payouts ORDER BY paid_at DESC",
+  );
+  res.json(rows.map((r) => ({
+    eventId: r.event_id, title: r.title, slug: r.slug, startsAt: r.starts_at, status: r.status, tickets: r.tickets,
+    organizer: { id: r.organizer_id, name: r.organizer_name, email: r.organizer_email, pixKey: r.payout_pix_key ?? "", holder: r.payout_holder ?? "" },
+    revenue: r.revenue, platformFees: r.fees, paidOut: r.paid_out, balance: r.revenue - r.paid_out,
+    history: history.filter((h) => h.event_id === r.event_id).map((h) => ({ id: h.id, amount: h.amount, note: h.note, paidAt: h.paid_at })),
+  })));
+});
+
+/** Registra um repasse feito (o Pix em si é feito por você no app do banco). */
+adminRouter.post("/payouts", async (req, res) => {
+  const d = parse(z.object({ eventId: z.string().min(1), amount: z.number().int().min(1), note: z.string().trim().max(300).default("") }), req.body);
+  const e = await one<{ id: string; title: string; organizer_id: string }>("SELECT id, title, organizer_id FROM events WHERE id = ?", d.eventId);
+  if (!e) throw notFound("Evento não encontrado.");
+  const s = (await one<{ revenue: number; paid_out: number }>(
+    `SELECT COALESCE((SELECT SUM(subtotal) FROM orders WHERE event_id = ? AND status = 'paid'), 0) revenue,
+            COALESCE((SELECT SUM(amount) FROM organizer_payouts WHERE event_id = ?), 0) paid_out`, e.id, e.id))!;
+  if (d.amount > s.revenue - s.paid_out)
+    throw badRequest("PAYOUT_TOO_HIGH", "O valor é maior do que o saldo a repassar deste evento.");
+  await run(
+    "INSERT INTO organizer_payouts (id, event_id, organizer_id, amount, note, paid_at, created_by) VALUES (?,?,?,?,?,?,?)",
+    randomUUID(), e.id, e.organizer_id, d.amount, d.note, now(), user(req).id,
+  );
+  const org = await one<{ email: string; name: string }>("SELECT email, name FROM users WHERE id = ?", e.organizer_id);
+  if (org) await sendEmail(payoutEmail(org.email, org.name, e.title, d.amount, d.note));
+  res.status(201).json({ ok: true });
 });

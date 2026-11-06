@@ -6,7 +6,7 @@ import { SiteHeader } from "@/components/site-header";
 import { RequireAuth } from "@/components/require-auth";
 import { EventCard } from "@/components/event-card";
 import { Button } from "@/components/ui/button";
-import { createEvent, type NewEvent } from "@/services/organizer";
+import { createEvent, uploadCover, type NewEvent } from "@/services/organizer";
 import { hasRole } from "@/services/session";
 import { brl, categoryLabel, platformFee } from "@/utils/format";
 import { cn } from "@/lib/utils";
@@ -65,6 +65,14 @@ function CreateEvent() {
   const [category, setCategory] = useState<EventCategory>("festas");
   const [cover, setCover] = useState(COVERS[0]!.file);
   const [customCover, setCustomCover] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const pickPhoto = async (file: File) => {
+    setUploadError(null); setUploading(true);
+    try { setCustomCover(await uploadCover(file)); }
+    catch (e) { setUploadError(e instanceof Error ? e.message : "Não foi possível enviar a foto."); }
+    finally { setUploading(false); }
+  };
   const [date, setDate] = useState("");
   const [time, setTime] = useState("22:00");
   const [venue, setVenue] = useState("");
@@ -152,6 +160,21 @@ function CreateEvent() {
             </div>
             <div>
               <Label>Capa</Label>
+              {/* Foto da galeria (ou câmera, no celular): reduzida no aparelho antes de enviar. */}
+              <label className={cn("mb-2 flex cursor-pointer items-center gap-3 rounded-lg border-2 border-dashed p-3 transition-colors",
+                customCover ? "border-primary bg-primary/5" : "hover:border-primary/50", uploading && "pointer-events-none opacity-60")}>
+                <input type="file" accept="image/*" className="sr-only" disabled={uploading}
+                  onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void pickPhoto(f); }} />
+                {customCover
+                  ? <img src={customCover} alt="Sua foto" className="size-16 shrink-0 rounded-md object-cover" />
+                  : <span className="grid size-16 shrink-0 place-items-center rounded-md bg-elevated"><ImagePlus className="size-6 text-primary" /></span>}
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium">{uploading ? "Enviando foto…" : customCover ? "Sua foto ✓ (toque para trocar)" : "Enviar foto da galeria"}</span>
+                  <span className="block text-xs text-muted-foreground">JPG ou PNG. Fotos na horizontal ficam melhores.</span>
+                </span>
+              </label>
+              {uploadError && <p className="mb-2 text-sm text-destructive">{uploadError}</p>}
+              <p className="mb-2 text-xs text-muted-foreground">Ou escolha uma capa pronta:</p>
               <div className="grid grid-cols-4 gap-2">
                 {COVERS.map((c) => (
                   <button key={c.file} type="button" onClick={() => { setCover(c.file); setCustomCover(""); }}
@@ -161,11 +184,6 @@ function CreateEvent() {
                     {!customCover && cover === c.file && <span className="absolute right-1 top-1 grid size-5 place-items-center rounded-full bg-primary text-primary-foreground"><Check className="size-3" /></span>}
                   </button>
                 ))}
-              </div>
-              <div className="mt-2 flex items-center gap-2">
-                <ImagePlus className="size-4 shrink-0 text-muted-foreground" />
-                <input value={customCover} onChange={(e) => setCustomCover(e.target.value)} placeholder="Ou cole o link de uma imagem sua (https://…)"
-                  className={inputCls} inputMode="url" />
               </div>
             </div>
           </Section>
@@ -273,6 +291,7 @@ function CreateEvent() {
 }
 
 function Created({ ev, onDone }: { ev: OrganizerEvent; onDone: () => void }) {
+  const inReview = ev.status === "review";
   const url = `${origin()}/eventos/${ev.slug}`;
   const [copied, setCopied] = useState(false);
   const share = async () => {
@@ -283,8 +302,12 @@ function Created({ ev, onDone }: { ev: OrganizerEvent; onDone: () => void }) {
   return (
     <section className="mx-auto max-w-md text-center">
       <CheckCircle2 className="mx-auto size-12 text-primary" />
-      <h1 className="mt-4 text-2xl font-semibold tracking-tight">Evento publicado!</h1>
-      <p className="mt-1 text-sm text-muted-foreground">Os ingressos já estão à venda. Divulgue o link no Instagram e no WhatsApp.</p>
+      <h1 className="mt-4 text-2xl font-semibold tracking-tight">{inReview ? "Evento enviado para análise!" : "Evento publicado!"}</h1>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {inReview
+          ? "A equipe do Passe confere os dados e aprova em breve. Você recebe um e-mail quando o evento entrar no ar; aí é só divulgar o link abaixo."
+          : "Os ingressos já estão à venda. Divulgue o link no Instagram e no WhatsApp."}
+      </p>
       <div className="mt-6 flex items-center gap-2 rounded-lg border bg-card p-2 pl-3 text-left">
         <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">{url}</span>
         <Button size="sm" variant="secondary" onClick={() => { void navigator.clipboard.writeText(url); setCopied(true); }}>

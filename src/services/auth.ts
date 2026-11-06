@@ -38,6 +38,19 @@ export async function loginWithGoogle(credential: string) {
   return r.user;
 }
 
+/** Envia o link de redefinição (a API responde ok mesmo se o e-mail não tiver conta). */
+export async function forgotPassword(email: string) {
+  await http<{ ok: true }>("/auth/forgot", { method: "POST", body: JSON.stringify({ email }) });
+}
+
+/** Troca a senha com o token do e-mail e já entra na conta. */
+export async function resetPassword(token: string, password: string) {
+  const r = await http<AuthResponse>("/auth/reset", { method: "POST", body: JSON.stringify({ token, password }) });
+  setAccessToken(r.accessToken);
+  setSession({ user: r.user, ready: true });
+  return r.user;
+}
+
 export async function logout() {
   if (!USE_MOCKS) await http("/auth/logout", { method: "POST" }).catch(() => undefined);
   setAccessToken(null);

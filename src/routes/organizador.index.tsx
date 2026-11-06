@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import {
   AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { addStaff, becomeOrganizer, myEventsQuery, removeEvent, removeStaff, staffQuery } from "@/services/organizer";
+import { addStaff, becomeOrganizer, myEventsQuery, payoutInfoQuery, removeEvent, removeStaff, savePayoutInfo, staffQuery } from "@/services/organizer";
 import { hasRole } from "@/services/session";
 import { brl, fmtDate, fmtTime } from "@/utils/format";
 import { cn } from "@/lib/utils";
@@ -64,6 +64,8 @@ function Dashboard() {
         <Button asChild className="hidden sm:inline-flex"><Link to="/organizador/novo"><CalendarPlus />Criar evento</Link></Button>
       </div>
 
+      <PayoutInfoCard />
+
       {isLoading && <p className="mt-8 text-sm text-muted-foreground">Carregando…</p>}
       {error && <p className="mt-8 text-sm text-destructive">{error.message}</p>}
       {data && !data.length && (
@@ -89,8 +91,49 @@ function Dashboard() {
   );
 }
 
+/** Chave Pix para receber os repasses das vendas. */
+function PayoutInfoCard() {
+  const qc = useQueryClient();
+  const { data } = useQuery(payoutInfoQuery());
+  const [editing, setEditing] = useState(false);
+  const [pixKey, setPixKey] = useState("");
+  const [holder, setHolder] = useState("");
+  const save = useMutation({
+    mutationFn: () => savePayoutInfo({ pixKey, holder }),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ["payout-info"] }); setEditing(false); toast.success("Dados para receber salvos."); },
+  });
+  if (!data) return null;
+  const missing = !data.pixKey;
+  if (!editing && !missing)
+    return (
+      <div className="mt-5 flex items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3 text-sm">
+        <span className="min-w-0 truncate text-muted-foreground">Repasses via Pix para <span className="text-foreground">{data.pixKey}</span> ({data.holder})</span>
+        <Button variant="ghost" size="sm" onClick={() => { setPixKey(data.pixKey); setHolder(data.holder); setEditing(true); }}>Alterar</Button>
+      </div>
+    );
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="mt-5 rounded-xl border border-primary/40 bg-card p-4">
+      <p className="font-medium">Onde você quer receber as vendas?</p>
+      <p className="mt-1 text-xs text-muted-foreground">O Passe repassa o valor dos ingressos vendidos por Pix. A taxa de serviço de 10% é paga pelo comprador.</p>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <input required minLength={3} value={pixKey} onChange={(e) => setPixKey(e.target.value)} placeholder="Chave Pix (CPF, CNPJ, e-mail, celular…)"
+          className="h-10 rounded-md border bg-surface px-3 text-sm outline-none focus:border-primary/50" />
+        <input required minLength={3} value={holder} onChange={(e) => setHolder(e.target.value)} placeholder="Nome do titular da conta"
+          className="h-10 rounded-md border bg-surface px-3 text-sm outline-none focus:border-primary/50" />
+      </div>
+      {save.error && <p className="mt-2 text-sm text-destructive">{save.error.message}</p>}
+      <div className="mt-3 flex gap-2">
+        <Button type="submit" size="sm" disabled={save.isPending}>{save.isPending ? "Salvando…" : "Salvar"}</Button>
+        {!missing && <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(false)}>Cancelar</Button>}
+      </div>
+    </form>
+  );
+}
+
 const STATUS: Record<OrganizerEvent["status"], { label: string; cls: string }> = {
   published: { label: "Publicado", cls: "bg-primary/15 text-primary" },
+  review: { label: "Em análise", cls: "bg-warning/15 text-warning" },
+  rejected: { label: "Não aprovado", cls: "bg-destructive/15 text-destructive" },
   draft: { label: "Rascunho", cls: "bg-elevated text-muted-foreground" },
   cancelled: { label: "Cancelado", cls: "bg-destructive/15 text-destructive" },
 };
@@ -113,11 +156,28 @@ function OrganizerEventCard({ ev }: { ev: OrganizerEvent }) {
         <p className="mt-1 text-sm text-muted-foreground">{fmtDate(ev.startsAt)} · {fmtTime(ev.startsAt)}</p>
         <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground"><MapPin className="size-3.5" />{ev.venue}, {ev.city}</p>
 
+        {ev.status === "review" && (
+          <p className="mt-4 rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
+            Aguardando aprovação do Passe. Você recebe um e-mail quando o evento entrar no ar.
+          </p>
+        )}
+        {ev.status === "rejected" && (
+          <p className="mt-4 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            Não aprovado{ev.reviewNote ? `: ${ev.reviewNote}` : "."} Responda o e-mail que enviamos para ajustar.
+          </p>
+        )}
+
         <dl className="mt-5 grid grid-cols-3 gap-2 text-center">
           <Stat label="Vendidos" value={`${ev.stats.ticketsSold}`} />
           <Stat label="Receita" value={brl(ev.stats.revenue)} />
           <Stat label="Entradas" value={`${ev.stats.checkedIn}`} />
         </dl>
+        {ev.stats.revenue > 0 && (
+          <div className="mt-2 flex justify-between rounded-lg bg-surface px-3 py-2 text-xs">
+            <span className="text-muted-foreground">Já recebido <span className="text-foreground">{brl(ev.stats.paidOut)}</span></span>
+            <span className="text-muted-foreground">A receber <span className="font-semibold text-primary">{brl(ev.stats.toReceive)}</span></span>
+          </div>
+        )}
 
         <div className="mt-4">
           <div className="flex justify-between text-xs text-muted-foreground"><span>Lotação</span><span>{ev.stats.ticketsSold} de {capacity}</span></div>

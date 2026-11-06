@@ -4,7 +4,7 @@ import { all } from "../db.js";
 import { findEvent, toEventDetail, toEventSummary, type EventRow } from "../domain/events.js";
 import { expireStaleOrders } from "../domain/orders.js";
 import { notFound } from "../lib/errors.js";
-import { parse } from "../lib/http.js";
+import { optionalAuth, parse } from "../lib/http.js";
 
 export const eventsRouter = Router();
 
@@ -38,9 +38,11 @@ eventsRouter.get("/", async (req, res) => {
   res.json(list);
 });
 
-eventsRouter.get("/:id", async (req, res) => {
+eventsRouter.get("/:id", optionalAuth, async (req, res) => {
   await expireStaleOrders();
-  const e = await findEvent(req.params.id);
-  if (!e || e.status === "draft") throw notFound("Evento não encontrado");
+  const e = await findEvent(String(req.params.id));
+  const isPublic = e && (e.status === "published" || e.status === "cancelled");
+  const canPreview = e && req.auth && (req.auth.id === e.organizer_id || req.auth.roles.includes("admin"));
+  if (!e || (!isPublic && !canPreview)) throw notFound("Evento não encontrado");
   res.json(await toEventDetail(e));
 });

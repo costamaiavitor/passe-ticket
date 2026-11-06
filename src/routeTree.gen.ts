@@ -10,11 +10,14 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as CadastroRouteImport } from './routes/cadastro'
 import { Route as EntrarRouteImport } from './routes/entrar'
+import { Route as EsqueciSenhaRouteImport } from './routes/esqueci-senha'
 import { Route as IngressosRouteImport } from './routes/ingressos'
 import { Route as PortariaRouteImport } from './routes/portaria'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
+import { Route as RedefinirSenhaRouteImport } from './routes/redefinir-senha'
 import { Route as TermosRouteImport } from './routes/termos'
 import { Route as CheckoutOrderIdRouteImport } from './routes/checkout.$orderId'
 import { Route as EventosIndexRouteImport } from './routes/eventos.index'
@@ -27,6 +30,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CadastroRoute = CadastroRouteImport.update({
   id: '/cadastro',
   path: '/cadastro',
@@ -35,6 +43,11 @@ const CadastroRoute = CadastroRouteImport.update({
 const EntrarRoute = EntrarRouteImport.update({
   id: '/entrar',
   path: '/entrar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EsqueciSenhaRoute = EsqueciSenhaRouteImport.update({
+  id: '/esqueci-senha',
+  path: '/esqueci-senha',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IngressosRoute = IngressosRouteImport.update({
@@ -50,6 +63,11 @@ const PortariaRoute = PortariaRouteImport.update({
 const PrivacidadeRoute = PrivacidadeRouteImport.update({
   id: '/privacidade',
   path: '/privacidade',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RedefinirSenhaRoute = RedefinirSenhaRouteImport.update({
+  id: '/redefinir-senha',
+  path: '/redefinir-senha',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TermosRoute = TermosRouteImport.update({
@@ -85,11 +103,14 @@ const OrganizadorNovoRoute = OrganizadorNovoRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/cadastro': typeof CadastroRoute
   '/entrar': typeof EntrarRoute
+  '/esqueci-senha': typeof EsqueciSenhaRoute
   '/ingressos': typeof IngressosRoute
   '/portaria': typeof PortariaRoute
   '/privacidade': typeof PrivacidadeRoute
+  '/redefinir-senha': typeof RedefinirSenhaRoute
   '/termos': typeof TermosRoute
   '/checkout/$orderId': typeof CheckoutOrderIdRoute
   '/eventos/$id': typeof EventosIdRoute
@@ -99,11 +120,14 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/cadastro': typeof CadastroRoute
   '/entrar': typeof EntrarRoute
+  '/esqueci-senha': typeof EsqueciSenhaRoute
   '/ingressos': typeof IngressosRoute
   '/portaria': typeof PortariaRoute
   '/privacidade': typeof PrivacidadeRoute
+  '/redefinir-senha': typeof RedefinirSenhaRoute
   '/termos': typeof TermosRoute
   '/checkout/$orderId': typeof CheckoutOrderIdRoute
   '/eventos/$id': typeof EventosIdRoute
@@ -114,11 +138,14 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/cadastro': typeof CadastroRoute
   '/entrar': typeof EntrarRoute
+  '/esqueci-senha': typeof EsqueciSenhaRoute
   '/ingressos': typeof IngressosRoute
   '/portaria': typeof PortariaRoute
   '/privacidade': typeof PrivacidadeRoute
+  '/redefinir-senha': typeof RedefinirSenhaRoute
   '/termos': typeof TermosRoute
   '/checkout/$orderId': typeof CheckoutOrderIdRoute
   '/eventos/$id': typeof EventosIdRoute
@@ -130,11 +157,14 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/cadastro'
     | '/entrar'
+    | '/esqueci-senha'
     | '/ingressos'
     | '/portaria'
     | '/privacidade'
+    | '/redefinir-senha'
     | '/termos'
     | '/checkout/$orderId'
     | '/eventos/$id'
@@ -144,11 +174,14 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/cadastro'
     | '/entrar'
+    | '/esqueci-senha'
     | '/ingressos'
     | '/portaria'
     | '/privacidade'
+    | '/redefinir-senha'
     | '/termos'
     | '/checkout/$orderId'
     | '/eventos/$id'
@@ -158,11 +191,14 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/cadastro'
     | '/entrar'
+    | '/esqueci-senha'
     | '/ingressos'
     | '/portaria'
     | '/privacidade'
+    | '/redefinir-senha'
     | '/termos'
     | '/checkout/$orderId'
     | '/eventos/$id'
@@ -173,11 +209,14 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
   CadastroRoute: typeof CadastroRoute
   EntrarRoute: typeof EntrarRoute
+  EsqueciSenhaRoute: typeof EsqueciSenhaRoute
   IngressosRoute: typeof IngressosRoute
   PortariaRoute: typeof PortariaRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
+  RedefinirSenhaRoute: typeof RedefinirSenhaRoute
   TermosRoute: typeof TermosRoute
   CheckoutOrderIdRoute: typeof CheckoutOrderIdRoute
   EventosIdRoute: typeof EventosIdRoute
@@ -195,6 +234,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/cadastro': {
       id: '/cadastro'
       path: '/cadastro'
@@ -207,6 +253,13 @@ declare module '@tanstack/react-router' {
       path: '/entrar'
       fullPath: '/entrar'
       preLoaderRoute: typeof EntrarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/esqueci-senha': {
+      id: '/esqueci-senha'
+      path: '/esqueci-senha'
+      fullPath: '/esqueci-senha'
+      preLoaderRoute: typeof EsqueciSenhaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ingressos': {
@@ -228,6 +281,13 @@ declare module '@tanstack/react-router' {
       path: '/privacidade'
       fullPath: '/privacidade'
       preLoaderRoute: typeof PrivacidadeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/redefinir-senha': {
+      id: '/redefinir-senha'
+      path: '/redefinir-senha'
+      fullPath: '/redefinir-senha'
+      preLoaderRoute: typeof RedefinirSenhaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/termos': {
@@ -277,11 +337,14 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
   CadastroRoute: CadastroRoute,
   EntrarRoute: EntrarRoute,
+  EsqueciSenhaRoute: EsqueciSenhaRoute,
   IngressosRoute: IngressosRoute,
   PortariaRoute: PortariaRoute,
   PrivacidadeRoute: PrivacidadeRoute,
+  RedefinirSenhaRoute: RedefinirSenhaRoute,
   TermosRoute: TermosRoute,
   CheckoutOrderIdRoute: CheckoutOrderIdRoute,
   EventosIdRoute: EventosIdRoute,

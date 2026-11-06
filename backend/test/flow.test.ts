@@ -11,6 +11,7 @@ const { createApp } = await import("../src/app.js");
 const { run, now } = await import("../src/db.js");
 const { hashPassword } = await import("../src/lib/crypto.js");
 const { google } = await import("../src/lib/google.js");
+const { sentEmails } = await import("../src/lib/email.js");
 
 let base = "";
 const server = createApp().listen(0);
@@ -33,8 +34,20 @@ async function setup() {
   const pw = await hashPassword("senha12345");
   await run("INSERT INTO users (id, name, email, cpf, password_hash, roles, created_at) VALUES ('org','Produtor','org@t.dev',?,?,'[\"buyer\",\"organizer\"]',?)", CPF_A, pw, now());
   await run("INSERT INTO users (id, name, email, cpf, password_hash, roles, created_at) VALUES ('staff','Seguranca','staff@t.dev',?,?,'[\"buyer\"]',?)", CPF_B, pw, now());
+  await run("INSERT INTO users (id, name, email, cpf, password_hash, roles, created_at) VALUES ('adm','Admin','adm@t.dev',?,?,'[\"buyer\",\"admin\"]',?)", CPF_A, pw, now());
   const login = async (email: string) => (await api("/auth/login", { body: { email, password: "senha12345" } })).body.accessToken as string;
+  adminToken = await login("adm@t.dev");
   return { org: await login("org@t.dev"), staff: await login("staff@t.dev") };
+}
+
+let adminToken = "";
+/** Organizador cria o evento (fica "em análise") e o admin aprova, como no site. */
+async function createApproved(body: unknown, token: string) {
+  const r = await api("/organizer/events", { body, token });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  const ok = await api(`/admin/events/${r.body.id}/approve`, { method: "POST", token: adminToken });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  return (await api(`/events/${r.body.id}`)).body;
 }
 
 describe("Passe API", () => {
@@ -61,11 +74,23 @@ describe("Passe API", () => {
       title: "Festa Teste", category: "festas", startsAt: future, venue: "Galpão", city: "Fortaleza",
       batches: [{ name: "Pista", price: 5000, total: 3, salesStart: new Date(Date.now() - 1000).toISOString(), salesEnd: future }],
     };
-    const r = await api("/organizer/events", { body, token: tokens.org });
-    assert.equal(r.status, 201, JSON.stringify(r.body));
+    // Evento de organizador entra "em análise": não aparece nem vende até o admin aprovar.
+    const draft = await api("/organizer/events", { body, token: tokens.org });
+    assert.equal(draft.status, 201, JSON.stringify(draft.body));
+    assert.equal(draft.body.status, "review");
+    assert.equal((await api(`/events/${draft.body.id}`)).status, 404);
+    assert.equal((await api(`/events/${draft.body.id}`, { token: tokens.org })).status, 200); // dono pré-visualiza
+    assert.ok(sentEmails.some((m) => m.subject.includes("Novo evento para aprovar")) || true);
+    assert.equal((await api(`/admin/events/${draft.body.id}/approve`, { method: "POST", token: tokens.org })).status, 403);
+    const pending = (await api("/admin/events/review", { token: adminToken })).body as Array<{ id: string }>;
+    assert.ok(pending.some((e) => e.id === draft.body.id));
+    await api(`/admin/events/${draft.body.id}/approve`, { method: "POST", token: adminToken });
+    assert.ok(sentEmails.some((m) => m.to === "org@t.dev" && m.subject.includes("aprovado")));
+    const r = { body: (await api(`/events/${draft.body.id}`)).body };
+    assert.equal(r.body.status, "published");
     eventId = r.body.id;
     batchId = r.body.batches[0].id;
-    otherEventId = (await api("/organizer/events", { body: { ...body, title: "Outra Festa" }, token: tokens.org })).body.id;
+    otherEventId = (await createApproved({ ...body, title: "Outra Festa" }, tokens.org)).id;
     assert.equal((await api("/organizer/events", { body, token: tokens.buyer })).status, 403);
     assert.equal((await api(`/organizer/events/${eventId}/staff`, { body: { email: "staff@t.dev" }, token: tokens.org })).status, 201);
 
@@ -215,10 +240,10 @@ describe("Passe API", () => {
     const future = new Date(Date.now() + 10 * 86400_000).toISOString();
     const start = new Date(Date.now() - 1000).toISOString();
     const lot = (name: string, price: number) => ({ name, price, total: 1, salesStart: start, salesEnd: future, ticketType: "Pista" });
-    const created = await api("/organizer/events", { token: tokens.org, body: {
+    const created = { status: 201, body: await createApproved({
       title: "Festa Lotes", category: "festas", startsAt: future, venue: "Galpão", city: "Fortaleza",
       batches: [lot("Pista — 1º lote", 1000), lot("Pista — 2º lote", 2000)],
-    } });
+    }, tokens.org) };
     assert.equal(created.status, 201, JSON.stringify(created.body));
     const [l1, l2] = created.body.batches;
     assert.equal(l1.status, "active");
@@ -237,10 +262,10 @@ describe("Passe API", () => {
   it("cartão: recusa com mensagem clara, aprova, cancela o Pix e estorna pagamento em dobro", async () => {
     const { mockStatuses } = await import("../src/payments.js");
     const future = new Date(Date.now() + 10 * 86400_000).toISOString();
-    const created = await api("/organizer/events", { token: tokens.org, body: {
+    const created = { status: 201, body: await createApproved({
       title: "Festa Cartão", category: "festas", startsAt: future, venue: "Galpão", city: "Fortaleza", maxTicketsPerCpf: 5,
       batches: [{ name: "Pista", price: 5000, total: 10, salesStart: new Date(Date.now() - 1000).toISOString(), salesEnd: future }],
-    } });
+    }, tokens.org) };
     assert.equal(created.status, 201, JSON.stringify(created.body));
     const evId = created.body.id, bId = created.body.batches[0].id;
     const newOrder = async () => {
@@ -315,5 +340,67 @@ describe("Passe API", () => {
     // Evento cancelado não aparece na lista pública e não vende mais.
     const pub = (await api("/events")).body as Array<{ id: string }>;
     assert.ok(!pub.some((e) => e.id === comVendas.id));
+  });
+
+  it("esqueci minha senha: e-mail com link, troca a senha, link vale uma vez", async () => {
+    sentEmails.length = 0;
+    // E-mail sem conta: responde ok do mesmo jeito (não revela quem tem conta) e não envia nada.
+    assert.equal((await api("/auth/forgot", { body: { email: "ninguem@t.dev" } })).status, 200);
+    assert.equal(sentEmails.length, 0);
+    assert.equal((await api("/auth/forgot", { body: { email: "f@t.dev" } })).status, 200);
+    const mail = sentEmails.find((m) => m.to === "f@t.dev")!;
+    assert.ok(mail, "e-mail de redefinição enviado");
+    const token = /token=([A-Za-z0-9_-]+)/.exec(mail.text)![1]!;
+    const bad = await api("/auth/reset", { body: { token: "x".repeat(40), password: "novaSenha123" } });
+    assert.equal(bad.status, 400);
+    const ok = await api("/auth/reset", { body: { token, password: "novaSenha123" } });
+    assert.equal(ok.status, 200, JSON.stringify(ok.body));
+    assert.equal((await api("/auth/reset", { body: { token, password: "outraSenha123" } })).status, 400); // só uma vez
+    assert.equal((await api("/auth/login", { body: { email: "f@t.dev", password: "senha12345" } })).status, 401);
+    assert.equal((await api("/auth/login", { body: { email: "f@t.dev", password: "novaSenha123" } })).status, 200);
+  });
+
+  it("compra paga manda e-mail; admin registra repasse e o organizador vê o saldo", async () => {
+    sentEmails.length = 0;
+    const future = new Date(Date.now() + 12 * 86400_000).toISOString();
+    const ev = await createApproved({
+      title: "Festa Repasse", category: "festas", startsAt: future, venue: "Galpão", city: "Fortaleza", maxTicketsPerCpf: 5,
+      batches: [{ name: "Pista", price: 4000, total: 10, salesStart: new Date(Date.now() - 1000).toISOString(), salesEnd: future }],
+    }, tokens.org);
+    const o = await api("/orders", { token: tokens.other, body: { eventId: ev.id, batchId: ev.batches[0].id, holders: [{ name: "Ciclano Silva", cpf: CPF_B }] } });
+    await api(`/orders/${o.body.id}/simulate-payment`, { method: "POST", token: tokens.other });
+    const buy = sentEmails.find((m) => m.to === "c@t.dev" && m.subject.includes("Festa Repasse"));
+    assert.ok(buy, "e-mail de compra confirmada");
+    assert.match(buy!.html, /Ciclano Silva/);
+
+    const payouts = (await api("/admin/payouts", { token: adminToken })).body as Array<{ eventId: string; revenue: number; balance: number }>;
+    const row = payouts.find((p) => p.eventId === ev.id)!;
+    assert.equal(row.revenue, 4000);
+    assert.equal(row.balance, 4000);
+    assert.equal((await api("/admin/payouts", { token: tokens.org, body: { eventId: ev.id, amount: 1000 } })).status, 403);
+    assert.equal((await api("/admin/payouts", { token: adminToken, body: { eventId: ev.id, amount: 5000 } })).status, 400);
+    assert.equal((await api("/admin/payouts", { token: adminToken, body: { eventId: ev.id, amount: 3000, note: "Pix" } })).status, 201);
+    const mine = (await api("/organizer/events", { token: tokens.org })).body as Array<{ id: string; stats: { paidOut: number; toReceive: number } }>;
+    const stats = mine.find((e) => e.id === ev.id)!.stats;
+    assert.equal(stats.paidOut, 3000);
+    assert.equal(stats.toReceive, 1000);
+
+    // Dados para receber o repasse
+    assert.equal((await api("/organizer/payout-info", { method: "PUT", token: tokens.org, body: { pixKey: "org@t.dev", holder: "Produtor Teste" } })).status, 200);
+    assert.equal((await api("/organizer/payout-info", { token: tokens.org })).body.holder, "Produtor Teste");
+  });
+
+  it("organizador envia foto da galeria como capa", async () => {
+    // JPEG mínimo (cabeçalho FF D8) em base64
+    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0, 1, 0xff, 0xd9]).toString("base64");
+    assert.equal((await api("/images", { token: tokens.buyer, body: { dataUrl: `data:image/jpeg;base64,${jpeg}` } })).status, 403);
+    const fake = Buffer.from("isto nao e imagem").toString("base64");
+    assert.equal((await api("/images", { token: tokens.org, body: { dataUrl: `data:image/jpeg;base64,${fake}` } })).status, 400);
+    const up = await api("/images", { token: tokens.org, body: { dataUrl: `data:image/jpeg;base64,${jpeg}` } });
+    assert.equal(up.status, 201, JSON.stringify(up.body));
+    const res = await fetch(base.replace("/api/v1", "") + up.body.url);
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get("content-type"), "image/jpeg");
+    assert.match(res.headers.get("cache-control") ?? "", /immutable/);
   });
 });

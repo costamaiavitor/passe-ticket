@@ -37,6 +37,9 @@ export const config = {
   paymentProvider: (env["PAYMENT_PROVIDER"] ?? "mock") as "mock" | "mercadopago",
   mpAccessToken: env["MP_ACCESS_TOKEN"] ?? "",
   mpWebhookSecret: env["MP_WEBHOOK_SECRET"] ?? "",
+  // E-mails: SMTP_URL ex. smtps://seuemail%40gmail.com:SENHA_DE_APP@smtp.gmail.com:465 (Gmail) ou o SMTP do Resend.
+  smtpUrl: env["SMTP_URL"] ?? "",
+  emailFrom: env["EMAIL_FROM"] || "Passe <no-reply@passe.app>",
   // Login com Google: o "ID do cliente" OAuth (é público; o mesmo valor vai no site como VITE_GOOGLE_CLIENT_ID).
   googleClientId: env["GOOGLE_CLIENT_ID"] ?? "",
   // Modo demonstração: libera o botão "Simular pagamento" no site publicado.

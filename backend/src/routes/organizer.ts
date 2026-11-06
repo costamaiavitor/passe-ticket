@@ -4,6 +4,8 @@ import { z } from "zod";
 import { all, now, one, run, tx } from "../db.js";
 import { toEventDetail, type BatchRow, type EventRow } from "../domain/events.js";
 import { removeEvent } from "../domain/orders.js";
+import { config } from "../config.js";
+import { eventForReviewEmail, sendEmail } from "../lib/email.js";
 import { maskCpf } from "../lib/cpf.js";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
 import { assertEventOwner, parse, requireRole, user } from "../lib/http.js";
@@ -59,20 +61,29 @@ organizerRouter.get("/events", async (req, res) => {
     ? await all<EventRow>("SELECT * FROM events ORDER BY starts_at DESC")
     : await all<EventRow>("SELECT * FROM events WHERE organizer_id = ? ORDER BY starts_at DESC", a.id);
   res.json(await Promise.all(rows.map(async (e) => {
-    const s = (await one<{ sold: number; revenue: number; checked: number }>(
+    const s = (await one<{ sold: number; revenue: number; checked: number; paid_out: number }>(
       `SELECT
          (SELECT COUNT(*) FROM tickets WHERE event_id = ? AND status IN ('valid','used')) sold,
          (SELECT COALESCE(SUM(subtotal), 0) FROM orders WHERE event_id = ? AND status = 'paid') revenue,
-         (SELECT COUNT(*) FROM tickets WHERE event_id = ? AND status = 'used') checked`,
-      e.id, e.id, e.id,
+         (SELECT COUNT(*) FROM tickets WHERE event_id = ? AND status = 'used') checked,
+         (SELECT COALESCE(SUM(amount), 0) FROM organizer_payouts WHERE event_id = ?) paid_out`,
+      e.id, e.id, e.id, e.id,
     ))!;
-    return { ...(await toEventDetail(e)), stats: { ticketsSold: s.sold, revenue: s.revenue, checkedIn: s.checked } };
+    return {
+      ...(await toEventDetail(e)),
+      reviewNote: e.review_note ?? "",
+      // O organizador recebe o valor cheio dos ingressos (a taxa de 10% é do Passe).
+      stats: { ticketsSold: s.sold, revenue: s.revenue, checkedIn: s.checked, paidOut: s.paid_out, toReceive: Math.max(0, s.revenue - s.paid_out) },
+    };
   })));
 });
 
 organizerRouter.post("/events", async (req, res) => {
   const d = parse(eventSchema, req.body);
   const a = user(req);
+  const isAdmin = a.roles.includes("admin");
+  // Eventos de organizadores passam pela aprovação do Passe antes de ir ao ar (evita evento falso).
+  const status = d.status === "draft" ? "draft" : isAdmin ? "published" : "review";
   const id = randomUUID();
   let slug = slugify(d.title) || "evento";
   if (await one("SELECT 1 FROM events WHERE slug = ?", slug)) slug = `${slug}-${id.slice(0, 6)}`;
@@ -83,16 +94,25 @@ organizerRouter.post("/events", async (req, res) => {
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       id, slug, a.id, d.title, d.category, d.coverUrl, new Date(d.startsAt).toISOString(), d.venue, d.city, d.address, d.description,
       JSON.stringify(d.importantInfo), d.refundPolicy, d.maxTransfers,
-      d.transferDeadline ? new Date(d.transferDeadline).toISOString() : null, d.maxTicketsPerCpf, d.status, now(),
+      d.transferDeadline ? new Date(d.transferDeadline).toISOString() : null, d.maxTicketsPerCpf, status, now(),
     );
     for (const [i, b] of d.batches.entries()) await insertBatch(id, b, i);
   });
+  if (status === "review") {
+    const org = await one<{ name: string }>("SELECT name FROM users WHERE id = ?", a.id);
+    for (const to of config.adminEmails) await sendEmail(eventForReviewEmail(to, d.title, org?.name ?? "Organizador"));
+  }
   res.status(201).json(await toEventDetail((await one<EventRow>("SELECT * FROM events WHERE id = ?", id))!));
 });
 
 organizerRouter.patch("/events/:id", async (req, res) => {
   await assertEventOwner(user(req), req.params.id);
   const d = parse(eventSchema.omit({ batches: true }).partial().extend({ status: z.enum(["draft", "published", "cancelled"]).optional() }), req.body);
+  // Publicar é decisão do admin; o organizador que pedir "published" manda para análise.
+  if (d.status === "published" && !user(req).roles.includes("admin")) {
+    const cur = await one<{ status: string }>("SELECT status FROM events WHERE id = ?", String(req.params.id));
+    if (cur?.status !== "published") d.status = "review" as never;
+  }
   const map: Record<string, [string, (v: never) => unknown]> = {
     title: ["title", (v) => v], category: ["category", (v) => v], coverUrl: ["cover_url", (v) => v],
     startsAt: ["starts_at", (v: string) => new Date(v).toISOString()], venue: ["venue", (v) => v], city: ["city", (v) => v],
@@ -151,6 +171,19 @@ organizerRouter.delete("/events/:id", async (req, res) => {
   const id = String(req.params.id);
   await assertEventOwner(user(req), id);
   res.json(await removeEvent(id));
+});
+
+// ---- Dados para receber os repasses ----
+organizerRouter.get("/payout-info", async (req, res) => {
+  const u = await one<{ payout_pix_key: string | null; payout_holder: string | null }>(
+    "SELECT payout_pix_key, payout_holder FROM users WHERE id = ?", user(req).id);
+  res.json({ pixKey: u?.payout_pix_key ?? "", holder: u?.payout_holder ?? "" });
+});
+
+organizerRouter.put("/payout-info", async (req, res) => {
+  const d = parse(z.object({ pixKey: z.string().trim().min(3).max(140), holder: z.string().trim().min(3).max(140) }), req.body);
+  await run("UPDATE users SET payout_pix_key = ?, payout_holder = ? WHERE id = ?", d.pixKey, d.holder, user(req).id);
+  res.json({ pixKey: d.pixKey, holder: d.holder });
 });
 
 // ---- Equipe da portaria ----

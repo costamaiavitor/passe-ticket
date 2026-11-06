@@ -147,6 +147,49 @@ DO $$ BEGIN
       CHECK (status IN ('pending','paid','expired','cancelled','refund_required','refunded'));
   END IF;
 END $$;
+
+-- Recuperação de senha (guarda só o hash do link enviado por e-mail).
+CREATE TABLE IF NOT EXISTS password_resets (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TEXT NOT NULL,
+  used_at TEXT
+);
+
+-- Dados para o organizador receber os repasses.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS payout_pix_key TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS payout_holder TEXT;
+
+-- Repasses feitos aos organizadores (registrados pelo admin).
+CREATE TABLE IF NOT EXISTS organizer_payouts (
+  id TEXT PRIMARY KEY,
+  event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  organizer_id TEXT NOT NULL REFERENCES users(id),
+  amount INTEGER NOT NULL CHECK (amount > 0),
+  note TEXT NOT NULL DEFAULT '',
+  paid_at TEXT NOT NULL,
+  created_by TEXT NOT NULL REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS organizer_payouts_event ON organizer_payouts(event_id);
+
+-- Fotos de capa enviadas pelos organizadores (base64, já reduzidas no celular).
+CREATE TABLE IF NOT EXISTS images (
+  id TEXT PRIMARY KEY,
+  owner_id TEXT NOT NULL REFERENCES users(id),
+  mime TEXT NOT NULL,
+  data TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+-- Aprovação de eventos: status "review" (em análise) e motivo de recusa.
+ALTER TABLE events ADD COLUMN IF NOT EXISTS review_note TEXT NOT NULL DEFAULT '';
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'events_status_v2') THEN
+    ALTER TABLE events DROP CONSTRAINT IF EXISTS events_status_check;
+    ALTER TABLE events ADD CONSTRAINT events_status_v2 CHECK (status IN ('draft','review','published','rejected','cancelled'));
+  END IF;
+END $$;
 `;
 
 type Param = string | number | boolean | null;

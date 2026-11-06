@@ -34,6 +34,7 @@ function Login() {
       <form onSubmit={onSubmit} className="mt-4 space-y-4">
         <Field label="E-mail" name="email" type="email" required autoComplete="email" />
         <Field label="Senha" name="password" type="password" required autoComplete="current-password" />
+        <div className="-mt-2 text-right"><Link to="/esqueci-senha" className="text-xs text-muted-foreground underline hover:text-foreground">Esqueci minha senha</Link></div>
         {error && <p className="text-sm text-destructive">{error}</p>}
         <SubmitButton loading={loading}>Entrar</SubmitButton>
       </form>

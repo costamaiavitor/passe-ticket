@@ -12,6 +12,7 @@ import { ordersRouter } from "./routes/orders.js";
 import { organizerRouter } from "./routes/organizer.js";
 import { ticketsRouter } from "./routes/tickets.js";
 import { webhooksRouter } from "./routes/webhooks.js";
+import { imagesRouter } from "./routes/images.js";
 
 export function createApp() {
   const app = express();
@@ -21,7 +22,8 @@ export function createApp() {
     origin: (origin, cb) => cb(null, !origin || config.corsOrigins.includes("*") || config.corsOrigins.includes(origin)),
     credentials: true,
   }));
-  app.use(express.json({ limit: "200kb" }));
+  // Upload de foto tem limite próprio (maior); o resto da API aceita no máximo 200 KB.
+  app.use((req, res, next) => (req.path === "/api/v1/images" && req.method === "POST" ? next() : express.json({ limit: "200kb" })(req, res, next)));
   app.use((_req, res, next) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("Referrer-Policy", "no-referrer");
@@ -40,6 +42,7 @@ export function createApp() {
   api.use("/organizer", organizerRouter);
   api.use("/admin", adminRouter);
   api.use("/webhooks", webhooksRouter);
+  api.use("/images", imagesRouter);
   app.use("/api/v1", api);
 
   app.use((_req, _res, next) => next(new HttpError(404, "NOT_FOUND", "Rota não encontrada.")));

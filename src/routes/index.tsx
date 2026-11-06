@@ -77,7 +77,7 @@ function Home() {
               <p className="text-sm text-primary">Para organizadores</p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight">Divulgue seu evento com segurança.</h2>
               <p className="mt-3 text-muted-foreground">Lotes, equipe de check-in, transferências e relatórios em um só painel.</p>
-              <Button asChild className="mt-6"><Link to="/cadastro">Começar a vender <ArrowRight /></Link></Button>
+              <Button asChild className="mt-6"><Link to="/organizador">Começar a vender <ArrowRight /></Link></Button>
             </div>
             <ul className="space-y-5">
               {[

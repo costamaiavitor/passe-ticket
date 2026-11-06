@@ -4,6 +4,7 @@ import { all, now, one, run, tx } from "../db.js";
 import { isValidCpf, onlyDigits } from "../lib/cpf.js";
 import { badRequest, conflict, forbidden, HttpError, notFound } from "../lib/errors.js";
 import { payments, type CardPaymentInput, type PaymentInfo } from "../payments.js";
+import { eventCancelledEmail, purchaseEmail, sendEmail } from "../lib/email.js";
 import { batchStatuses, type BatchRow, type EventRow } from "./events.js";
 
 export interface OrderRow {
@@ -12,6 +13,8 @@ export interface OrderRow {
   status: "pending" | "paid" | "expired" | "cancelled" | "refund_required" | "refunded";
   payment_provider: string; payment_id: string | null; payment_data: string; expires_at: string;
   paid_at: string | null; created_at: string; paid_payment_id: string | null;
+  /** Só no retorno de approveOrder: o pedido acabou de ser pago nesta chamada. */
+  justPaid?: boolean;
 }
 
 interface OrderPaymentRow { id: string; order_id: string; method: string; status: string; status_detail: string }
@@ -98,7 +101,7 @@ export async function createOrder(userId: string, input: { eventId: string; batc
 
   // Ingresso gratuito: aprova direto.
   if (order.total === 0) {
-    await approveOrder(order.id);
+    if ((await approveOrder(order.id)).justPaid) await notifyPaid(order.id);
     return (await one<OrderRow>("SELECT * FROM orders WHERE id = ?", order.id))!;
   }
 
@@ -138,7 +141,7 @@ export function approveOrder(orderId: string, paymentId: string | null = null) {
     }
     await run("UPDATE orders SET status = 'paid', paid_at = ?, paid_payment_id = ? WHERE id = ?", t, paymentId, o.id);
     await run("UPDATE tickets SET status = 'valid' WHERE order_id = ?", o.id);
-    return { ...o, status: "paid" as const, paid_at: t, paid_payment_id: paymentId };
+    return { ...o, status: "paid" as const, paid_at: t, paid_payment_id: paymentId, justPaid: true };
   });
 }
 
@@ -187,6 +190,7 @@ async function confirmPayment(orderId: string, paymentId: string) {
   }
   // Pagou no cartão: cancela o Pix que ficou em aberto para ninguém pagar duas vezes.
   if (r.payment_id && r.payment_id !== paymentId) await payments.cancel(r.payment_id).catch(() => undefined);
+  if ("justPaid" in r && r.justPaid) await notifyPaid(orderId);
 }
 
 /** Estorno ou contestação depois de pago: cancela os ingressos e devolve as vagas ao lote. */
@@ -333,10 +337,28 @@ export async function removeEvent(eventId: string) {
       if (paymentId && o.total > 0) await payments.refund(paymentId);
       await markRefunded(o.id);
       refunded++;
+      const buyer = await one<{ email: string; name: string }>("SELECT email, name FROM users WHERE id = ?", o.user_id);
+      const ev = await one<{ title: string }>("SELECT title FROM events WHERE id = ?", eventId);
+      if (buyer && ev) await sendEmail(eventCancelledEmail(buyer.email, buyer.name, ev.title, o.total));
     } catch (e) {
       refundFailed++;
       console.error(`ATENÇÃO: estorne manualmente o pedido ${o.id} (pagamento ${paymentId}) do evento cancelado ${eventId}:`, e);
     }
   }
   return { deleted: false, refunded, refundFailed };
+}
+
+/** Manda o e-mail de "compra confirmada" com o resumo e o link para os QR Codes. */
+export async function notifyPaid(orderId: string) {
+  const d = await one<{
+    id: string; total: number; email: string; name: string; title: string; starts_at: string; venue: string; city: string; batch: string;
+  }>(`SELECT o.id, o.total, u.email, u.name, e.title, e.starts_at, e.venue, e.city, b.name batch
+      FROM orders o JOIN users u ON u.id = o.user_id JOIN events e ON e.id = o.event_id JOIN batches b ON b.id = o.batch_id
+      WHERE o.id = ?`, orderId);
+  if (!d) return;
+  const holders = (await all<{ holder_name: string }>("SELECT holder_name FROM tickets WHERE order_id = ? ORDER BY created_at", orderId)).map((t) => t.holder_name);
+  await sendEmail(purchaseEmail({
+    to: d.email, name: d.name, orderId: d.id, eventTitle: d.title, startsAt: d.starts_at, venue: d.venue, city: d.city,
+    batchName: d.batch, total: d.total, holders,
+  }));
 }

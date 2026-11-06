@@ -6,6 +6,7 @@ import { now, one, run } from "../db.js";
 import { isValidCpf, onlyDigits } from "../lib/cpf.js";
 import { hashPassword, randomToken, sha256, signAccessToken, verifyPassword } from "../lib/crypto.js";
 import { badRequest, conflict, HttpError, unauthorized } from "../lib/errors.js";
+import { passwordResetEmail, sendEmail } from "../lib/email.js";
 import { google } from "../lib/google.js";
 import { parse, rateLimit, requireAuth, user, type Role } from "../lib/http.js";
 
@@ -99,6 +100,36 @@ authRouter.post("/google", limiter, async (req, res) => {
     if (!u || u.google_sub !== g.sub) throw conflict("GOOGLE_ACCOUNT_MISMATCH", "Esse e-mail já está ligado a outra conta Google.");
   }
   res.json(await issueSession(res, u));
+});
+
+// ---------- Esqueci minha senha ----------
+const RESET_TTL_MS = 60 * 60_000; // o link vale 1 hora
+
+/** Sempre responde "ok" (não revela se o e-mail tem conta). Se tiver, envia o link por e-mail. */
+authRouter.post("/forgot", limiter, async (req, res) => {
+  const { email } = parse(z.object({ email: z.string().trim().toLowerCase().email() }), req.body);
+  const u = await one<UserRow>("SELECT * FROM users WHERE email = ?", email);
+  if (u) {
+    const token = randomToken();
+    await run("INSERT INTO password_resets (id, user_id, token_hash, expires_at) VALUES (?,?,?,?)",
+      randomUUID(), u.id, sha256(token), new Date(Date.now() + RESET_TTL_MS).toISOString());
+    await sendEmail(passwordResetEmail(u.email, u.name, `${config.publicUrl}/redefinir-senha?token=${token}`));
+  }
+  res.json({ ok: true });
+});
+
+/** Troca a senha com o link do e-mail. O link só funciona uma vez, e todas as sessões abertas são encerradas. */
+authRouter.post("/reset", limiter, async (req, res) => {
+  const { token, password } = parse(z.object({ token: z.string().min(20).max(200), password: z.string().min(8).max(200) }), req.body);
+  const row = await one<{ id: string; user_id: string; expires_at: string; used_at: string | null }>(
+    "SELECT * FROM password_resets WHERE token_hash = ?", sha256(token));
+  if (!row || row.used_at || row.expires_at < now())
+    throw badRequest("RESET_INVALID", "Este link expirou ou já foi usado. Peça um novo em “Esqueci minha senha”.");
+  const used = await run("UPDATE password_resets SET used_at = ? WHERE id = ? AND used_at IS NULL", now(), row.id);
+  if (!used.changes) throw badRequest("RESET_INVALID", "Este link já foi usado. Peça um novo.");
+  await run("UPDATE users SET password_hash = ? WHERE id = ?", await hashPassword(password), row.user_id);
+  await run("UPDATE refresh_tokens SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL", now(), row.user_id);
+  res.json(await issueSession(res, (await one<UserRow>("SELECT * FROM users WHERE id = ?", row.user_id))!));
 });
 
 /** Rotaciona o refresh token (cookie httpOnly ou corpo) e devolve novo access token. */
