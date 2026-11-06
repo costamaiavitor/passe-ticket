@@ -190,8 +190,10 @@ function OrganizerEventCard({ ev }: { ev: OrganizerEvent }) {
         </div>
         <div className="mt-2 grid grid-cols-2 gap-2">
           <Button asChild variant="ghost" size="sm"><Link to="/portaria"><QrCode />Leitor</Link></Button>
-          {ev.status !== "cancelled" && (
-            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setRemoveOpen(true)}><Trash2 />Remover</Button>
+          {(ev.status !== "cancelled" || ev.stats.ticketsSold > 0) && (
+            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setRemoveOpen(true)}>
+              <Trash2 />{ev.status === "cancelled" ? "Estornar compras" : "Remover"}
+            </Button>
           )}
         </div>
       </div>
@@ -211,7 +213,7 @@ function RemoveDialog({ ev, open, onOpenChange }: { ev: OrganizerEvent; open: bo
       void qc.invalidateQueries({ queryKey: ["events"] });
       onOpenChange(false);
       if (r.deleted) toast.success("Evento removido.");
-      else if (r.refundFailed) toast.error(`Evento cancelado. ${r.refunded} compra(s) estornada(s), mas ${r.refundFailed} precisa(m) de estorno manual no Mercado Pago.`);
+      else if (r.refundFailed) toast.error(`Evento cancelado. ${r.refunded} compra(s) estornada(s), mas ${r.refundFailed} não foi(foram) estornada(s). Motivo: ${r.errors[0] ?? "erro no Mercado Pago"}. Tente de novo em “Estornar compras” ou estorne pelo app do Mercado Pago.`, { duration: 15000 });
       else toast.success(`Evento cancelado e ${r.refunded} compra(s) estornada(s).`);
     },
   });

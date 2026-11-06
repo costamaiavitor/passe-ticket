@@ -326,11 +326,12 @@ export async function removeEvent(eventId: string) {
       await run("DELETE FROM orders WHERE event_id = ?", eventId);
       await run("DELETE FROM events WHERE id = ?", eventId); // lotes e equipe saem junto (ON DELETE CASCADE)
     });
-    return { deleted: true, refunded: 0, refundFailed: 0 };
+    return { deleted: true, refunded: 0, refundFailed: 0, errors: [] as string[] };
   }
 
   await run("UPDATE events SET status = 'cancelled' WHERE id = ?", eventId);
   let refunded = 0, refundFailed = 0;
+  const errors: string[] = [];
   for (const o of paid) {
     const paymentId = o.paid_payment_id ?? o.payment_id;
     try {
@@ -342,10 +343,11 @@ export async function removeEvent(eventId: string) {
       if (buyer && ev) await sendEmail(eventCancelledEmail(buyer.email, buyer.name, ev.title, o.total));
     } catch (e) {
       refundFailed++;
+      errors.push(e instanceof Error ? e.message : String(e));
       console.error(`ATENÇÃO: estorne manualmente o pedido ${o.id} (pagamento ${paymentId}) do evento cancelado ${eventId}:`, e);
     }
   }
-  return { deleted: false, refunded, refundFailed };
+  return { deleted: false, refunded, refundFailed, errors };
 }
 
 /** Manda o e-mail de "compra confirmada" com o resumo e o link para os QR Codes. */

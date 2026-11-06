@@ -53,7 +53,7 @@ export const myEventsQuery = () => queryOptions({ queryKey: ["organizer-events"]
 
 /** Remove o evento: apaga se não houver vendas; com vendas, cancela e estorna os compradores. */
 export const removeEvent = (eventId: string) =>
-  http<{ deleted: boolean; refunded: number; refundFailed: number }>(`/organizer/events/${encodeURIComponent(eventId)}`, { method: "DELETE" });
+  http<{ deleted: boolean; refunded: number; refundFailed: number; errors: string[] }>(`/organizer/events/${encodeURIComponent(eventId)}`, { method: "DELETE" });
 
 // ---- Dados para receber repasses ----
 export const payoutInfoQuery = () =>
