@@ -39,6 +39,9 @@ export const config = {
   mpWebhookSecret: env["MP_WEBHOOK_SECRET"] ?? "",
   // E-mails: SMTP_URL ex. smtps://seuemail%40gmail.com:SENHA_DE_APP@smtp.gmail.com:465 (Gmail) ou o SMTP do Resend.
   smtpUrl: env["SMTP_URL"] ?? "",
+  // Atalho para Gmail: só o e-mail e a "senha de app" (16 letras) — o servidor é preenchido sozinho.
+  smtpUser: env["SMTP_USER"] ?? "",
+  smtpPass: (env["SMTP_PASS"] ?? "").replace(/\s+/g, ""),
   emailFrom: env["EMAIL_FROM"] || "Passe <no-reply@passe.app>",
   // Login com Google: o "ID do cliente" OAuth (é público; o mesmo valor vai no site como VITE_GOOGLE_CLIENT_ID).
   googleClientId: env["GOOGLE_CLIENT_ID"] ?? "",

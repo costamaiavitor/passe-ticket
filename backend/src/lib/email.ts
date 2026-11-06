@@ -9,17 +9,21 @@ export interface Email { to: string; subject: string; html: string; text: string
 export const sentEmails: Email[] = [];
 
 let transport: Transporter | null = null;
-const getTransport = () => (transport ??= nodemailer.createTransport(config.smtpUrl));
+const getTransport = () => (transport ??= config.smtpUrl
+  ? nodemailer.createTransport(config.smtpUrl)
+  : nodemailer.createTransport({ host: "smtp.gmail.com", port: 465, secure: true, auth: { user: config.smtpUser, pass: config.smtpPass } }));
+const configured = () => !!config.smtpUrl || (!!config.smtpUser && !!config.smtpPass);
+const fromAddress = () => (config.smtpUser && !config.smtpUrl ? `Passe <${config.smtpUser}>` : config.emailFrom);
 
 /** Envia sem nunca derrubar a operação principal (compra, cadastro…): falha vira só um aviso no log. */
 export async function sendEmail(mail: Email): Promise<boolean> {
   if (config.isTest) { sentEmails.push(mail); return true; }
-  if (!config.smtpUrl) {
-    console.log(`[e-mail não enviado — configure SMTP_URL] para ${mail.to}: ${mail.subject}`);
+  if (!configured()) {
+    console.log(`[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para ${mail.to}: ${mail.subject}`);
     return false;
   }
   try {
-    await getTransport().sendMail({ from: config.emailFrom, to: mail.to, subject: mail.subject, html: mail.html, text: mail.text });
+    await getTransport().sendMail({ from: fromAddress(), to: mail.to, subject: mail.subject, html: mail.html, text: mail.text });
     return true;
   } catch (e) {
     console.error(`Falha ao enviar e-mail para ${mail.to} (${mail.subject}):`, e);
