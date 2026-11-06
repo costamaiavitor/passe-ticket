@@ -176,15 +176,47 @@ describe("Passe API", () => {
     assert.equal(stats.body.totalTickets, 2);
   });
 
-  it("transferência gera QR novo e invalida o antigo", async () => {
+  it("transferência por CPF: fica pendente, quem recebe aceita ou recusa, QR novo invalida o antigo", async () => {
+    sentEmails.length = 0;
     const list = (await api("/tickets", { token: tokens.buyer })).body;
     const t = list.find((x: any) => x.status === "valid");
     const oldQr = t.qrPayload;
-    const tr = await api(`/tickets/${t.id}/transfer`, { token: tokens.buyer, body: { email: "c@t.dev", holderName: "Ciclano Silva", holderCpf: CPF_B } });
-    assert.equal(tr.status, 200, JSON.stringify(tr.body));
+
+    assert.equal((await api(`/tickets/${t.id}/transfer`, { token: tokens.buyer, body: { cpf: "123.456.789-00" } })).status, 400); // CPF inválido
+    assert.equal((await api(`/tickets/${t.id}/transfer`, { token: tokens.other, body: { cpf: CPF_B } })).status, 403);       // não é o dono
+
+    // 1ª oferta → recusada
+    const offer = await api(`/tickets/${t.id}/transfer`, { token: tokens.buyer, body: { cpf: CPF_B } });
+    assert.equal(offer.status, 201, JSON.stringify(offer.body));
+    assert.ok(sentEmails.some((m) => m.to === "c@t.dev" && m.subject.includes("quer te passar")), "convite por e-mail");
+    assert.equal((await api(`/tickets/${t.id}/transfer`, { token: tokens.buyer, body: { cpf: CPF_B } })).status, 409); // já tem pendente
+    const pend = (await api(`/tickets/${t.id}`, { token: tokens.buyer })).body;
+    assert.equal(pend.qrPayload, oldQr, "QR continua valendo até o aceite");
+    assert.ok(pend.pendingTransfer);
+    const inc = (await api("/tickets/transfers/incoming", { token: tokens.other })).body;
+    assert.equal(inc.needsCpf, false);
+    const invite = inc.transfers.find((x: any) => x.id === offer.body.id);
+    assert.ok(invite, "convite aparece para o CPF certo");
+    assert.equal((await api(`/tickets/transfers/${invite.id}/accept`, { method: "POST", token: tokens.buyer })).status, 403); // outro CPF
+    assert.equal((await api(`/tickets/transfers/${invite.id}/decline`, { method: "POST", token: tokens.other })).status, 200);
+    assert.ok(sentEmails.some((m) => m.to === "f@t.dev" && m.subject.includes("recusou")));
+    assert.equal((await api(`/tickets/${t.id}`, { token: tokens.buyer })).body.pendingTransfer, null);
+
+    // Cancelar antes do aceite
+    await api(`/tickets/${t.id}/transfer`, { token: tokens.buyer, body: { cpf: CPF_B } });
+    assert.equal((await api(`/tickets/${t.id}/transfer`, { method: "DELETE", token: tokens.buyer })).status, 204);
+    assert.equal((await api("/tickets/transfers/incoming", { token: tokens.other })).body.transfers.length, 0);
+
+    // 2ª oferta → aceita
+    const offer2 = await api(`/tickets/${t.id}/transfer`, { token: tokens.buyer, body: { cpf: CPF_B } });
+    const acc = await api(`/tickets/transfers/${offer2.body.id}/accept`, { method: "POST", token: tokens.other });
+    assert.equal(acc.status, 200, JSON.stringify(acc.body));
+    assert.ok(sentEmails.some((m) => m.to === "f@t.dev" && m.subject.includes("aceitou")));
     assert.equal((await api(`/tickets/${t.id}`, { token: tokens.buyer })).status, 403);
     const mine = (await api(`/tickets/${t.id}`, { token: tokens.other })).body;
+    assert.equal(mine.holderName, "Ciclano Silva");
     assert.notEqual(mine.qrPayload, oldQr);
+    assert.equal((await api(`/tickets/transfers/${offer2.body.id}/accept`, { method: "POST", token: tokens.other })).status, 409); // só uma vez
     assert.equal((await api("/checkin/scan", { token: tokens.staff, body: { eventId, code: oldQr } })).body.result, "revoked");
     assert.equal((await api("/checkin/scan", { token: tokens.staff, body: { eventId, code: mine.qrPayload } })).body.result, "ok");
   });

@@ -164,6 +164,14 @@ authRouter.get("/me", requireAuth, async (req, res) => {
   res.json(await publicUser(u));
 });
 
+/** Informa o CPF da conta (quem entrou com Google não tem). Só pode ser definido uma vez. */
+authRouter.put("/me/cpf", requireAuth, async (req, res) => {
+  const { cpf } = parse(z.object({ cpf: z.string().transform(onlyDigits).refine(isValidCpf, "CPF inválido") }), req.body);
+  const r = await run("UPDATE users SET cpf = ? WHERE id = ? AND (cpf IS NULL OR cpf = '')", cpf, user(req).id);
+  if (!r.changes) throw conflict("CPF_ALREADY_SET", "Sua conta já tem um CPF. Para trocar, fale com o suporte.");
+  res.json({ ok: true });
+});
+
 /** Qualquer usuário pode virar produtor e criar eventos (como nas plataformas de ingresso). */
 authRouter.post("/become-organizer", requireAuth, async (req, res) => {
   const u = await one<UserRow>("SELECT * FROM users WHERE id = ?", user(req).id);

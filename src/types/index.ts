@@ -94,6 +94,17 @@ export interface Ticket {
   checkedInAt: string | null;
   transfers: number;
   canTransfer: boolean;
+  /** Transferência oferecida e ainda não aceita (o QR continua valendo até o aceite). */
+  pendingTransfer?: { id: string; toCpf: string; createdAt: string } | null;
+}
+
+/** Convite de transferência recebido (Meus ingressos). */
+export interface IncomingTransfer {
+  id: string;
+  fromName: string;
+  createdAt: string;
+  batchName: string;
+  event: { id: string; slug: string; title: string; startsAt: string; venue: string; city: string; coverUrl: string };
 }
 
 export type ScanResultCode = "ok" | "already_used" | "invalid" | "revoked" | "wrong_event" | "not_paid" | "cancelled";

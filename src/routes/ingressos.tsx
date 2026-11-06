@@ -4,6 +4,7 @@ import { CheckCircle2, MapPin } from "lucide-react";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { RequireAuth } from "@/components/require-auth";
 import { TicketQr } from "@/components/ticket-qr";
+import { IncomingTransfers, TransferControls } from "@/components/ticket-transfer";
 import { Button } from "@/components/ui/button";
 import { ticketsQuery } from "@/services/tickets";
 import { fmtDate, fmtTime } from "@/utils/format";
@@ -17,7 +18,7 @@ export const Route = createFileRoute("/ingressos")({
       <main className="container-page py-12">
         <h1 className="text-3xl font-semibold tracking-tight">Meus ingressos</h1>
         <p className="mt-1 text-sm text-muted-foreground">Apresente o QR Code na entrada junto com um documento do titular.</p>
-        <RequireAuth>{() => <TicketList />}</RequireAuth>
+        <RequireAuth>{() => <><IncomingTransfers /><TicketList /></>}</RequireAuth>
       </main>
       <SiteFooter />
     </div>
@@ -67,6 +68,7 @@ function TicketCard({ t }: { t: Ticket }) {
           <div><dt className="text-xs text-muted-foreground">Lote</dt><dd>{t.batchName}</dd></div>
           <div><dt className="text-xs text-muted-foreground">Status</dt><dd className={used ? "text-muted-foreground" : "text-primary"}>{used ? "Utilizado" : "Válido"}</dd></div>
         </dl>
+        <TransferControls t={t} />
         <p className="mt-3 text-center font-mono text-[10px] text-muted-foreground">#{t.id.slice(0, 8)}</p>
       </div>
     </article>

@@ -130,3 +130,25 @@ export function payoutEmail(to: string, name: string, eventTitle: string, amount
     text: `Repasse de ${brl(amount)} enviado referente a ${eventTitle}. ${note}`,
   };
 }
+
+export function transferOfferEmail(to: string, name: string, fromName: string, eventTitle: string): Email {
+  const link = `${config.publicUrl}/ingressos`;
+  return {
+    to,
+    subject: `${fromName} quer te passar um ingresso`,
+    html: layout("Você recebeu um ingresso 🎟️", `<p>Oi, ${esc(name)}! <strong>${esc(fromName)}</strong> quer transferir para você um ingresso de <strong>${esc(eventTitle)}</strong>.</p><p>Entre no Passe e aceite em <strong>Meus ingressos</strong>. Depois de aceitar, o ingresso fica no seu nome e CPF, com um QR Code novo.</p>`,
+      { label: "Ver e aceitar", url: link }),
+    text: `${fromName} quer transferir para você um ingresso de ${eventTitle}. Aceite em ${link}`,
+  };
+}
+
+export function transferResultEmail(to: string, name: string, toName: string, eventTitle: string, accepted: boolean): Email {
+  return {
+    to,
+    subject: accepted ? `${toName} aceitou o ingresso de ${eventTitle}` : `${toName} recusou o ingresso de ${eventTitle}`,
+    html: accepted
+      ? layout("Transferência concluída", `<p>Oi, ${esc(name)}! <strong>${esc(toName)}</strong> aceitou o ingresso de <strong>${esc(eventTitle)}</strong>. Ele agora está no nome dessa pessoa, e o seu QR Code antigo deixou de valer.</p>`)
+      : layout("Transferência recusada", `<p>Oi, ${esc(name)}. <strong>${esc(toName)}</strong> recusou o ingresso de <strong>${esc(eventTitle)}</strong>. Ele continua com você, e o seu QR Code segue valendo.</p>`),
+    text: accepted ? `${toName} aceitou o ingresso de ${eventTitle}.` : `${toName} recusou o ingresso de ${eventTitle}. Ele continua com você.`,
+  };
+}

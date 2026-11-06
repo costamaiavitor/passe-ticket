@@ -173,6 +173,21 @@ CREATE TABLE IF NOT EXISTS organizer_payouts (
 );
 CREATE INDEX IF NOT EXISTS organizer_payouts_event ON organizer_payouts(event_id);
 
+-- Transferências de ingresso aguardando o aceite de quem recebe (identificado pelo CPF).
+CREATE TABLE IF NOT EXISTS ticket_transfers (
+  id TEXT PRIMARY KEY,
+  ticket_id TEXT NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+  from_user_id TEXT NOT NULL REFERENCES users(id),
+  to_cpf TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('pending','accepted','declined','cancelled')),
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  resolved_at TEXT,
+  accepted_by TEXT REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS ticket_transfers_to ON ticket_transfers(to_cpf, status);
+CREATE UNIQUE INDEX IF NOT EXISTS ticket_transfers_one_pending ON ticket_transfers(ticket_id) WHERE status = 'pending';
+
 -- Fotos de capa enviadas pelos organizadores (base64, já reduzidas no celular).
 CREATE TABLE IF NOT EXISTS images (
   id TEXT PRIMARY KEY,
