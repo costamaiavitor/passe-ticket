@@ -194,7 +194,7 @@ async function confirmPayment(orderId: string, paymentId: string) {
 }
 
 /** Estorno ou contestação depois de pago: cancela os ingressos e devolve as vagas ao lote. */
-async function markRefunded(orderId: string) {
+export async function markRefunded(orderId: string) {
   await tx(async () => {
     const o = await one<OrderRow>("SELECT * FROM orders WHERE id = ? FOR UPDATE", orderId);
     if (!o || o.status !== "paid") return;

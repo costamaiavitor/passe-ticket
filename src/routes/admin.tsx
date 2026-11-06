@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { RequireAuth } from "@/components/require-auth";
 import { Button } from "@/components/ui/button";
-import { approveEvent, payoutsQuery, registerPayout, rejectEvent, reviewEventsQuery } from "@/services/admin";
+import { approveEvent, markRefundedOutside, payoutsQuery, registerPayout, rejectEvent, reviewEventsQuery } from "@/services/admin";
 import { brl, fmtDate, fmtTime } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import type { PayoutRow, ReviewEvent } from "@/types";
@@ -126,6 +126,11 @@ function PayoutCard({ row }: { row: PayoutRow }) {
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ["admin-payouts"] }); toast.success("Repasse registrado e organizador avisado."); setNote(""); },
   });
   const ended = new Date(row.startsAt).getTime() < Date.now();
+  const [confirmManual, setConfirmManual] = useState(false);
+  const manual = useMutation({
+    mutationFn: () => markRefundedOutside(row.eventId),
+    onSuccess: (r) => { void qc.invalidateQueries({ queryKey: ["admin-payouts"] }); void qc.invalidateQueries({ queryKey: ["organizer-events"] }); toast.success(`${r.orders} compra(s) marcada(s) como devolvida(s). Ingressos cancelados.`); },
+  });
   return (
     <article className="rounded-xl border bg-card p-4 md:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -148,7 +153,20 @@ function PayoutCard({ row }: { row: PayoutRow }) {
           </>
         ) : <span className="text-warning">O organizador ainda não cadastrou a chave Pix em Meus eventos.</span>}
       </div>
-      {row.balance > 0 && (
+      {row.status === "cancelled" && row.balance > 0 && (
+        <div className="mt-3 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm">
+          <p className="text-warning">Evento cancelado com compras ainda não estornadas.</p>
+          <p className="mt-1 text-xs text-muted-foreground">Se o Mercado Pago não conseguiu estornar (por exemplo, sem saldo), devolva por Pix direto ao comprador e marque aqui. Isso não movimenta dinheiro: só cancela os ingressos e zera o saldo.</p>
+          {confirmManual ? (
+            <div className="mt-2 flex gap-2">
+              <Button size="sm" variant="destructive" disabled={manual.isPending} onClick={() => manual.mutate()}>Confirmar: já devolvi</Button>
+              <Button size="sm" variant="ghost" onClick={() => setConfirmManual(false)}>Voltar</Button>
+            </div>
+          ) : <Button size="sm" variant="outline" className="mt-2" onClick={() => setConfirmManual(true)}>Marcar como devolvido por fora</Button>}
+          {manual.error && <p className="mt-2 text-destructive">{manual.error.message}</p>}
+        </div>
+      )}
+      {row.balance > 0 && row.status !== "cancelled" && (
         <form className="mt-3 flex flex-wrap gap-2" onSubmit={(e) => { e.preventDefault(); pay.mutate(); }}>
           <input inputMode="numeric" value={brl(amount)} onChange={(e) => setAmount(Math.min(Number(e.target.value.replace(/\D/g, "") || "0"), row.balance))}
             className="h-9 w-32 rounded-md border bg-surface px-3 text-sm outline-none focus:border-primary/50" />

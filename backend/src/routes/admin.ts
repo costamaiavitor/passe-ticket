@@ -3,6 +3,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { all, now, one, run } from "../db.js";
 import { toEventDetail, type EventRow } from "../domain/events.js";
+import { markRefunded } from "../domain/orders.js";
 import { eventReviewedEmail, payoutEmail, sendEmail } from "../lib/email.js";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
 import { parse, requireRole, user } from "../lib/http.js";
@@ -95,6 +96,22 @@ adminRouter.get("/payouts", async (_req, res) => {
     revenue: r.revenue, platformFees: r.fees, paidOut: r.paid_out, balance: r.revenue - r.paid_out,
     history: history.filter((h) => h.event_id === r.event_id).map((h) => ({ id: h.id, amount: h.amount, note: h.note, paidAt: h.paid_at })),
   })));
+});
+
+/**
+ * Evento cancelado cujas compras não puderam ser estornadas pelo Mercado Pago (ex.: sem saldo na conta):
+ * marca como devolvidas por fora (Pix direto, ou compra de teste). Não movimenta dinheiro nenhum —
+ * só cancela os ingressos e zera o saldo a repassar.
+ */
+adminRouter.post("/events/:id/mark-refunded", async (req, res) => {
+  const id = String(req.params.id);
+  const e = await one<{ status: string }>("SELECT status FROM events WHERE id = ?", id);
+  if (!e) throw notFound("Evento não encontrado.");
+  if (e.status !== "cancelled") throw conflict("NOT_CANCELLED", "Só dá para fazer isso em evento cancelado.");
+  const paid = await all<{ id: string }>("SELECT id FROM orders WHERE event_id = ? AND status = 'paid'", id);
+  for (const o of paid) await markRefunded(o.id);
+  console.warn(`Admin ${user(req).id} marcou ${paid.length} compra(s) do evento ${id} como devolvidas por fora.`);
+  res.json({ ok: true, orders: paid.length });
 });
 
 /** Registra um repasse feito (o Pix em si é feito por você no app do banco). */

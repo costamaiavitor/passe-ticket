@@ -12,6 +12,9 @@ export const approveEvent = (id: string) =>
 export const rejectEvent = (id: string, reason: string) =>
   http<{ ok: true }>(`/admin/events/${encodeURIComponent(id)}/reject`, { method: "POST", body: JSON.stringify({ reason }) });
 
+export const markRefundedOutside = (eventId: string) =>
+  http<{ ok: true; orders: number }>(`/admin/events/${encodeURIComponent(eventId)}/mark-refunded`, { method: "POST" });
+
 export const payoutsQuery = () => queryOptions({ queryKey: ["admin-payouts"], queryFn: () => http<PayoutRow[]>("/admin/payouts") });
 
 export const registerPayout = (d: { eventId: string; amount: number; note: string }) =>

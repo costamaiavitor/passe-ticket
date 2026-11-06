@@ -403,4 +403,26 @@ describe("Passe API", () => {
     assert.equal(res.headers.get("content-type"), "image/jpeg");
     assert.match(res.headers.get("cache-control") ?? "", /immutable/);
   });
+
+  it("admin marca compras de evento cancelado como devolvidas por fora (sem mexer em dinheiro)", async () => {
+    const future = new Date(Date.now() + 14 * 86400_000).toISOString();
+    const ev = await createApproved({
+      title: "Festa Sem Saldo", category: "festas", startsAt: future, venue: "Galpão", city: "Fortaleza", maxTicketsPerCpf: 5,
+      batches: [{ name: "Pista", price: 100, total: 5, salesStart: new Date(Date.now() - 1000).toISOString(), salesEnd: future }],
+    }, tokens.org);
+    const o = await api("/orders", { token: tokens.other, body: { eventId: ev.id, batchId: ev.batches[0].id, holders: [{ name: "Ciclano Silva", cpf: CPF_B }] } });
+    await api(`/orders/${o.body.id}/simulate-payment`, { method: "POST", token: tokens.other });
+
+    // Evento ainda ativo: não pode.
+    assert.equal((await api(`/admin/events/${ev.id}/mark-refunded`, { method: "POST", token: adminToken })).status, 409);
+    // Simula o caso real: evento cancelado mas o estorno do Mercado Pago falhou (compra continua paga).
+    await run("UPDATE events SET status = 'cancelled' WHERE id = ?", ev.id);
+    assert.equal((await api(`/admin/events/${ev.id}/mark-refunded`, { method: "POST", token: tokens.org })).status, 403);
+    const r = await api(`/admin/events/${ev.id}/mark-refunded`, { method: "POST", token: adminToken });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.orders, 1);
+    assert.equal((await api(`/orders/${o.body.id}`, { token: tokens.other })).body.status, "refunded");
+    const payouts = (await api("/admin/payouts", { token: adminToken })).body as Array<{ eventId: string; balance: number }>;
+    assert.equal(payouts.find((p) => p.eventId === ev.id)?.balance ?? 0, 0);
+  });
 });
