@@ -60,22 +60,43 @@ organizerRouter.get("/events", async (req, res) => {
   const rows = a.roles.includes("admin")
     ? await all<EventRow>("SELECT * FROM events ORDER BY starts_at DESC")
     : await all<EventRow>("SELECT * FROM events WHERE organizer_id = ? ORDER BY starts_at DESC", a.id);
-  res.json(await Promise.all(rows.map(async (e) => {
-    const s = (await one<{ sold: number; revenue: number; checked: number; paid_out: number }>(
-      `SELECT
-         (SELECT COUNT(*) FROM tickets WHERE event_id = ? AND status IN ('valid','used')) sold,
-         (SELECT COALESCE(SUM(subtotal), 0) FROM orders WHERE event_id = ? AND status = 'paid') revenue,
-         (SELECT COUNT(*) FROM tickets WHERE event_id = ? AND status = 'used') checked,
-         (SELECT COALESCE(SUM(amount), 0) FROM organizer_payouts WHERE event_id = ?) paid_out`,
-      e.id, e.id, e.id, e.id,
-    ))!;
-    return {
-      ...(await toEventDetail(e)),
-      reviewNote: e.review_note ?? "",
-      // O organizador recebe o valor cheio dos ingressos (a taxa de 10% é do Passe).
-      stats: { ticketsSold: s.sold, revenue: s.revenue, checkedIn: s.checked, paidOut: s.paid_out, toReceive: Math.max(0, s.revenue - s.paid_out) },
-    };
-  })));
+  res.json(await Promise.all(rows.map(organizerView)));
+});
+
+/** Evento visto pelo organizador: dados públicos + números de vendas e repasses. */
+async function organizerView(e: EventRow) {
+  const s = (await one<{ sold: number; revenue: number; checked: number; paid_out: number; buyers: number; pending: number }>(
+    `SELECT
+       (SELECT COUNT(*) FROM tickets WHERE event_id = ? AND status IN ('valid','used')) sold,
+       (SELECT COALESCE(SUM(subtotal), 0) FROM orders WHERE event_id = ? AND status = 'paid') revenue,
+       (SELECT COUNT(*) FROM tickets WHERE event_id = ? AND status = 'used') checked,
+       (SELECT COALESCE(SUM(amount), 0) FROM organizer_payouts WHERE event_id = ?) paid_out,
+       (SELECT COUNT(DISTINCT user_id) FROM orders WHERE event_id = ? AND status = 'paid') buyers,
+       (SELECT COALESCE(SUM(quantity), 0) FROM orders WHERE event_id = ? AND status = 'pending') pending`,
+    e.id, e.id, e.id, e.id, e.id, e.id,
+  ))!;
+  return {
+    ...(await toEventDetail(e)),
+    reviewNote: e.review_note ?? "",
+    // O organizador recebe o valor cheio dos ingressos (a taxa de 10% é do Passe).
+    stats: {
+      ticketsSold: s.sold, revenue: s.revenue, checkedIn: s.checked, paidOut: s.paid_out,
+      toReceive: Math.max(0, s.revenue - s.paid_out), buyers: s.buyers, awaitingPayment: s.pending,
+    },
+  };
+}
+
+/** Painel de um evento: resumo, vendas por lote (pagas) e números da portaria. */
+organizerRouter.get("/events/:id", async (req, res) => {
+  const id = String(req.params.id);
+  await assertEventOwner(user(req), id);
+  const e = (await one<EventRow>("SELECT * FROM events WHERE id = ?", id))!;
+  const lots = await all<{ id: string; name: string; price: number; total: number; sold: number; reserved: number }>(
+    "SELECT id, name, price, total, sold, reserved FROM batches WHERE event_id = ? ORDER BY position, price", id);
+  res.json({
+    ...(await organizerView(e)),
+    salesByBatch: lots.map((b) => ({ id: b.id, name: b.name, price: b.price, total: b.total, sold: b.sold, reserved: b.reserved, revenue: b.sold * b.price })),
+  });
 });
 
 organizerRouter.post("/events", async (req, res) => {
@@ -157,13 +178,31 @@ organizerRouter.patch("/batches/:id", async (req, res) => {
 });
 
 /** Lista de participantes (CPF mascarado). */
+/**
+ * Lista de participantes: um item por ingresso pago (CPF parcialmente oculto, como diz a Política de Privacidade).
+ * "Comprador" é quem pagou; "titular" é quem entra (pode ser outra pessoa, inclusive por transferência).
+ */
 organizerRouter.get("/events/:id/tickets", async (req, res) => {
-  await assertEventOwner(user(req), req.params.id);
-  res.json((await all<{ id: string; holder_name: string; holder_cpf: string; status: string; checked_in_at: string | null; batch: string; email: string }>(
-    `SELECT t.id, t.holder_name, t.holder_cpf, t.status, t.checked_in_at, b.name batch, u.email
-     FROM tickets t JOIN batches b ON b.id = t.batch_id JOIN users u ON u.id = t.owner_id
-     WHERE t.event_id = ? AND t.status IN ('valid','used') ORDER BY t.holder_name`, req.params.id,
-  )).map((t) => ({ id: t.id, holderName: t.holder_name, holderCpf: maskCpf(t.holder_cpf), status: t.status, checkedInAt: t.checked_in_at, batchName: t.batch, ownerEmail: t.email })));
+  const id = String(req.params.id);
+  await assertEventOwner(user(req), id);
+  const rows = await all<{
+    id: string; holder_name: string; holder_cpf: string; status: string; checked_in_at: string | null; batch: string;
+    owner_email: string; buyer_name: string; buyer_email: string; buyer_id: string; owner_id: string;
+    order_id: string; unit_price: number; paid_at: string | null; transfers: number;
+  }>(
+    `SELECT t.id, t.holder_name, t.holder_cpf, t.status, t.checked_in_at, t.transfers, t.owner_id, b.name batch,
+            uo.email owner_email, ub.name buyer_name, ub.email buyer_email, ub.id buyer_id,
+            o.id order_id, o.unit_price, o.paid_at
+     FROM tickets t JOIN batches b ON b.id = t.batch_id JOIN orders o ON o.id = t.order_id
+       JOIN users uo ON uo.id = t.owner_id JOIN users ub ON ub.id = o.user_id
+     WHERE t.event_id = ? AND t.status IN ('valid','used') ORDER BY o.paid_at DESC, t.holder_name`, id,
+  );
+  res.json(rows.map((t) => ({
+    id: t.id, holderName: t.holder_name, holderCpf: maskCpf(t.holder_cpf), status: t.status, checkedInAt: t.checked_in_at,
+    batchName: t.batch, price: t.unit_price, paidAt: t.paid_at, orderId: t.order_id,
+    buyerName: t.buyer_name, buyerEmail: t.buyer_email, ownerEmail: t.owner_email,
+    transferred: t.transfers > 0 || t.owner_id !== t.buyer_id,
+  })));
 });
 
 /** Remove o evento: apaga se não houver vendas; com vendas, cancela e estorna os compradores. */

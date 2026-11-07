@@ -135,7 +135,22 @@ export interface OrganizerEvent extends EventDetail {
   maxTicketsPerCpf: number;
   reviewNote?: string;
   /** revenue = valor dos ingressos vendidos (o que o organizador recebe); paidOut = já repassado. */
-  stats: { ticketsSold: number; revenue: number; checkedIn: number; paidOut: number; toReceive: number };
+  stats: {
+    ticketsSold: number; revenue: number; checkedIn: number; paidOut: number; toReceive: number;
+    buyers?: number; awaitingPayment?: number;
+  };
+}
+
+/** Painel de um evento (organizador). */
+export interface EventPanel extends OrganizerEvent {
+  salesByBatch: Array<{ id: string; name: string; price: number; total: number; sold: number; reserved: number; revenue: number }>;
+}
+
+/** Um ingresso vendido, na lista de participantes do organizador. */
+export interface Attendee {
+  id: string; holderName: string; holderCpf: string; status: "valid" | "used"; checkedInAt: string | null;
+  batchName: string; price: number; paidAt: string | null; orderId: string;
+  buyerName: string; buyerEmail: string; ownerEmail: string; transferred: boolean;
 }
 
 /** Evento aguardando aprovação (tela do admin). */

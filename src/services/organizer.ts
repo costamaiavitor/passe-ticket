@@ -1,6 +1,6 @@
 // Área do organizador: criar eventos, acompanhar vendas e montar a equipe da portaria.
 import { queryOptions } from "@tanstack/react-query";
-import type { AuthUser, EventCategory, OrganizerEvent, StaffMember } from "@/types";
+import type { Attendee, AuthUser, EventCategory, EventPanel, OrganizerEvent, StaffMember } from "@/types";
 import { API_BASE, http, setAccessToken, USE_MOCKS } from "./http";
 import { setSession } from "./session";
 
@@ -86,6 +86,12 @@ export async function uploadCover(file: File) {
   const r = await http<{ id: string; url: string }>("/images", { method: "POST", body: JSON.stringify({ dataUrl }) });
   return `${API_BASE}${r.url}`;
 }
+
+// ---- Painel do evento ----
+export const eventPanelQuery = (id: string) =>
+  queryOptions({ queryKey: ["event-panel", id], queryFn: () => http<EventPanel>(`/organizer/events/${encodeURIComponent(id)}`), refetchInterval: 15_000 });
+export const attendeesQuery = (id: string) =>
+  queryOptions({ queryKey: ["attendees", id], queryFn: () => http<Attendee[]>(`/organizer/events/${encodeURIComponent(id)}/tickets`), refetchInterval: 15_000 });
 
 // ---- Equipe da portaria ----
 const staffPath = (eventId: string) => `/organizer/events/${encodeURIComponent(eventId)}/staff`;

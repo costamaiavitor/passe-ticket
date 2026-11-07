@@ -457,4 +457,33 @@ describe("Passe API", () => {
     const payouts = (await api("/admin/payouts", { token: adminToken })).body as Array<{ eventId: string; balance: number }>;
     assert.equal(payouts.find((p) => p.eventId === ev.id)?.balance ?? 0, 0);
   });
+
+  it("painel do evento: resumo, vendas por lote e lista de compradores só para o dono", async () => {
+    const future = new Date(Date.now() + 16 * 86400_000).toISOString();
+    const ev = await createApproved({
+      title: "Festa Painel", category: "festas", startsAt: future, venue: "Galpão", city: "Fortaleza", maxTicketsPerCpf: 5,
+      batches: [{ name: "Pista", price: 2500, total: 10, salesStart: new Date(Date.now() - 1000).toISOString(), salesEnd: future }],
+    }, tokens.org);
+    const o = await api("/orders", { token: tokens.other, body: { eventId: ev.id, batchId: ev.batches[0].id, holders: [{ name: "Ciclano Silva", cpf: CPF_B }, { name: "Fulano de Tal", cpf: CPF_C }] } });
+    await api(`/orders/${o.body.id}/simulate-payment`, { method: "POST", token: tokens.other });
+
+    assert.equal((await api(`/organizer/events/${ev.id}`, { token: tokens.buyer })).status, 403);
+    const panel = (await api(`/organizer/events/${ev.id}`, { token: tokens.org })).body;
+    assert.equal(panel.stats.ticketsSold, 2);
+    assert.equal(panel.stats.buyers, 1);
+    assert.equal(panel.stats.revenue, 5000);
+    assert.equal(panel.salesByBatch[0].sold, 2);
+    assert.equal(panel.salesByBatch[0].revenue, 5000);
+
+    assert.equal((await api(`/organizer/events/${ev.id}/tickets`, { token: tokens.buyer })).status, 403);
+    const people = (await api(`/organizer/events/${ev.id}/tickets`, { token: tokens.org })).body as Array<any>;
+    assert.equal(people.length, 2);
+    const fulano = people.find((p) => p.holderName === "Fulano de Tal");
+    assert.equal(fulano.buyerName, "Ciclano Silva");
+    assert.equal(fulano.buyerEmail, "c@t.dev");
+    assert.equal(fulano.price, 2500);
+    assert.ok(fulano.paidAt);
+    assert.match(fulano.holderCpf, /^\*\*\*\.\d{3}\.\d{3}-\*\*$/); // CPF parcialmente oculto
+    assert.equal(fulano.status, "valid");
+  });
 });

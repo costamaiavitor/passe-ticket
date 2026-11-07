@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
-import { CalendarPlus, ExternalLink, MapPin, QrCode, Trash2, Users } from "lucide-react";
+import { BarChart3, CalendarPlus, ExternalLink, MapPin, QrCode, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { RequireAuth } from "@/components/require-auth";
@@ -152,7 +152,7 @@ function OrganizerEventCard({ ev }: { ev: OrganizerEvent }) {
         <span className={cn("absolute left-3 top-3 rounded-full px-2 py-0.5 text-xs font-medium", st.cls)}>{st.label}</span>
       </div>
       <div className="p-5">
-        <h2 className="font-medium leading-snug">{ev.title}</h2>
+        <h2 className="font-medium leading-snug"><Link to="/organizador/evento/$id" params={{ id: ev.id }} className="hover:underline">{ev.title}</Link></h2>
         <p className="mt-1 text-sm text-muted-foreground">{fmtDate(ev.startsAt)} · {fmtTime(ev.startsAt)}</p>
         <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground"><MapPin className="size-3.5" />{ev.venue}, {ev.city}</p>
 
@@ -184,7 +184,8 @@ function OrganizerEventCard({ ev }: { ev: OrganizerEvent }) {
           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-elevated"><div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} /></div>
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-2">
+        <Button asChild size="sm" className="mt-5 w-full"><Link to="/organizador/evento/$id" params={{ id: ev.id }}><BarChart3 />Vendas e compradores</Link></Button>
+        <div className="mt-2 grid grid-cols-2 gap-2">
           <Button variant="outline" size="sm" onClick={() => setStaffOpen(true)}><Users />Equipe</Button>
           <Button asChild variant="outline" size="sm"><Link to="/eventos/$id" params={{ id: ev.slug }}><ExternalLink />Ver página</Link></Button>
         </div>
