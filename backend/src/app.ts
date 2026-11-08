@@ -50,6 +50,13 @@ export function createApp() {
     if (err instanceof HttpError) {
       return void res.status(err.status).json({ code: err.code, message: err.message, details: err.details });
     }
+    const type = (err as { type?: string } | null)?.type;
+    if (type === "entity.too.large") {
+      return void res.status(413).json({ code: "TOO_LARGE", message: "O envio é grande demais. Se for uma foto, use uma imagem menor." });
+    }
+    if (type === "encoding.unsupported" || type === "charset.unsupported" || type === "entity.parse.failed") {
+      return void res.status(400).json({ code: "INVALID_BODY", message: "Não foi possível ler os dados enviados." });
+    }
     if (err instanceof SyntaxError && "body" in err) {
       return void res.status(400).json({ code: "INVALID_JSON", message: "JSON inválido." });
     }

@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { config } from "./config.js";
 
 export interface PaymentInfo {
@@ -151,7 +151,9 @@ export function verifyMercadoPagoSignature(headers: Record<string, string | stri
   const parts = Object.fromEntries(sig.split(",").map((kv) => kv.trim().split("=") as [string, string]));
   if (!parts["ts"] || !parts["v1"]) return false;
   const manifest = `id:${dataId.toLowerCase()};request-id:${requestId};ts:${parts["ts"]};`;
-  return createHmac("sha256", config.mpWebhookSecret).update(manifest).digest("hex") === parts["v1"];
+  const expected = Buffer.from(createHmac("sha256", config.mpWebhookSecret).update(manifest).digest("hex"));
+  const got = Buffer.from(parts["v1"]);
+  return got.length === expected.length && timingSafeEqual(got, expected);
 }
 
 export const payments: PaymentProvider = config.paymentProvider === "mercadopago" ? mercadopago : mock;

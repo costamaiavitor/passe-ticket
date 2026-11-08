@@ -15,7 +15,7 @@ const createSchema = z.object({
   holders: z.array(z.object({ name: z.string(), cpf: z.string() })).min(1),
 });
 
-ordersRouter.post("/", rateLimit({ windowMs: 60_000, max: 20, key: (r) => `order:${r.auth?.id}` }), async (req, res) => {
+ordersRouter.post("/", rateLimit({ windowMs: 60_000, max: config.isTest ? 1000 : 20, key: (r) => `order:${r.auth?.id}` }), async (req, res) => {
   const o = await createOrder(user(req).id, parse(createSchema, req.body));
   res.status(201).json(await toOrder(o));
 });

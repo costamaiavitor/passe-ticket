@@ -127,6 +127,12 @@ export function approveOrder(orderId: string, paymentId: string | null = null) {
     const o = await one<OrderRow>("SELECT * FROM orders WHERE id = ? FOR UPDATE", orderId);
     if (!o) throw notFound("Pedido não encontrado.");
     if (o.status === "paid" || o.status === "refunded" || o.status === "refund_required") return o;
+    // Evento cancelado: não emite ingresso; o pagamento será estornado por quem chamou (confirmPayment).
+    const evStatus = (await one<{ status: string }>("SELECT status FROM events WHERE id = ?", o.event_id))?.status;
+    if (evStatus === "cancelled") {
+      await run("UPDATE orders SET status = 'refund_required' WHERE id = ?", o.id);
+      return { ...o, status: "refund_required" as const };
+    }
     const t = now();
     if (o.status === "pending") {
       await run("UPDATE batches SET reserved = reserved - ?, sold = sold + ? WHERE id = ?", o.quantity, o.quantity, o.batch_id);
@@ -154,6 +160,14 @@ export async function releaseOrder(orderId: string, status: "expired" | "cancell
     await run("UPDATE orders SET status = ? WHERE id = ?", status, o.id);
     await run("UPDATE tickets SET status = 'cancelled' WHERE order_id = ?", o.id);
   });
+}
+
+let lastExpiry = 0;
+/** Igual a expireStaleOrders, mas no máximo uma vez a cada 30 s por servidor (usada nas páginas públicas). */
+export async function expireStaleOrdersThrottled() {
+  if (Date.now() - lastExpiry < 30_000) return 0;
+  lastExpiry = Date.now();
+  return expireStaleOrders();
 }
 
 export async function expireStaleOrders() {
@@ -207,7 +221,9 @@ export async function markRefunded(orderId: string) {
 /** Reconsulta o provedor (Pix e cartões em análise) e atualiza o pedido. Usado pelo webhook e pelo polling do checkout. */
 export async function syncPayment(o: OrderRow, opts: { checkRefund?: boolean } = {}) {
   if (o.payment_provider !== payments.name) return o;
-  if (o.status !== "pending" && o.status !== "paid") return o;
+  // Pedidos expirados/cancelados também são conferidos: um Pix pago com atraso precisa virar ingresso
+  // (se ainda houver vaga) ou estorno — nunca ficar parado na conta.
+  if (o.status === "refunded" || o.status === "refund_required") return o;
 
   // Cartões em análise: resolvidos mesmo se o pedido já foi pago por outro meio
   // (aí o confirmPayment estorna a cobrança repetida).
@@ -233,7 +249,7 @@ export async function syncPayment(o: OrderRow, opts: { checkRefund?: boolean } =
   if (o.payment_id) {
     const s = await payments.status(o.payment_id);
     if (s === "approved") await confirmPayment(o.id, o.payment_id);
-    else if ((s === "rejected" || s === "cancelled") && !cards.length) {
+    else if ((s === "rejected" || s === "cancelled") && !cards.length && o.status === "pending") {
       const cur = (await one<OrderRow>("SELECT * FROM orders WHERE id = ?", o.id))!;
       if (cur.status === "pending") await releaseOrder(o.id, "cancelled");
     }
@@ -318,7 +334,12 @@ export async function removeEvent(eventId: string) {
   }
 
   const paid = await all<OrderRow>("SELECT * FROM orders WHERE event_id = ? AND status = 'paid'", eventId);
-  if (!paid.length) {
+  // Só apaga de vez se nunca houve cobrança gerada. Se algum Pix/cartão foi criado, o evento fica como
+  // "cancelado": assim um pagamento que chegue atrasado ainda encontra o pedido e é estornado.
+  const everCharged = await one(
+    `SELECT 1 FROM orders o WHERE o.event_id = ? AND (o.payment_id IS NOT NULL OR o.paid_payment_id IS NOT NULL
+       OR EXISTS (SELECT 1 FROM order_payments p WHERE p.order_id = o.id)) LIMIT 1`, eventId);
+  if (!paid.length && !everCharged) {
     await tx(async () => {
       await run("DELETE FROM checkins WHERE event_id = ?", eventId);
       await run("DELETE FROM tickets WHERE event_id = ?", eventId);

@@ -358,8 +358,10 @@ describe("Passe API", () => {
 
     const del = await api(`/organizer/events/${semVendas.id}`, { method: "DELETE", token: tokens.org });
     assert.equal(del.status, 200, JSON.stringify(del.body));
-    assert.equal(del.body.deleted, true);
-    assert.equal((await api(`/events/${semVendas.id}`)).status, 404);
+    // Teve Pix gerado (mesmo sem pagar): fica como cancelado para um pagamento atrasado ainda achar o pedido.
+    assert.equal(del.body.deleted, false);
+    assert.equal(del.body.refunded, 0);
+    assert.equal((await api(`/events/${semVendas.id}`)).body.status, "cancelled");
 
     const cancel = await api(`/organizer/events/${comVendas.id}`, { method: "DELETE", token: tokens.org });
     assert.equal(cancel.status, 200, JSON.stringify(cancel.body));

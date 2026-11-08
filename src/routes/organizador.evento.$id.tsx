@@ -207,7 +207,8 @@ function StatusPill({ a }: { a: Attendee }) {
 
 /** Planilha CSV (abre direto no Excel/Google Planilhas, com acentos certos). */
 function downloadCsv(title: string, rows: Attendee[]) {
-  const cell = (v: string) => `"${v.replace(/"/g, '""')}"`;
+  // Texto que começa com = + - @ vira fórmula no Excel: um apóstrofo na frente impede (nomes são digitados pelos compradores).
+  const cell = (v: string) => `"${(/^[=+\-@\t\r]/.test(v) ? `'${v}` : v).replace(/"/g, '""')}"`;
   const head = ["Titular", "CPF", "Lote", "Valor", "Comprador", "E-mail do comprador", "Data da compra", "Entrada", "Transferido para"];
   const lines = rows.map((a) => [
     a.holderName, a.holderCpf, a.batchName, (a.price / 100).toFixed(2).replace(".", ","), a.buyerName, a.buyerEmail,

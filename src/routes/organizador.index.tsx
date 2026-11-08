@@ -213,7 +213,7 @@ function RemoveDialog({ ev, open, onOpenChange }: { ev: OrganizerEvent; open: bo
       void qc.invalidateQueries({ queryKey: ["organizer-events"] });
       void qc.invalidateQueries({ queryKey: ["events"] });
       onOpenChange(false);
-      if (r.deleted) toast.success("Evento removido.");
+      if (r.deleted || (!r.refunded && !r.refundFailed)) toast.success("Evento removido do site.");
       else if (r.refundFailed) toast.error(`Evento cancelado. ${r.refunded} compra(s) estornada(s), mas ${r.refundFailed} não foi(foram) estornada(s). Motivo: ${r.errors[0] ?? "erro no Mercado Pago"}. Tente de novo em “Estornar compras” ou estorne pelo app do Mercado Pago.`, { duration: 15000 });
       else toast.success(`Evento cancelado e ${r.refunded} compra(s) estornada(s).`);
     },

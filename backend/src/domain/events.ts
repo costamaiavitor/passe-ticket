@@ -73,6 +73,16 @@ export async function toEventSummary(e: EventRow) {
   return summary(e, await batchesOf(e.id));
 }
 
+/** Vários eventos de uma vez: uma única consulta de lotes (em vez de uma por evento). */
+export async function toEventSummaries(events: EventRow[]) {
+  if (!events.length) return [];
+  const rows = await all<BatchRow>(
+    `SELECT * FROM batches WHERE event_id IN (${events.map(() => "?").join(",")}) ORDER BY position, price`, ...events.map((e) => e.id));
+  const byEvent = new Map<string, BatchRow[]>();
+  for (const b of rows) byEvent.set(b.event_id, [...(byEvent.get(b.event_id) ?? []), b]);
+  return events.map((e) => summary(e, byEvent.get(e.id) ?? []));
+}
+
 export async function toEventDetail(e: EventRow) {
   const batches = await batchesOf(e.id);
   const org = await one<{ id: string; name: string }>("SELECT id, name FROM users WHERE id = ?", e.organizer_id);

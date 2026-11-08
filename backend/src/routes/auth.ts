@@ -23,9 +23,11 @@ const cookieOpts = () => ({
   maxAge: config.refreshTokenTtlSec * 1000,
 });
 
-export async function rolesOf(u: Pick<UserRow, "roles" | "email" | "id">): Promise<Role[]> {
+export async function rolesOf(u: Pick<UserRow, "roles" | "email" | "id"> & { google_sub?: string | null }): Promise<Role[]> {
   const roles = new Set(JSON.parse(u.roles) as Role[]);
-  if (config.adminEmails.includes(u.email) && !roles.has("admin")) {
+  // Só vira admin quem provou que é dono do e-mail (login com Google). Cadastro com senha não confirma o e-mail,
+  // então alguém poderia se cadastrar antes com o e-mail de um futuro admin.
+  if (config.adminEmails.includes(u.email) && !roles.has("admin") && u.google_sub) {
     roles.add("admin");
     await run("UPDATE users SET roles = ? WHERE id = ?", JSON.stringify([...roles]), u.id);
   }

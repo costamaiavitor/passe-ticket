@@ -128,11 +128,25 @@ organizerRouter.post("/events", async (req, res) => {
 
 organizerRouter.patch("/events/:id", async (req, res) => {
   await assertEventOwner(user(req), req.params.id);
-  const d = parse(eventSchema.omit({ batches: true }).partial().extend({ status: z.enum(["draft", "published", "cancelled"]).optional() }), req.body);
-  // Publicar é decisão do admin; o organizador que pedir "published" manda para análise.
-  if (d.status === "published" && !user(req).roles.includes("admin")) {
-    const cur = await one<{ status: string }>("SELECT status FROM events WHERE id = ?", String(req.params.id));
-    if (cur?.status !== "published") d.status = "review" as never;
+  // Cancelar só pelo "Remover" (DELETE), que estorna os compradores. Aqui só rascunho/publicado.
+  const d = parse(eventSchema.omit({ batches: true }).partial().extend({ status: z.enum(["draft", "published"]).optional() }), req.body);
+  const isAdmin = user(req).roles.includes("admin");
+  const cur = (await one<{ status: string; title: string }>("SELECT status, title FROM events WHERE id = ?", String(req.params.id)))!;
+  if (cur.status === "cancelled") throw conflict("EVENT_CANCELLED", "Este evento foi cancelado e não pode mais ser editado.");
+  if (d.status === "draft") {
+    const sold = await one("SELECT 1 FROM orders WHERE event_id = ? AND status IN ('paid','pending')", String(req.params.id));
+    if (sold) throw conflict("HAS_SALES", "Este evento já tem vendas. Para tirar do ar, use “Remover” (os compradores são reembolsados).");
+  }
+  if (!isAdmin) {
+    // Publicar é decisão do admin; e mudar o conteúdo de um evento já aprovado passa por nova análise
+    // (senão daria para aprovar um evento inofensivo e depois trocar por outro).
+    const contentKeys = ["title", "category", "coverUrl", "startsAt", "venue", "city", "address", "description"] as const;
+    const editsContent = contentKeys.some((k) => d[k] !== undefined);
+    if (d.status === "published" && cur.status !== "published") d.status = "review" as never;
+    if (cur.status === "published" && editsContent) {
+      d.status = "review" as never;
+      for (const to of config.adminEmails) await sendEmail(eventForReviewEmail(to, d.title ?? cur.title, "Organizador (edição de evento publicado)"));
+    }
   }
   const map: Record<string, [string, (v: never) => unknown]> = {
     title: ["title", (v) => v], category: ["category", (v) => v], coverUrl: ["cover_url", (v) => v],

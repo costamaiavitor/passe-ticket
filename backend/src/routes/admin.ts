@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import { z } from "zod";
-import { all, now, one, run } from "../db.js";
+import { all, now, one, run, tx } from "../db.js";
 import { toEventDetail, type EventRow } from "../domain/events.js";
 import { markRefunded } from "../domain/orders.js";
 import { eventReviewedEmail, payoutEmail, sendEmail } from "../lib/email.js";
@@ -117,17 +117,21 @@ adminRouter.post("/events/:id/mark-refunded", async (req, res) => {
 /** Registra um repasse feito (o Pix em si é feito por você no app do banco). */
 adminRouter.post("/payouts", async (req, res) => {
   const d = parse(z.object({ eventId: z.string().min(1), amount: z.number().int().min(1), note: z.string().trim().max(300).default("") }), req.body);
-  const e = await one<{ id: string; title: string; organizer_id: string }>("SELECT id, title, organizer_id FROM events WHERE id = ?", d.eventId);
-  if (!e) throw notFound("Evento não encontrado.");
-  const s = (await one<{ revenue: number; paid_out: number }>(
-    `SELECT COALESCE((SELECT SUM(subtotal) FROM orders WHERE event_id = ? AND status = 'paid'), 0) revenue,
-            COALESCE((SELECT SUM(amount) FROM organizer_payouts WHERE event_id = ?), 0) paid_out`, e.id, e.id))!;
-  if (d.amount > s.revenue - s.paid_out)
-    throw badRequest("PAYOUT_TOO_HIGH", "O valor é maior do que o saldo a repassar deste evento.");
-  await run(
-    "INSERT INTO organizer_payouts (id, event_id, organizer_id, amount, note, paid_at, created_by) VALUES (?,?,?,?,?,?,?)",
-    randomUUID(), e.id, e.organizer_id, d.amount, d.note, now(), user(req).id,
-  );
+  // Trava o evento: dois cliques seguidos não registram mais do que o saldo.
+  const e = await tx(async () => {
+    const ev = await one<{ id: string; title: string; organizer_id: string }>("SELECT id, title, organizer_id FROM events WHERE id = ? FOR UPDATE", d.eventId);
+    if (!ev) throw notFound("Evento não encontrado.");
+    const s = (await one<{ revenue: number; paid_out: number }>(
+      `SELECT COALESCE((SELECT SUM(subtotal) FROM orders WHERE event_id = ? AND status = 'paid'), 0) revenue,
+              COALESCE((SELECT SUM(amount) FROM organizer_payouts WHERE event_id = ?), 0) paid_out`, ev.id, ev.id))!;
+    if (d.amount > s.revenue - s.paid_out)
+      throw badRequest("PAYOUT_TOO_HIGH", "O valor é maior do que o saldo a repassar deste evento.");
+    await run(
+      "INSERT INTO organizer_payouts (id, event_id, organizer_id, amount, note, paid_at, created_by) VALUES (?,?,?,?,?,?,?)",
+      randomUUID(), ev.id, ev.organizer_id, d.amount, d.note, now(), user(req).id,
+    );
+    return ev;
+  });
   const org = await one<{ email: string; name: string }>("SELECT email, name FROM users WHERE id = ?", e.organizer_id);
   if (org) await sendEmail(payoutEmail(org.email, org.name, e.title, d.amount, d.note));
   res.status(201).json({ ok: true });
