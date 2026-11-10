@@ -151,17 +151,14 @@ function EventPage() {
         <aside className="h-fit rounded-xl border bg-card p-5 lg:sticky lg:top-20">
           <h2 className="font-medium">Ingressos</h2>
           <div className="mt-4 space-y-2">
-            {ev.batches.map((b) => {
+            {/* Só aparecem os lotes à venda agora: próximos lotes, esgotados e pausados ficam escondidos. */}
+            {buyable.map((b) => {
               const left = b.total - b.sold;
-              const disabled = b.status !== "active" || left <= 0;
-              const label = b.status === "upcoming" ? "Em breve · abre quando o lote anterior esgotar"
-                : b.status === "soldout" || left <= 0 ? "Esgotado"
-                : b.status === "active" ? `${left} disponíveis` : "Vendas encerradas";
+              const label = `${left} disponíveis`;
               return (
-                <button key={b.id} disabled={disabled || step === "holders"} onClick={() => { setBatchId(b.id); setQty(1); }}
+                <button key={b.id} disabled={step === "holders"} onClick={() => { setBatchId(b.id); setQty(1); }}
                   className={cn("flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left transition-colors",
-                    batchId === b.id ? "border-primary bg-primary/5" : "hover:border-muted-foreground/40",
-                    disabled && "cursor-not-allowed opacity-50")}>
+                    batchId === b.id ? "border-primary bg-primary/5" : "hover:border-muted-foreground/40")}>
                   <div><p className="text-sm font-medium">{b.name}</p>
                     <p className="text-xs text-muted-foreground">{label}</p></div>
                   <span className="text-sm font-medium">{brl(b.price)}</span>
@@ -228,7 +225,11 @@ function EventPage() {
               )}
             </>
           ) : (
-            <p className="mt-5 text-sm text-muted-foreground">Ingressos esgotados para este evento.</p>
+            <p className="text-sm text-muted-foreground">
+              {ev.status === "cancelled" ? "Este evento foi cancelado. As vendas foram encerradas."
+                : ev.batches.some((b) => b.total - b.sold > 0 && b.status !== "soldout") ? "Nenhum ingresso à venda no momento. Volte mais tarde."
+                : "Ingressos esgotados para este evento."}
+            </p>
           )}
         </aside>
       </main>
