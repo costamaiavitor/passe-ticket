@@ -15,6 +15,12 @@ export const rejectEvent = (id: string, reason: string) =>
 export const markRefundedOutside = (eventId: string) =>
   http<{ ok: true; orders: number }>(`/admin/events/${encodeURIComponent(eventId)}/mark-refunded`, { method: "POST" });
 
+export interface AdminEvent {
+  id: string; slug: string; title: string; status: string; startsAt: string; city: string; coverUrl: string; visibility: string;
+  organizer: { name: string; email: string }; sold: number; revenue: number;
+}
+export const allEventsQuery = () => queryOptions({ queryKey: ["admin-events"], queryFn: () => http<AdminEvent[]>("/admin/events") });
+
 export const payoutsQuery = () => queryOptions({ queryKey: ["admin-payouts"], queryFn: () => http<PayoutRow[]>("/admin/payouts") });
 
 export const registerPayout = (d: { eventId: string; amount: number; note: string }) =>

@@ -76,10 +76,8 @@ async function insertBatch(eventId: string, b: z.infer<typeof batchSchema>, posi
 }
 
 organizerRouter.get("/events", async (req, res) => {
-  const a = user(req);
-  const rows = a.roles.includes("admin")
-    ? await all<EventRow>("SELECT * FROM events ORDER BY starts_at DESC")
-    : await all<EventRow>("SELECT * FROM events WHERE organizer_id = ? ORDER BY starts_at DESC", a.id);
+  // "Meus eventos" mostra só os eventos da própria conta, inclusive para admin (todos os eventos ficam no Admin).
+  const rows = await all<EventRow>("SELECT * FROM events WHERE organizer_id = ? ORDER BY starts_at DESC", user(req).id);
   res.json(await Promise.all(rows.map(organizerView)));
 });
 

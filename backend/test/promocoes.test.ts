@@ -66,6 +66,18 @@ describe("Privado, senha, cupons e cortesias", () => {
     await user("bia");
   });
 
+  it("Meus eventos do admin mostra só os eventos dele; a lista de todos fica no Admin", async () => {
+    const ev = await event("Festa do Cliente");
+    const mine = (await api("/organizer/events", { token: T["adm"] })).body as any[];
+    assert.ok(!mine.some((e) => e.id === ev.id), "evento de cliente não aparece em Meus eventos do admin");
+    const all = (await api("/admin/events", { token: T["adm"] })).body as any[];
+    const row = all.find((e) => e.id === ev.id);
+    assert.equal(row.organizer.email, "org@t.dev");
+    assert.equal((await api("/admin/events", { token: T["org"] })).status, 403);
+    // o admin continua podendo abrir o painel do evento do cliente
+    assert.equal((await api(`/organizer/events/${ev.id}`, { token: T["adm"] })).status, 200);
+  });
+
   // ---------------- Evento privado ----------------
   it("evento privado não aparece na lista nem na busca, mas abre pelo link", async () => {
     const ev = await event("Aniversário Secreto", { visibility: "unlisted" });

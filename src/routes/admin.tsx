@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { RequireAuth } from "@/components/require-auth";
 import { Button } from "@/components/ui/button";
-import { approveEvent, markRefundedOutside, payoutsQuery, registerPayout, rejectEvent, reviewEventsQuery } from "@/services/admin";
+import { allEventsQuery, approveEvent, markRefundedOutside, payoutsQuery, registerPayout, rejectEvent, reviewEventsQuery } from "@/services/admin";
 import { brl, fmtDate, fmtTime } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import type { PayoutRow, ReviewEvent } from "@/types";
@@ -25,20 +25,56 @@ export const Route = createFileRoute("/admin")({
 });
 
 function Admin() {
-  const [tab, setTab] = useState<"review" | "payouts">("review");
+  const [tab, setTab] = useState<"review" | "events" | "payouts">("review");
   const { data: review } = useQuery(reviewEventsQuery());
   return (
     <>
       <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Admin</h1>
-      <div className="mt-5 inline-grid grid-cols-2 gap-1 rounded-lg bg-surface p-1">
-        {([["review", `Aprovar eventos${review?.length ? ` (${review.length})` : ""}`], ["payouts", "Repasses"]] as const).map(([k, label]) => (
+      <div className="mt-5 inline-grid grid-cols-3 gap-1 rounded-lg bg-surface p-1">
+        {([["review", `Aprovar eventos${review?.length ? ` (${review.length})` : ""}`], ["events", "Todos os eventos"], ["payouts", "Repasses"]] as const).map(([k, label]) => (
           <button key={k} type="button" onClick={() => setTab(k)}
             className={cn("rounded-md px-4 py-2 text-sm font-medium transition-colors",
               tab === k ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>{label}</button>
         ))}
       </div>
-      <div className="mt-6">{tab === "review" ? <ReviewList /> : <Payouts />}</div>
+      <div className="mt-6">{tab === "review" ? <ReviewList /> : tab === "events" ? <AllEvents /> : <Payouts />}</div>
     </>
+  );
+}
+
+// ---------------- Todos os eventos (de qualquer organizador) ----------------
+const EV_STATUS: Record<string, string> = { published: "Publicado", review: "Em análise", rejected: "Não aprovado", draft: "Rascunho", cancelled: "Cancelado" };
+function AllEvents() {
+  const { data, isLoading, error } = useQuery(allEventsQuery());
+  const [q, setQ] = useState("");
+  if (isLoading) return <p className="text-sm text-muted-foreground">Carregando…</p>;
+  if (error) return <p className="text-sm text-destructive">{error.message}</p>;
+  const term = q.trim().toLowerCase();
+  const list = (data ?? []).filter((e) => !term || `${e.title} ${e.organizer.name} ${e.organizer.email} ${e.city}`.toLowerCase().includes(term));
+  return (
+    <div>
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por evento, organizador ou cidade"
+        className="mb-4 h-10 w-full max-w-md rounded-md border bg-surface px-3 text-sm outline-none focus:border-primary/50" />
+      {!list.length && <p className="rounded-xl border p-8 text-center text-sm text-muted-foreground">Nenhum evento encontrado.</p>}
+      <div className="divide-y rounded-xl border bg-card">
+        {list.map((e) => (
+          <div key={e.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+            <img src={e.coverUrl} alt="" className="hidden size-14 shrink-0 rounded-md object-cover sm:block" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-medium">{e.title}
+                <span className="ml-2 rounded-full bg-elevated px-2 py-0.5 text-xs font-normal text-muted-foreground">{EV_STATUS[e.status] ?? e.status}{e.visibility === "unlisted" ? " · privado" : ""}</span></p>
+              <p className="text-xs text-muted-foreground">{fmtDate(e.startsAt)} · {e.city} · {e.organizer.name} ({e.organizer.email})</p>
+              <p className="text-xs text-muted-foreground">{e.sold} ingresso(s) · {brl(e.revenue)} vendidos</p>
+            </div>
+            <div className="flex shrink-0 gap-2">
+              <Button asChild size="sm" variant="secondary"><Link to="/organizador/evento/$id" params={{ id: e.id }}>Painel</Link></Button>
+              {e.status !== "cancelled" && <Button asChild size="sm" variant="outline"><Link to="/organizador/editar/$id" params={{ id: e.id }}>Editar</Link></Button>}
+              <Button asChild size="sm" variant="ghost"><Link to="/eventos/$id" params={{ id: e.slug }}><ExternalLink /></Link></Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

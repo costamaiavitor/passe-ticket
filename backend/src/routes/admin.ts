@@ -30,6 +30,20 @@ adminRouter.patch("/users/:id/roles", async (req, res) => {
 interface ReviewRow extends EventRow { organizer_name: string; organizer_email: string }
 
 /** Eventos aguardando aprovação (mais antigos primeiro). */
+/** Todos os eventos do site, de qualquer organizador (o admin abre o painel/edição de cada um). */
+adminRouter.get("/events", async (_req, res) => {
+  const rows = await all<{ id: string; slug: string; title: string; status: string; starts_at: string; city: string; cover_url: string;
+    visibility: string; organizer_name: string; organizer_email: string; sold: number; revenue: number }>(
+    `SELECT e.id, e.slug, e.title, e.status, e.starts_at, e.city, e.cover_url, e.visibility, u.name organizer_name, u.email organizer_email,
+       (SELECT COUNT(*) FROM tickets t WHERE t.event_id = e.id AND t.status IN ('valid','used')) sold,
+       COALESCE((SELECT SUM(subtotal) FROM orders o WHERE o.event_id = e.id AND o.status = 'paid'), 0) revenue
+     FROM events e JOIN users u ON u.id = e.organizer_id ORDER BY e.starts_at DESC`);
+  res.json(rows.map((r) => ({
+    id: r.id, slug: r.slug, title: r.title, status: r.status, startsAt: r.starts_at, city: r.city, coverUrl: r.cover_url,
+    visibility: r.visibility, organizer: { name: r.organizer_name, email: r.organizer_email }, sold: Number(r.sold), revenue: Number(r.revenue),
+  })));
+});
+
 adminRouter.get("/events/review", async (_req, res) => {
   const rows = await all<ReviewRow>(
     `SELECT e.*, u.name organizer_name, u.email organizer_email FROM events e JOIN users u ON u.id = e.organizer_id
