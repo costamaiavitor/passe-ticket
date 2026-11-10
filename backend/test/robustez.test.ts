@@ -350,4 +350,29 @@ describe("Robustez do Booticket", () => {
     const both = await Promise.all([scan(ev.id, qr), scan(ev.id, qr), scan(ev.id, qr)]);
     assert.equal(both.filter((r) => r.body.ok).length, 1, "três leitores ao mesmo tempo: só uma entrada");
   });
+
+  // ---------------- Ataques a contas ----------------
+  it("cadastro antecipado com o e-mail de outra pessoa: quando o dono entra pelo Google, a senha do invasor deixa de valer", async () => {
+    // Invasor cria conta com senha usando o e-mail da vítima (o cadastro com senha não confirma o e-mail).
+    const atk = await api("/auth/register", { body: { name: "Invasor", email: "vitima@t.dev", cpf: "29537905004", password: "senha-do-invasor" } });
+    assert.equal(atk.status, 201);
+    // A vítima, dona de verdade do e-mail, entra pelo Google.
+    google.verifyIdToken = async () => ({ sub: "g-vitima", email: "vitima@t.dev", name: "Vítima" });
+    assert.equal((await api("/auth/google", { body: { credential: "x".repeat(40) } })).status, 200);
+    // A senha do invasor e a sessão aberta dele param de funcionar.
+    assert.equal((await api("/auth/login", { body: { email: "vitima@t.dev", password: "senha-do-invasor" } })).status, 401);
+    assert.equal((await api("/auth/refresh", { body: { refreshToken: atk.body.refreshToken } })).status, 401);
+  });
+
+  it("um CPF só pode estar em uma conta (senão outra conta receberia transferências e cortesias desse CPF)", async () => {
+    const dup = await api("/auth/register", { body: { name: "Copia da Ana", email: "copia@t.dev", cpf: CPFS[3], password: PW } });
+    assert.equal(dup.status, 409);
+    assert.equal(dup.body.code, "CPF_TAKEN");
+    // Conta do Google (sem CPF) tentando colocar o CPF de outra pessoa.
+    google.verifyIdToken = async () => ({ sub: "g-sem-cpf", email: "semcpf@t.dev", name: "Sem CPF" });
+    const g = await api("/auth/google", { body: { credential: "x".repeat(40) } });
+    const r = await api("/auth/me/cpf", { method: "PUT", token: g.body.accessToken, body: { cpf: CPFS[3] } });
+    assert.equal(r.status, 409);
+    assert.equal(r.body.code, "CPF_TAKEN");
+  });
 });

@@ -54,6 +54,9 @@ const readCookie = (req: Request, name: string) =>
 // Nos testes automáticos todas as chamadas vêm do mesmo IP; o limite real é 10 por minuto.
 const limiter = rateLimit({ windowMs: 60_000, max: config.isTest ? 1000 : 10, key: (req) => `auth:${req.ip}` });
 
+const cpfTaken = () => conflict("CPF_TAKEN",
+  "Esse CPF já está em outra conta do Booticket. Entre nessa conta ou use “Esqueci minha senha”. Se não foi você, fale com o suporte.");
+
 const registerSchema = z.object({
   name: z.string().trim().min(3).max(120),
   email: z.string().trim().toLowerCase().email(),
@@ -64,6 +67,9 @@ const registerSchema = z.object({
 authRouter.post("/register", limiter, async (req, res) => {
   const data = parse(registerSchema, req.body);
   if (await one("SELECT 1 FROM users WHERE email = ?", data.email)) throw conflict("EMAIL_TAKEN", "Já existe uma conta com esse e-mail.");
+  // Um CPF por conta: transferências e cortesias são entregues pelo CPF, então outra conta com o mesmo CPF
+  // poderia receber ingressos que eram de outra pessoa.
+  if (await one("SELECT 1 FROM users WHERE cpf = ?", data.cpf)) throw cpfTaken();
   const id = randomUUID();
   await run(
     "INSERT INTO users (id, name, email, cpf, password_hash, roles, created_at) VALUES (?,?,?,?,?,?,?)",
@@ -92,6 +98,16 @@ authRouter.post("/google", limiter, async (req, res) => {
 
   let u = await one<UserRow & { google_sub: string | null }>("SELECT * FROM users WHERE google_sub = ?", g.sub);
   if (!u) {
+    // Conta com senha criada com este e-mail, mas nunca confirmada (o cadastro com senha não verifica o e-mail).
+    // Quem entra agora pelo Google PROVA que é dono do e-mail: a senha antiga pode ter sido criada por outra pessoa
+    // (para esperar a vítima ligar o Google e herdar o acesso — inclusive de admin). Por isso a senha é apagada e
+    // as sessões abertas caem. O dono continua entrando pelo Google ou cria uma senha nova em "Esqueci minha senha".
+    const unverified = await one<{ id: string; password_hash: string }>(
+      "SELECT id, password_hash FROM users WHERE email = ? AND google_sub IS NULL", g.email);
+    if (unverified?.password_hash) {
+      await run("UPDATE users SET password_hash = '' WHERE id = ?", unverified.id);
+      await run("UPDATE refresh_tokens SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL", now(), unverified.id);
+    }
     await run(
       `INSERT INTO users (id, name, email, cpf, password_hash, roles, created_at, google_sub) VALUES (?,?,?,'','',?,?,?)
        ON CONFLICT (email) DO UPDATE SET google_sub = COALESCE(users.google_sub, EXCLUDED.google_sub)`,
@@ -169,6 +185,7 @@ authRouter.get("/me", requireAuth, async (req, res) => {
 /** Informa o CPF da conta (quem entrou com Google não tem). Só pode ser definido uma vez. */
 authRouter.put("/me/cpf", requireAuth, async (req, res) => {
   const { cpf } = parse(z.object({ cpf: z.string().transform(onlyDigits).refine(isValidCpf, "CPF inválido") }), req.body);
+  if (await one("SELECT 1 FROM users WHERE cpf = ? AND id <> ?", cpf, user(req).id)) throw cpfTaken();
   const r = await run("UPDATE users SET cpf = ? WHERE id = ? AND (cpf IS NULL OR cpf = '')", cpf, user(req).id);
   if (!r.changes) throw conflict("CPF_ALREADY_SET", "Sua conta já tem um CPF. Para trocar, fale com o suporte.");
   res.json({ ok: true });

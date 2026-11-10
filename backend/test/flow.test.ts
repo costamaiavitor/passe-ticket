@@ -32,9 +32,9 @@ const CPF_A = "52998224725", CPF_B = "11144477735", CPF_C = "39053344705";
 
 async function setup() {
   const pw = await hashPassword("senha12345");
-  await run("INSERT INTO users (id, name, email, cpf, password_hash, roles, created_at) VALUES ('org','Produtor','org@t.dev',?,?,'[\"buyer\",\"organizer\"]',?)", CPF_A, pw, now());
-  await run("INSERT INTO users (id, name, email, cpf, password_hash, roles, created_at) VALUES ('staff','Seguranca','staff@t.dev',?,?,'[\"buyer\"]',?)", CPF_B, pw, now());
-  await run("INSERT INTO users (id, name, email, cpf, password_hash, roles, created_at) VALUES ('adm','Admin','adm@t.dev',?,?,'[\"buyer\",\"admin\"]',?)", CPF_A, pw, now());
+  await run("INSERT INTO users (id, name, email, cpf, password_hash, roles, created_at) VALUES ('org','Produtor','org@t.dev',?,?,'[\"buyer\",\"organizer\"]',?)", "71020030054", pw, now());
+  await run("INSERT INTO users (id, name, email, cpf, password_hash, roles, created_at) VALUES ('staff','Seguranca','staff@t.dev',?,?,'[\"buyer\"]',?)", "71020030135", pw, now());
+  await run("INSERT INTO users (id, name, email, cpf, password_hash, roles, created_at) VALUES ('adm','Admin','adm@t.dev',?,?,'[\"buyer\",\"admin\"]',?)", "71020030216", pw, now());
   const login = async (email: string) => (await api("/auth/login", { body: { email, password: "senha12345" } })).body.accessToken as string;
   adminToken = await login("adm@t.dev");
   return { org: await login("org@t.dev"), staff: await login("staff@t.dev") };
@@ -255,10 +255,14 @@ describe("Booticket API", () => {
     const again = await api("/auth/google", { body: { credential: `ok:g-111:nova@t.dev:${"x".repeat(20)}` } });
     assert.equal(again.body.user.id, novo.body.user.id);
 
-    // E-mail que já tinha conta com senha: entra na mesma conta, e a senha continua funcionando.
+    // E-mail que já tinha conta com senha: entra na mesma conta (mesmos ingressos). Como o cadastro com senha
+    // nunca confirmou o e-mail, a senha antiga é apagada por segurança (ela pode ter sido criada por um invasor);
+    // o dono segue entrando pelo Google ou cria uma senha nova em "Esqueci minha senha".
+    const before = (await api("/auth/login", { body: { email: "f@t.dev", password: "senha12345" } })).body.user.id;
     const linked = await api("/auth/google", { body: { credential: `ok:g-222:f@t.dev:${"x".repeat(20)}` } });
     assert.equal(linked.status, 200);
-    assert.equal((await api("/auth/login", { body: { email: "f@t.dev", password: "senha12345" } })).body.user.id, linked.body.user.id);
+    assert.equal(linked.body.user.id, before);
+    assert.equal((await api("/auth/login", { body: { email: "f@t.dev", password: "senha12345" } })).status, 401);
 
     // Outra conta Google tentando o mesmo e-mail é recusada.
     const other = await api("/auth/google", { body: { credential: `ok:g-999:f@t.dev:${"x".repeat(20)}` } });

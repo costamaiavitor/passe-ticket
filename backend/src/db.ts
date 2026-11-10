@@ -251,6 +251,15 @@ CREATE TABLE IF NOT EXISTS mp_oauth_states (
 -- Pedido pago direto na conta do organizador: quem é o vendedor e quanto ficou de taxa para o Booticket.
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS seller_id TEXT REFERENCES users(id);
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS application_fee INTEGER NOT NULL DEFAULT 0;
+
+-- Um CPF por conta (transferências e cortesias são entregues pelo CPF). Só cria a trava se ainda não houver
+-- CPFs repetidos no banco, para a atualização nunca derrubar o site; o cadastro já recusa CPF repetido.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'users_cpf_unique')
+     AND NOT EXISTS (SELECT cpf FROM users WHERE cpf <> '' GROUP BY cpf HAVING COUNT(*) > 1) THEN
+    CREATE UNIQUE INDEX users_cpf_unique ON users (cpf) WHERE cpf <> '';
+  END IF;
+END $$;
 `;
 
 type Param = string | number | boolean | null;
