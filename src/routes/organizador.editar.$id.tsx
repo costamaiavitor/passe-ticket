@@ -287,7 +287,7 @@ function EditEvent({ ev }: { ev: EventPanel }) {
         </Section>
 
         <Section n={5} title="Quem pode ver e comprar">
-          <AccessFields visibility={visibility} onVisibility={setVisibility} accessCode={accessCode} onAccessCode={setAccessCode} />
+          <AccessFields wasPrivate={ev.visibility === "unlisted"} visibility={visibility} onVisibility={setVisibility} accessCode={accessCode} onAccessCode={setAccessCode} />
         </Section>
 
         {(formError || save.error) && <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{formError ?? save.error?.message}</p>}

@@ -20,9 +20,9 @@ export const formatCpf = (v: string) =>
 export const couponLabel = (c: Pick<Coupon, "kind" | "value">) => (c.kind === "percent" ? `${c.value}% off` : `${brl(c.value)} off por ingresso`);
 
 // ---------------- Público / privado e palavra-senha ----------------
-export function AccessFields({ visibility, onVisibility, accessCode, onAccessCode, isNew }: {
+export function AccessFields({ visibility, onVisibility, accessCode, onAccessCode, isNew, wasPrivate }: {
   visibility: "public" | "unlisted"; onVisibility: (v: "public" | "unlisted") => void;
-  accessCode: string; onAccessCode: (v: string) => void; isNew?: boolean;
+  accessCode: string; onAccessCode: (v: string) => void; isNew?: boolean; wasPrivate?: boolean;
 }) {
   const [useCode, setUseCode] = useState(!!accessCode);
   const opt = (v: "public" | "unlisted", icon: React.ReactNode, title: string, desc: string) => (
@@ -41,7 +41,7 @@ export function AccessFields({ visibility, onVisibility, accessCode, onAccessCod
           {opt("public", <Globe className="size-4" />, "Público", "Aparece na página inicial e na busca do Passe.")}
           {opt("unlisted", <Link2 className="size-4" />, "Privado", "Não aparece no site. Só entra quem tiver o link.")}
         </div>
-        {visibility === "unlisted" && !isNew && (
+        {visibility === "unlisted" && !isNew && !wasPrivate && (
           <p className="mt-2 text-xs text-muted-foreground">Ao deixar privado, o link do evento muda para um difícil de adivinhar. Compartilhe o link novo.</p>
         )}
       </div>
