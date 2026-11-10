@@ -1,4 +1,4 @@
-// Área do admin do Passe: aprovar eventos e registrar repasses aos organizadores.
+// Área do admin do Booticket: aprovar eventos e registrar repasses aos organizadores.
 import { queryOptions } from "@tanstack/react-query";
 import type { PayoutRow, ReviewEvent } from "@/types";
 import { http } from "./http";

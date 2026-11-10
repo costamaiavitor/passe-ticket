@@ -5,7 +5,7 @@ import { AuthShell, Field, SubmitButton, useSubmit } from "@/components/auth-for
 import { forgotPassword } from "@/services/auth";
 
 export const Route = createFileRoute("/esqueci-senha")({
-  head: () => ({ meta: [{ title: "Esqueci minha senha — Passe" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Esqueci minha senha — Booticket" }, { name: "robots", content: "noindex" }] }),
   component: Forgot,
 });
 

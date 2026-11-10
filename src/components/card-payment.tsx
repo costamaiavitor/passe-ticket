@@ -113,7 +113,7 @@ export function CardPayment({ order, payerEmail, onDone }: { order: Order; payer
       <div id={containerId} />
       {error && <p className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
       <p className="mt-3 text-xs text-muted-foreground">
-        Os dados do cartão vão direto para o Mercado Pago e não passam pelo Passe. Parcelamento em até {MAX_INSTALLMENTS}x; juros, quando houver, são mostrados antes de confirmar.
+        Os dados do cartão vão direto para o Mercado Pago e não passam pelo Booticket. Parcelamento em até {MAX_INSTALLMENTS}x; juros, quando houver, são mostrados antes de confirmar.
       </p>
     </div>
   );

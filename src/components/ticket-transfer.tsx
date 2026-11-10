@@ -113,7 +113,7 @@ export function TransferControls({ t }: { t: Ticket }) {
           <DialogHeader>
             <DialogTitle>Transferir ingresso</DialogTitle>
             <DialogDescription>
-              {t.event.title} · {t.batchName}. Informe o CPF de quem vai receber. A pessoa precisa ter conta no Passe com esse CPF e aceitar em “Meus ingressos”.
+              {t.event.title} · {t.batchName}. Informe o CPF de quem vai receber. A pessoa precisa ter conta no Booticket com esse CPF e aceitar em “Meus ingressos”.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={submit} className="space-y-3">

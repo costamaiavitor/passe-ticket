@@ -9,7 +9,7 @@ export function AuthShell({ title, subtitle, children, footer }: { title: string
     <div className="grid min-h-screen place-items-center px-5">
       <div className="w-full max-w-sm">
         <Link to="/" className="mb-10 flex items-center gap-2 font-semibold">
-          <span className="grid size-7 place-items-center rounded-md bg-primary text-primary-foreground"><Ticket className="size-4" /></span>Passe
+          <span className="grid size-7 place-items-center rounded-md bg-primary text-primary-foreground"><Ticket className="size-4" /></span>Booticket
         </Link>
         <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>

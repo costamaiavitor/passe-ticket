@@ -1,4 +1,4 @@
-// Split 1:1 do Mercado Pago: organizador conecta a conta e as vendas caem direto nela, com a taxa do Passe separada.
+// Split 1:1 do Mercado Pago: organizador conecta a conta e as vendas caem direto nela, com a taxa do Booticket separada.
 process.env["NODE_ENV"] = "test";
 process.env["PAYMENT_PROVIDER"] = "mock";
 
@@ -96,14 +96,14 @@ describe("Split 1:1 Mercado Pago", () => {
     assert.equal((await api("/organizer/mercadopago", { token: T["orgB"] })).body.connected, false);
   });
 
-  it("venda de organizador conectado: Pix criado na conta dele, taxa do Passe separada, sem repasse manual", async () => {
+  it("venda de organizador conectado: Pix criado na conta dele, taxa do Booticket separada, sem repasse manual", async () => {
     const ev = await event("orgA", "Festa do A", 10000);
     const o = await buy("ana", ev);
     assert.equal(o.status, 201, JSON.stringify(o.body));
     const row = (await orderRow(o.body.id))!;
     assert.equal(row.seller_id, "orgA");
     assert.equal(mockAccounts.get(row.payment_id), "seller-orgA", "Pix na conta do organizador");
-    assert.equal(mockFees.get(row.payment_id), 1000, "taxa de R$ 10 para o Passe");
+    assert.equal(mockFees.get(row.payment_id), 1000, "taxa de R$ 10 para o Booticket");
     assert.equal(row.application_fee, 1000);
     assert.equal(o.body.total, 11000);
     // pagamento aprovado (consulta feita com o token do organizador)
@@ -119,7 +119,7 @@ describe("Split 1:1 Mercado Pago", () => {
     assert.equal((await api("/admin/payouts", { token: T["adm"], body: { eventId: ev.id, amount: 100 } })).status, 400, "não repassa de novo");
   });
 
-  it("organizador sem conta conectada continua no modelo antigo (cai no Passe, repasse manual)", async () => {
+  it("organizador sem conta conectada continua no modelo antigo (cai no Booticket, repasse manual)", async () => {
     const ev = await event("orgB", "Festa do B", 5000);
     const o = await buy("ana", ev);
     const row = (await orderRow(o.body.id))!;
@@ -160,7 +160,7 @@ describe("Split 1:1 Mercado Pago", () => {
     assert.equal(mockStatuses.get(cardId), "refunded");
   });
 
-  it("desconectar: novas vendas voltam para o Passe; pedidos antigos continuam consultando a conta do organizador", async () => {
+  it("desconectar: novas vendas voltam para o Booticket; pedidos antigos continuam consultando a conta do organizador", async () => {
     const ev = await event("orgB", "Festa B3");
     const old = await buy("ana", ev);
     assert.equal((await api("/organizer/mercadopago", { method: "DELETE", token: T["orgB"] })).body.connected, false);
@@ -179,7 +179,7 @@ describe("Split 1:1 Mercado Pago", () => {
     assert.equal(mockAccounts.get((await orderRow(o.body.id))!.payment_id), "seller-orgA");
     const exp = (await one<{ expires_at: string }>("SELECT expires_at FROM mp_accounts WHERE user_id = 'orgA'"))!.expires_at;
     assert.ok(new Date(exp).getTime() > Date.now() + 100 * 86400_000, "renovado por mais 180 dias");
-    // organizador revogou o acesso: token vencido e renovação recusada → a venda cai no Passe em vez de falhar
+    // organizador revogou o acesso: token vencido e renovação recusada → a venda cai no Booticket em vez de falhar
     const { encrypt } = await import("../src/domain/mpaccounts.js");
     await run("UPDATE mp_accounts SET expires_at = ?, refresh_token = ? WHERE user_id = 'orgA'", new Date(Date.now() - 1000).toISOString(), encrypt("revogado"));
     const o2 = await buy("bia", ev);

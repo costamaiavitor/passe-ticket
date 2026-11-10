@@ -140,7 +140,7 @@ organizerRouter.post("/events", async (req, res) => {
   }
   const a = user(req);
   const isAdmin = a.roles.includes("admin");
-  // Eventos de organizadores passam pela aprovação do Passe antes de ir ao ar (evita evento falso).
+  // Eventos de organizadores passam pela aprovação do Booticket antes de ir ao ar (evita evento falso).
   const status = d.status === "draft" ? "draft" : isAdmin ? "published" : "review";
   const id = randomUUID();
   let slug = d.visibility === "unlisted" ? privateSlug(d.title) : slugify(d.title) || "evento";

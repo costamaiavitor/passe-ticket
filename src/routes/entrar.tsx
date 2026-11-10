@@ -9,10 +9,10 @@ export const Route = createFileRoute("/entrar")({
     typeof s["redirect"] === "string" && s["redirect"].startsWith("/") ? { redirect: s["redirect"] } : {},
   head: () => ({
     meta: [
-      { title: "Entrar — Passe" },
-      { name: "description", content: "Acesse sua conta Passe." },
-      { property: "og:title", content: "Entrar — Passe" },
-      { property: "og:description", content: "Acesse sua conta Passe." },
+      { title: "Entrar — Booticket" },
+      { name: "description", content: "Acesse sua conta Booticket." },
+      { property: "og:title", content: "Entrar — Booticket" },
+      { property: "og:description", content: "Acesse sua conta Booticket." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],

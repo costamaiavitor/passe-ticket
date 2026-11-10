@@ -13,7 +13,7 @@ const getTransport = () => (transport ??= config.smtpUrl
   ? nodemailer.createTransport(config.smtpUrl)
   : nodemailer.createTransport({ host: "smtp.gmail.com", port: 465, secure: true, auth: { user: config.smtpUser, pass: config.smtpPass } }));
 const configured = () => !!config.smtpUrl || (!!config.smtpUser && !!config.smtpPass);
-const fromAddress = () => (config.smtpUser && !config.smtpUrl ? `Passe <${config.smtpUser}>` : config.emailFrom);
+const fromAddress = () => (config.smtpUser && !config.smtpUrl ? `Booticket <${config.smtpUser}>` : config.emailFrom);
 
 /** Envia sem nunca derrubar a operação principal (compra, cadastro…): falha vira só um aviso no log. */
 export async function sendEmail(mail: Email): Promise<boolean> {
@@ -44,21 +44,21 @@ function layout(title: string, body: string, cta?: { label: string; url: string 
     : "";
   return `<!doctype html><html lang="pt-BR"><body style="margin:0;background:#090B0F;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;color:#F5F7FA">
   <div style="max-width:520px;margin:0 auto;background:#171A21;border:1px solid #272D38;border-radius:12px;padding:28px">
-    <p style="margin:0 0 20px;font-weight:700;font-size:18px"><span style="background:#B8F34A;color:#14200A;border-radius:6px;padding:2px 7px;margin-right:6px">▣</span>Passe</p>
+    <p style="margin:0 0 20px;font-weight:700;font-size:18px"><span style="background:#B8F34A;color:#14200A;border-radius:6px;padding:2px 7px;margin-right:6px">▣</span>Booticket</p>
     <h1 style="margin:0 0 12px;font-size:20px">${esc(title)}</h1>
     <div style="font-size:15px;line-height:1.55;color:#C9CED8">${body}</div>
     ${button}
-    <p style="margin:28px 0 0;font-size:12px;color:#9299A7">Passe · Ingressos com segurança · <a href="${config.publicUrl}" style="color:#9299A7">${config.publicUrl.replace(/^https?:\/\//, "")}</a></p>
+    <p style="margin:28px 0 0;font-size:12px;color:#9299A7">Booticket · Ingressos com segurança · <a href="${config.publicUrl}" style="color:#9299A7">${config.publicUrl.replace(/^https?:\/\//, "")}</a></p>
   </div></body></html>`;
 }
 
 export function passwordResetEmail(to: string, name: string, link: string): Email {
   return {
     to,
-    subject: "Redefina sua senha do Passe",
+    subject: "Redefina sua senha do Booticket",
     html: layout("Redefinir senha", `<p>Oi, ${esc(name)}!</p><p>Recebemos um pedido para trocar a senha da sua conta. O link vale por <strong>1 hora</strong>.</p><p>Se não foi você, ignore este e-mail: sua senha continua a mesma.</p>`,
       { label: "Criar nova senha", url: link }),
-    text: `Oi, ${name}! Para criar uma nova senha no Passe, abra: ${link} (vale por 1 hora). Se não foi você, ignore este e-mail.`,
+    text: `Oi, ${name}! Para criar uma nova senha no Booticket, abra: ${link} (vale por 1 hora). Se não foi você, ignore este e-mail.`,
   };
 }
 
@@ -148,7 +148,7 @@ export function courtesyEmail(to: string, name: string, eventTitle: string, read
   const link = `${config.publicUrl}/ingressos`;
   const how = ready
     ? "O ingresso já está na sua conta, em Meus ingressos."
-    : "Para receber, entre no Passe (ou crie sua conta) com o seu CPF e aceite o ingresso em Meus ingressos.";
+    : "Para receber, entre no Booticket (ou crie sua conta) com o seu CPF e aceite o ingresso em Meus ingressos.";
   return {
     to,
     subject: `Você ganhou uma cortesia: ${eventTitle}`,
@@ -163,7 +163,7 @@ export function transferOfferEmail(to: string, name: string, fromName: string, e
   return {
     to,
     subject: `${fromName} quer te passar um ingresso`,
-    html: layout("Você recebeu um ingresso 🎟️", `<p>Oi, ${esc(name)}! <strong>${esc(fromName)}</strong> quer transferir para você um ingresso de <strong>${esc(eventTitle)}</strong>.</p><p>Entre no Passe e aceite em <strong>Meus ingressos</strong>. Depois de aceitar, o ingresso fica no seu nome e CPF, com um QR Code novo.</p>`,
+    html: layout("Você recebeu um ingresso 🎟️", `<p>Oi, ${esc(name)}! <strong>${esc(fromName)}</strong> quer transferir para você um ingresso de <strong>${esc(eventTitle)}</strong>.</p><p>Entre no Booticket e aceite em <strong>Meus ingressos</strong>. Depois de aceitar, o ingresso fica no seu nome e CPF, com um QR Code novo.</p>`,
       { label: "Ver e aceitar", url: link }),
     text: `${fromName} quer transferir para você um ingresso de ${eventTitle}. Aceite em ${link}`,
   };

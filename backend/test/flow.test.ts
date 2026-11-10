@@ -50,7 +50,7 @@ async function createApproved(body: unknown, token: string) {
   return (await api(`/events/${r.body.id}`)).body;
 }
 
-describe("Passe API", () => {
+describe("Booticket API", () => {
   let tokens: { org: string; staff: string; buyer: string; other: string };
   let eventId = "", batchId = "", otherEventId = "";
 

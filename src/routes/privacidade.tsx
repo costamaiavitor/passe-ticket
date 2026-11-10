@@ -4,8 +4,8 @@ import { CONTACT_EMAIL, LegalPage, LegalSection } from "@/components/legal-page"
 export const Route = createFileRoute("/privacidade")({
   head: () => ({
     meta: [
-      { title: "Política de Privacidade — Passe" },
-      { name: "description", content: "Como o Passe coleta, usa e protege seus dados pessoais." },
+      { title: "Política de Privacidade — Booticket" },
+      { name: "description", content: "Como o Booticket coleta, usa e protege seus dados pessoais." },
     ],
   }),
   component: Privacy,
@@ -15,10 +15,10 @@ function Privacy() {
   return (
     <LegalPage
       title="Política de Privacidade"
-      intro="Esta política explica quais dados pessoais o Passe coleta, por que coleta e o que você pode fazer com eles, seguindo a Lei Geral de Proteção de Dados (LGPD — Lei nº 13.709/2018)."
+      intro="Esta política explica quais dados pessoais o Booticket coleta, por que coleta e o que você pode fazer com eles, seguindo a Lei Geral de Proteção de Dados (LGPD — Lei nº 13.709/2018)."
     >
       <LegalSection n={1} title="Quem somos">
-        <p>O <strong>Passe</strong> é uma plataforma online de venda de ingressos para eventos. Organizadores publicam seus eventos e o público compra ingressos nominais com QR Code.</p>
+        <p>O <strong>Booticket</strong> é uma plataforma online de venda de ingressos para eventos. Organizadores publicam seus eventos e o público compra ingressos nominais com QR Code.</p>
         <p>Contato do responsável pelos dados: <a className="text-foreground underline" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.</p>
       </LegalSection>
 

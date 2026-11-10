@@ -5,7 +5,7 @@ import { expireStaleOrders } from "./domain/orders.js";
 
 const app = createApp();
 app.listen(config.port, () => {
-  console.log(`Passe API em ${config.publicUrl}/api/v1 (pagamentos: ${config.paymentProvider})`);
+  console.log(`Booticket API em ${config.publicUrl}/api/v1 (pagamentos: ${config.paymentProvider})`);
 });
 
 // Libera reservas de pedidos não pagos.

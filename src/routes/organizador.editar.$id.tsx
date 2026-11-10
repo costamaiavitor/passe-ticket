@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import type { EventCategory, EventPanel } from "@/types";
 
 export const Route = createFileRoute("/organizador/editar/$id")({
-  head: () => ({ meta: [{ title: "Editar evento — Passe" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Editar evento — Booticket" }, { name: "robots", content: "noindex" }] }),
   component: () => {
     const { id } = Route.useParams();
     return (

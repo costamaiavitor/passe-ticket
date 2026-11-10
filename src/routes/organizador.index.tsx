@@ -19,7 +19,7 @@ import { MercadoPagoCard } from "@/components/mp-connect";
 import type { AuthUser, OrganizerEvent } from "@/types";
 
 export const Route = createFileRoute("/organizador/")({
-  head: () => ({ meta: [{ title: "Meus eventos — Passe" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Meus eventos — Booticket" }, { name: "robots", content: "noindex" }] }),
   component: () => (
     <div className="min-h-screen">
       <SiteHeader />
@@ -36,7 +36,7 @@ function BecomeOrganizer({ user }: { user: AuthUser }) {
   return (
     <section className="mx-auto max-w-lg rounded-xl border bg-card p-6 text-center md:p-10">
       <span className="mx-auto grid size-12 place-items-center rounded-lg bg-primary text-primary-foreground"><CalendarPlus className="size-6" /></span>
-      <h1 className="mt-5 text-2xl font-semibold tracking-tight">Venda ingressos no Passe</h1>
+      <h1 className="mt-5 text-2xl font-semibold tracking-tight">Venda ingressos no Booticket</h1>
       <p className="mt-2 text-sm text-muted-foreground">
         Crie seu evento em poucos minutos. Cada ingresso sai com QR Code único, e a sua equipe valida a entrada pelo celular.
       </p>
@@ -120,7 +120,7 @@ function PayoutInfoCard() {
   return (
     <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="mt-5 rounded-xl border border-primary/40 bg-card p-4">
       <p className="font-medium">Onde você quer receber as vendas?</p>
-      <p className="mt-1 text-xs text-muted-foreground">O Passe repassa o valor dos ingressos vendidos por Pix. A taxa de serviço de 10% é paga pelo comprador.</p>
+      <p className="mt-1 text-xs text-muted-foreground">O Booticket repassa o valor dos ingressos vendidos por Pix. A taxa de serviço de 10% é paga pelo comprador.</p>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         <input required minLength={3} value={pixKey} onChange={(e) => setPixKey(e.target.value)} placeholder="Chave Pix (CPF, CNPJ, e-mail, celular…)"
           className="h-10 rounded-md border bg-surface px-3 text-sm outline-none focus:border-primary/50" />
@@ -175,7 +175,7 @@ function OrganizerEventCard({ ev }: { ev: OrganizerEvent }) {
 
         {ev.status === "review" && (
           <p className="mt-4 rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
-            Aguardando aprovação do Passe. Você recebe um e-mail quando o evento entrar no ar.
+            Aguardando aprovação do Booticket. Você recebe um e-mail quando o evento entrar no ar.
           </p>
         )}
         {ev.status === "rejected" && (
@@ -292,7 +292,7 @@ function StaffDialog({ eventId, title, open, onOpenChange }: { eventId: string; 
           <Button type="submit" disabled={add.isPending}>{add.isPending ? "…" : "Adicionar"}</Button>
         </form>
         {add.error && <p className="text-sm text-destructive">{add.error.message}</p>}
-        <p className="text-xs text-muted-foreground">A pessoa precisa ter conta no Passe. Ela acessa pelo menu “Portaria”.</p>
+        <p className="text-xs text-muted-foreground">A pessoa precisa ter conta no Booticket. Ela acessa pelo menu “Portaria”.</p>
         <ul className="divide-y rounded-lg border">
           {isLoading && <li className="p-3 text-sm text-muted-foreground">Carregando…</li>}
           {staff && !staff.length && <li className="p-3 text-sm text-muted-foreground">Ninguém na equipe ainda.</li>}

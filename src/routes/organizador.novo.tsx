@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import type { EventCategory, OrganizerEvent } from "@/types";
 
 export const Route = createFileRoute("/organizador/novo")({
-  head: () => ({ meta: [{ title: "Criar evento — Passe" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Criar evento — Booticket" }, { name: "robots", content: "noindex" }] }),
   component: () => (
     <div className="min-h-screen">
       <SiteHeader />
@@ -286,7 +286,7 @@ function Created({ ev, onDone }: { ev: OrganizerEvent; onDone: () => void }) {
       <h1 className="mt-4 text-2xl font-semibold tracking-tight">{inReview ? "Evento enviado para análise!" : "Evento publicado!"}</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         {inReview
-          ? "A equipe do Passe confere os dados e aprova em breve. Você recebe um e-mail quando o evento entrar no ar; aí é só divulgar o link abaixo."
+          ? "A equipe do Booticket confere os dados e aprova em breve. Você recebe um e-mail quando o evento entrar no ar; aí é só divulgar o link abaixo."
           : "Os ingressos já estão à venda. Divulgue o link no Instagram e no WhatsApp."}
       </p>
       <div className="mt-6 flex items-center gap-2 rounded-lg border bg-card p-2 pl-3 text-left">

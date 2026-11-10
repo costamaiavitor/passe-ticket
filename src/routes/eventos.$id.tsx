@@ -25,7 +25,7 @@ export const Route = createFileRoute("/eventos/$id")({
   head: ({ loaderData }) => ({
     meta: loaderData
       ? [
-          { title: `${loaderData.title} — Passe` },
+          { title: `${loaderData.title} — Booticket` },
           { name: "description", content: loaderData.description },
           { property: "og:title", content: loaderData.title },
           { property: "og:description", content: loaderData.description },
@@ -34,7 +34,7 @@ export const Route = createFileRoute("/eventos/$id")({
           // Evento privado: buscadores (Google) não devem listar.
           ...(loaderData.visibility === "unlisted" ? [{ name: "robots", content: "noindex" }] : []),
         ]
-      : [{ title: "Evento indisponível — Passe" }, { name: "robots", content: "noindex" }],
+      : [{ title: "Evento indisponível — Booticket" }, { name: "robots", content: "noindex" }],
   }),
   notFoundComponent: () => (
     <div className="grid min-h-screen place-items-center text-center">

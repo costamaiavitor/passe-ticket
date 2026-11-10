@@ -4,7 +4,7 @@ import { resetPassword } from "@/services/auth";
 
 export const Route = createFileRoute("/redefinir-senha")({
   validateSearch: (s: Record<string, unknown>): { token?: string } => (typeof s["token"] === "string" ? { token: s["token"] } : {}),
-  head: () => ({ meta: [{ title: "Nova senha — Passe" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Nova senha — Booticket" }, { name: "robots", content: "noindex" }] }),
   component: Reset,
 });
 

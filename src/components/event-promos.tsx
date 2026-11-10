@@ -38,7 +38,7 @@ export function AccessFields({ visibility, onVisibility, accessCode, onAccessCod
       <div>
         <Label>Quem pode ver o evento</Label>
         <div className="grid gap-2 sm:grid-cols-2">
-          {opt("public", <Globe className="size-4" />, "Público", "Aparece na página inicial e na busca do Passe.")}
+          {opt("public", <Globe className="size-4" />, "Público", "Aparece na página inicial e na busca do Booticket.")}
           {opt("unlisted", <Link2 className="size-4" />, "Privado", "Não aparece no site. Só entra quem tiver o link.")}
         </div>
         {visibility === "unlisted" && !isNew && !wasPrivate && (

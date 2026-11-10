@@ -43,7 +43,7 @@ export const config = {
   mpAccessToken: env["MP_ACCESS_TOKEN"] ?? "",
   mpWebhookSecret: env["MP_WEBHOOK_SECRET"] ?? "",
   // Split 1:1: organizadores conectam a própria conta Mercado Pago (OAuth) e as vendas caem direto nela;
-  // a taxa do Passe vai para a conta do Passe. MP_CLIENT_ID = "Número da aplicação"; MP_CLIENT_SECRET = "Client Secret".
+  // a taxa do Booticket vai para a conta do Booticket. MP_CLIENT_ID = "Número da aplicação"; MP_CLIENT_SECRET = "Client Secret".
   mpClientId: env["MP_CLIENT_ID"] ?? "",
   mpClientSecret: env["MP_CLIENT_SECRET"] ?? "",
   // Chave para criptografar os tokens dos organizadores no banco (se faltar, deriva do JWT_SECRET).
@@ -53,7 +53,7 @@ export const config = {
   // Atalho para Gmail: só o e-mail e a "senha de app" (16 letras) — o servidor é preenchido sozinho.
   smtpUser: env["SMTP_USER"] ?? "",
   smtpPass: (env["SMTP_PASS"] ?? "").replace(/\s+/g, ""),
-  emailFrom: env["EMAIL_FROM"] || "Passe <no-reply@passe.app>",
+  emailFrom: env["EMAIL_FROM"] || "Booticket <no-reply@bootickets.com.br>",
   // Login com Google: o "ID do cliente" OAuth (é público; o mesmo valor vai no site como VITE_GOOGLE_CLIENT_ID).
   googleClientId: env["GOOGLE_CLIENT_ID"] ?? "",
   // Modo demonstração: libera o botão "Simular pagamento" no site publicado.

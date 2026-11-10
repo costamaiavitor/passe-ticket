@@ -16,7 +16,7 @@ export interface OrderRow {
   payment_provider: string; payment_id: string | null; payment_data: string; expires_at: string;
   paid_at: string | null; created_at: string; paid_payment_id: string | null;
   coupon_id?: string | null; discount?: number; kind?: "sale" | "courtesy";
-  /** Split 1:1: organizador em cuja conta Mercado Pago o pagamento foi criado (null = conta do Passe). */
+  /** Split 1:1: organizador em cuja conta Mercado Pago o pagamento foi criado (null = conta do Booticket). */
   seller_id?: string | null; application_fee?: number;
   /** Só no retorno de approveOrder: o pedido acabou de ser pago nesta chamada. */
   justPaid?: boolean;
@@ -118,7 +118,7 @@ export async function createOrder(userId: string, input: { eventId: string; batc
     return (await one<OrderRow>("SELECT * FROM orders WHERE id = ?", order.id))!;
   }
 
-  // Split 1:1: organizador com Mercado Pago conectado recebe direto; a taxa do Passe sai automaticamente.
+  // Split 1:1: organizador com Mercado Pago conectado recebe direto; a taxa do Booticket sai automaticamente.
   const seller = await sellerAuth(order.organizerId).catch(() => null);
   const base = { orderId: order.id, amountCents: order.total, description: order.title, payerEmail: buyer.email, expiresAt: order.expires };
   try {
@@ -129,9 +129,9 @@ export async function createOrder(userId: string, input: { eventId: string; batc
         p = await payments.create({ ...base, split: { ...seller, applicationFeeCents: order.fee } });
         sellerId = order.organizerId;
       } catch (e) {
-        // Conta do organizador com problema (ex.: acesso revogado): a venda não para — cai na conta do Passe
+        // Conta do organizador com problema (ex.: acesso revogado): a venda não para — cai na conta do Booticket
         // e entra no repasse manual.
-        console.error(`Split indisponível para o organizador ${order.organizerId}; cobrando na conta do Passe:`, e);
+        console.error(`Split indisponível para o organizador ${order.organizerId}; cobrando na conta do Booticket:`, e);
       }
     }
     p ??= await payments.create(base);
@@ -330,7 +330,7 @@ export async function payWithCard(userId: string, orderId: string, input: CardIn
       split: auth ? { ...auth, applicationFeeCents: o.application_fee ?? 0 } : undefined,
       token: input.token, paymentMethodId: input.paymentMethodId, issuerId: input.issuerId,
       installments: input.installments, identification: input.identification,
-      orderId: o.id, amountCents: o.total, description: `Ingresso — ${ev?.title ?? "Passe"}`,
+      orderId: o.id, amountCents: o.total, description: `Ingresso — ${ev?.title ?? "Booticket"}`,
       payerEmail: input.payerEmail || user.email,
     });
   } catch (e) {
