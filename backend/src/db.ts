@@ -227,6 +227,30 @@ CREATE TABLE IF NOT EXISTS coupons (
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS coupon_id TEXT REFERENCES coupons(id) ON DELETE SET NULL;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'sale';
+
+-- Split 1:1: conta Mercado Pago conectada por cada organizador (tokens criptografados).
+CREATE TABLE IF NOT EXISTS mp_accounts (
+  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  mp_user_id TEXT NOT NULL,
+  access_token TEXT NOT NULL,
+  refresh_token TEXT NOT NULL,
+  public_key TEXT NOT NULL DEFAULT '',
+  live_mode INTEGER NOT NULL DEFAULT 1,
+  expires_at TEXT NOT NULL,
+  connected_at TEXT NOT NULL,
+  disconnected_at TEXT,
+  last_error TEXT
+);
+-- Tentativas de conexão em andamento (state + PKCE), válidas por 10 minutos.
+CREATE TABLE IF NOT EXISTS mp_oauth_states (
+  state TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  verifier TEXT NOT NULL,
+  expires_at TEXT NOT NULL
+);
+-- Pedido pago direto na conta do organizador: quem é o vendedor e quanto ficou de taxa para o Passe.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS seller_id TEXT REFERENCES users(id);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS application_fee INTEGER NOT NULL DEFAULT 0;
 `;
 
 type Param = string | number | boolean | null;

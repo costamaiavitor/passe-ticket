@@ -67,7 +67,7 @@ adminRouter.post("/events/:id/reject", async (req, res) => {
 interface PayoutRow {
   event_id: string; title: string; slug: string; starts_at: string; status: string;
   organizer_id: string; organizer_name: string; organizer_email: string; payout_pix_key: string | null; payout_holder: string | null;
-  revenue: number; fees: number; paid_out: number; tickets: number;
+  revenue: number; direct: number; fees: number; paid_out: number; tickets: number;
 }
 
 /**
@@ -79,6 +79,7 @@ adminRouter.get("/payouts", async (_req, res) => {
     `SELECT e.id event_id, e.title, e.slug, e.starts_at, e.status, u.id organizer_id, u.name organizer_name, u.email organizer_email,
             u.payout_pix_key, u.payout_holder,
             COALESCE((SELECT SUM(subtotal) FROM orders WHERE event_id = e.id AND status = 'paid'), 0) revenue,
+            COALESCE((SELECT SUM(subtotal) FROM orders WHERE event_id = e.id AND status = 'paid' AND seller_id IS NOT NULL), 0) direct,
             COALESCE((SELECT SUM(fee) FROM orders WHERE event_id = e.id AND status = 'paid'), 0) fees,
             COALESCE((SELECT SUM(amount) FROM organizer_payouts WHERE event_id = e.id), 0) paid_out,
             (SELECT COUNT(*) FROM tickets WHERE event_id = e.id AND status IN ('valid','used')) tickets
@@ -93,7 +94,8 @@ adminRouter.get("/payouts", async (_req, res) => {
   res.json(rows.map((r) => ({
     eventId: r.event_id, title: r.title, slug: r.slug, startsAt: r.starts_at, status: r.status, tickets: r.tickets,
     organizer: { id: r.organizer_id, name: r.organizer_name, email: r.organizer_email, pixKey: r.payout_pix_key ?? "", holder: r.payout_holder ?? "" },
-    revenue: r.revenue, platformFees: r.fees, paidOut: r.paid_out, balance: r.revenue - r.paid_out,
+    // direct = vendas que já caíram na conta Mercado Pago do organizador (split): não entram no repasse manual.
+    revenue: r.revenue, direct: Number(r.direct), platformFees: r.fees, paidOut: r.paid_out, balance: r.revenue - Number(r.direct) - r.paid_out,
     history: history.filter((h) => h.event_id === r.event_id).map((h) => ({ id: h.id, amount: h.amount, note: h.note, paidAt: h.paid_at })),
   })));
 });
@@ -122,7 +124,7 @@ adminRouter.post("/payouts", async (req, res) => {
     const ev = await one<{ id: string; title: string; organizer_id: string }>("SELECT id, title, organizer_id FROM events WHERE id = ? FOR UPDATE", d.eventId);
     if (!ev) throw notFound("Evento não encontrado.");
     const s = (await one<{ revenue: number; paid_out: number }>(
-      `SELECT COALESCE((SELECT SUM(subtotal) FROM orders WHERE event_id = ? AND status = 'paid'), 0) revenue,
+      `SELECT COALESCE((SELECT SUM(subtotal) FROM orders WHERE event_id = ? AND status = 'paid' AND seller_id IS NULL), 0) revenue,
               COALESCE((SELECT SUM(amount) FROM organizer_payouts WHERE event_id = ?), 0) paid_out`, ev.id, ev.id))!;
     if (d.amount > s.revenue - s.paid_out)
       throw badRequest("PAYOUT_TOO_HIGH", "O valor é maior do que o saldo a repassar deste evento.");

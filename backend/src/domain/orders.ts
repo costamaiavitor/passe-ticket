@@ -7,6 +7,7 @@ import { payments, type CardPaymentInput, type PaymentInfo } from "../payments.j
 import { eventCancelledEmail, purchaseEmail, sendEmail } from "../lib/email.js";
 import { batchStatuses, normalizeCode, type BatchRow, type EventRow } from "./events.js";
 import { discountFor, findUsableCoupon } from "./promos.js";
+import { authForOrder, sellerAuth } from "./mpaccounts.js";
 
 export interface OrderRow {
   id: string; user_id: string; event_id: string; batch_id: string; quantity: number; unit_price: number;
@@ -15,6 +16,8 @@ export interface OrderRow {
   payment_provider: string; payment_id: string | null; payment_data: string; expires_at: string;
   paid_at: string | null; created_at: string; paid_payment_id: string | null;
   coupon_id?: string | null; discount?: number; kind?: "sale" | "courtesy";
+  /** Split 1:1: organizador em cuja conta Mercado Pago o pagamento foi criado (null = conta do Passe). */
+  seller_id?: string | null; application_fee?: number;
   /** Só no retorno de approveOrder: o pedido acabou de ser pago nesta chamada. */
   justPaid?: boolean;
 }
@@ -106,7 +109,7 @@ export async function createOrder(userId: string, input: { eventId: string; batc
          VALUES (?,?,?,?,?,?,?, 'pending', ?)`,
         randomUUID(), id, ev.id, b.id, userId, h.name, h.cpf, t,
       );
-    return { id, total: subtotal + fee, title: `${ev.title} — ${b.name}`, expires };
+    return { id, total: subtotal + fee, fee, title: `${ev.title} — ${b.name}`, expires, organizerId: ev.organizer_id };
   });
 
   // Ingresso gratuito: aprova direto.
@@ -115,11 +118,25 @@ export async function createOrder(userId: string, input: { eventId: string; batc
     return (await one<OrderRow>("SELECT * FROM orders WHERE id = ?", order.id))!;
   }
 
+  // Split 1:1: organizador com Mercado Pago conectado recebe direto; a taxa do Passe sai automaticamente.
+  const seller = await sellerAuth(order.organizerId).catch(() => null);
+  const base = { orderId: order.id, amountCents: order.total, description: order.title, payerEmail: buyer.email, expiresAt: order.expires };
   try {
-    const p = await payments.create({
-      orderId: order.id, amountCents: order.total, description: order.title, payerEmail: buyer.email, expiresAt: order.expires,
-    });
-    await run("UPDATE orders SET payment_id = ?, payment_data = ? WHERE id = ?", p.id, JSON.stringify(p.info), order.id);
+    let p;
+    let sellerId: string | null = null;
+    if (seller) {
+      try {
+        p = await payments.create({ ...base, split: { ...seller, applicationFeeCents: order.fee } });
+        sellerId = order.organizerId;
+      } catch (e) {
+        // Conta do organizador com problema (ex.: acesso revogado): a venda não para — cai na conta do Passe
+        // e entra no repasse manual.
+        console.error(`Split indisponível para o organizador ${order.organizerId}; cobrando na conta do Passe:`, e);
+      }
+    }
+    p ??= await payments.create(base);
+    await run("UPDATE orders SET payment_id = ?, payment_data = ?, seller_id = ?, application_fee = ? WHERE id = ?",
+      p.id, JSON.stringify(p.info), sellerId, sellerId ? order.fee : 0, order.id);
   } catch (e) {
     await releaseOrder(order.id, "cancelled");
     if (e instanceof HttpError) throw e;
@@ -203,7 +220,7 @@ async function confirmPayment(orderId: string, paymentId: string) {
   const duplicate = r.status === "paid" && !!r.paid_payment_id && r.paid_payment_id !== paymentId;
   if (duplicate || r.status === "refund_required") {
     try {
-      await payments.refund(paymentId);
+      await payments.refund(paymentId, await authForOrder(r));
       await run("UPDATE order_payments SET status = 'refunded' WHERE id = ?", paymentId);
       if (r.status === "refund_required") await run("UPDATE orders SET status = 'refunded' WHERE id = ?", orderId);
       console.warn(`Pagamento ${paymentId} do pedido ${orderId} estornado automaticamente (${duplicate ? "pago em dobro" : "sem estoque"}).`);
@@ -213,7 +230,7 @@ async function confirmPayment(orderId: string, paymentId: string) {
     return;
   }
   // Pagou no cartão: cancela o Pix que ficou em aberto para ninguém pagar duas vezes.
-  if (r.payment_id && r.payment_id !== paymentId) await payments.cancel(r.payment_id).catch(() => undefined);
+  if (r.payment_id && r.payment_id !== paymentId) await payments.cancel(r.payment_id, await authForOrder(r).catch(() => undefined)).catch(() => undefined);
   if ("justPaid" in r && r.justPaid) await notifyPaid(orderId);
 }
 
@@ -234,12 +251,14 @@ export async function syncPayment(o: OrderRow, opts: { checkRefund?: boolean } =
   // Pedidos expirados/cancelados também são conferidos: um Pix pago com atraso precisa virar ingresso
   // (se ainda houver vaga) ou estorno — nunca ficar parado na conta.
   if (o.status === "refunded" || o.status === "refund_required") return o;
+  // Pagamentos de um pedido com split existem na conta do organizador: consulta com o token dele.
+  const auth = await authForOrder(o);
 
   // Cartões em análise: resolvidos mesmo se o pedido já foi pago por outro meio
   // (aí o confirmPayment estorna a cobrança repetida).
   const cards = await all<OrderPaymentRow>("SELECT * FROM order_payments WHERE order_id = ? AND status = 'pending'", o.id);
   for (const c of cards) {
-    const s = await payments.status(c.id);
+    const s = await payments.status(c.id, auth);
     if (s === "pending") continue;
     await run("UPDATE order_payments SET status = ? WHERE id = ?", s === "approved" ? "approved" : "rejected", c.id);
     if (s === "approved") await confirmPayment(o.id, c.id);
@@ -248,16 +267,16 @@ export async function syncPayment(o: OrderRow, opts: { checkRefund?: boolean } =
   if (o.status === "paid") {
     if (opts.checkRefund) {
       // Webhook: estorno/contestação do pagamento que quitou o pedido → cancela os ingressos.
-      if (o.paid_payment_id && (await payments.status(o.paid_payment_id)) === "refunded") await markRefunded(o.id);
+      if (o.paid_payment_id && (await payments.status(o.paid_payment_id, auth)) === "refunded") await markRefunded(o.id);
       // Pix pago depois que o cartão já tinha quitado (os dois ao mesmo tempo) → estorna o Pix.
-      else if (o.payment_id && o.payment_id !== o.paid_payment_id && (await payments.status(o.payment_id)) === "approved")
+      else if (o.payment_id && o.payment_id !== o.paid_payment_id && (await payments.status(o.payment_id, auth)) === "approved")
         await confirmPayment(o.id, o.payment_id);
     }
     return (await one<OrderRow>("SELECT * FROM orders WHERE id = ?", o.id))!;
   }
 
   if (o.payment_id) {
-    const s = await payments.status(o.payment_id);
+    const s = await payments.status(o.payment_id, auth);
     if (s === "approved") await confirmPayment(o.id, o.payment_id);
     else if ((s === "rejected" || s === "cancelled") && !cards.length && o.status === "pending") {
       const cur = (await one<OrderRow>("SELECT * FROM orders WHERE id = ?", o.id))!;
@@ -303,9 +322,12 @@ export async function payWithCard(userId: string, orderId: string, input: CardIn
 
   const user = (await one<{ email: string }>("SELECT email FROM users WHERE id = ?", userId))!;
   const ev = await one<{ title: string }>("SELECT title FROM events WHERE id = ?", o.event_id);
+  // O cartão vai para a mesma conta do Pix do pedido (organizador, se houver split).
+  const auth = await authForOrder(o);
   let r;
   try {
     r = await payments.createCard({
+      split: auth ? { ...auth, applicationFeeCents: o.application_fee ?? 0 } : undefined,
       token: input.token, paymentMethodId: input.paymentMethodId, issuerId: input.issuerId,
       installments: input.installments, identification: input.identification,
       orderId: o.id, amountCents: o.total, description: `Ingresso — ${ev?.title ?? "Passe"}`,
@@ -339,7 +361,7 @@ export async function findOrderByPayment(paymentId: string) {
 export async function removeEvent(eventId: string) {
   const pending = await all<OrderRow>("SELECT * FROM orders WHERE event_id = ? AND status = 'pending'", eventId);
   for (const o of pending) {
-    if (o.payment_id) await payments.cancel(o.payment_id).catch(() => undefined);
+    if (o.payment_id) await payments.cancel(o.payment_id, await authForOrder(o).catch(() => undefined)).catch(() => undefined);
     await releaseOrder(o.id, "cancelled");
   }
 
@@ -366,7 +388,7 @@ export async function removeEvent(eventId: string) {
   for (const o of paid) {
     const paymentId = o.paid_payment_id ?? o.payment_id;
     try {
-      if (paymentId && o.total > 0) await payments.refund(paymentId);
+      if (paymentId && o.total > 0) await payments.refund(paymentId, await authForOrder(o));
       await markRefunded(o.id);
       refunded++;
       const buyer = await one<{ email: string; name: string }>("SELECT email, name FROM users WHERE id = ?", o.user_id);

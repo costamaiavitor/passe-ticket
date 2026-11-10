@@ -85,26 +85,27 @@ organizerRouter.get("/events", async (req, res) => {
 
 /** Evento visto pelo organizador: dados públicos + números de vendas e repasses. */
 async function organizerView(e: EventRow) {
-  const s = (await one<{ sold: number; revenue: number; checked: number; paid_out: number; buyers: number; pending: number; courtesies: number }>(
+  const s = (await one<{ sold: number; revenue: number; direct: number; checked: number; paid_out: number; buyers: number; pending: number; courtesies: number }>(
     `SELECT
        (SELECT COUNT(*) FROM tickets WHERE event_id = ? AND status IN ('valid','used')) sold,
        (SELECT COALESCE(SUM(subtotal), 0) FROM orders WHERE event_id = ? AND status = 'paid') revenue,
+       (SELECT COALESCE(SUM(subtotal), 0) FROM orders WHERE event_id = ? AND status = 'paid' AND seller_id IS NOT NULL) direct,
        (SELECT COUNT(*) FROM tickets WHERE event_id = ? AND status = 'used') checked,
        (SELECT COALESCE(SUM(amount), 0) FROM organizer_payouts WHERE event_id = ?) paid_out,
        (SELECT COUNT(DISTINCT user_id) FROM orders WHERE event_id = ? AND status = 'paid' AND kind = 'sale') buyers,
        (SELECT COALESCE(SUM(quantity), 0) FROM orders WHERE event_id = ? AND status = 'pending') pending,
        (SELECT COUNT(*) FROM tickets t JOIN orders o ON o.id = t.order_id
           WHERE t.event_id = ? AND o.kind = 'courtesy' AND t.status IN ('valid','used')) courtesies`,
-    e.id, e.id, e.id, e.id, e.id, e.id, e.id,
+    e.id, e.id, e.id, e.id, e.id, e.id, e.id, e.id,
   ))!;
   return {
     ...(await toEventDetail(e)),
     reviewNote: e.review_note ?? "",
     accessCode: e.access_code ?? "",
-    // O organizador recebe o valor cheio dos ingressos (a taxa de 10% é do Passe).
+    // Vendas pela conta Mercado Pago conectada (direct) já caíram com o organizador; o repasse manual é só do resto.
     stats: {
-      ticketsSold: s.sold, revenue: s.revenue, checkedIn: s.checked, paidOut: s.paid_out,
-      toReceive: Math.max(0, s.revenue - s.paid_out), buyers: s.buyers, awaitingPayment: s.pending, courtesies: Number(s.courtesies),
+      ticketsSold: s.sold, revenue: s.revenue, checkedIn: s.checked, paidOut: s.paid_out, receivedDirect: Number(s.direct),
+      toReceive: Math.max(0, s.revenue - Number(s.direct) - s.paid_out), buyers: s.buyers, awaitingPayment: s.pending, courtesies: Number(s.courtesies),
     },
   };
 }

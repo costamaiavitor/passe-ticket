@@ -139,3 +139,11 @@ export const addStaff = (eventId: string, email: string) =>
 
 export const removeStaff = (eventId: string, userId: string) =>
   http<null>(`${staffPath(eventId)}/${encodeURIComponent(userId)}`, { method: "DELETE" });
+
+// ---- Conta Mercado Pago do organizador (split: vendas caem direto nela) ----
+export interface MpConnection { available: boolean; connected: boolean; mpUserId: string | null; connectedAt: string | null; problem: string | null }
+export const mpConnectionQuery = () =>
+  queryOptions({ queryKey: ["mp-connection"], queryFn: () => http<MpConnection>("/organizer/mercadopago") });
+/** Devolve o link de autorização do Mercado Pago (o site redireciona para ele). */
+export const connectMercadoPago = async () => (await http<{ url: string }>("/organizer/mercadopago/connect", { method: "POST" })).url;
+export const disconnectMercadoPago = () => http<MpConnection>("/organizer/mercadopago", { method: "DELETE" });

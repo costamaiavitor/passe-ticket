@@ -141,6 +141,7 @@ function PayoutCard({ row }: { row: PayoutRow }) {
         </div>
         <div className="text-right text-sm">
           <p className="text-muted-foreground">Vendido <span className="text-foreground">{brl(row.revenue)}</span></p>
+          {!!row.direct && <p className="text-muted-foreground">Direto no Mercado Pago <span className="text-foreground">{brl(row.direct)}</span></p>}
           <p className="text-muted-foreground">Repassado <span className="text-foreground">{brl(row.paidOut)}</span></p>
           <p className="font-semibold text-primary">Saldo {brl(row.balance)}</p>
         </div>

@@ -22,6 +22,11 @@ export const config = {
   ).replace(/\/$/, ""),
   corsOrigins: (env["CORS_ORIGINS"] ?? "http://localhost:8080,http://localhost:5173,http://localhost:3000")
     .split(",").map((s) => s.trim()).filter(Boolean),
+  // Endereço do site (para onde o organizador volta depois de conectar o Mercado Pago).
+  // Na Vercel o site e a API estão no mesmo endereço; localmente o site roda na 8080.
+  siteUrl: (env["SITE_URL"] ||
+    (env["VERCEL_PROJECT_PRODUCTION_URL"] ? `https://${env["VERCEL_PROJECT_PRODUCTION_URL"]}` : "") ||
+    (env["CORS_ORIGINS"] ?? "http://localhost:8080").split(",")[0]!.trim() || "http://localhost:8080").replace(/\/$/, ""),
   // Postgres (Neon). Sem ela, usa o Postgres embutido (PGlite) na pasta localDataDir.
   databaseUrl: env["DATABASE_URL"] || env["POSTGRES_URL"] || "",
   localDataDir: env["LOCAL_DATA_DIR"] ?? "./data/pglite",
@@ -37,6 +42,12 @@ export const config = {
   paymentProvider: (env["PAYMENT_PROVIDER"] ?? "mock") as "mock" | "mercadopago",
   mpAccessToken: env["MP_ACCESS_TOKEN"] ?? "",
   mpWebhookSecret: env["MP_WEBHOOK_SECRET"] ?? "",
+  // Split 1:1: organizadores conectam a própria conta Mercado Pago (OAuth) e as vendas caem direto nela;
+  // a taxa do Passe vai para a conta do Passe. MP_CLIENT_ID = "Número da aplicação"; MP_CLIENT_SECRET = "Client Secret".
+  mpClientId: env["MP_CLIENT_ID"] ?? "",
+  mpClientSecret: env["MP_CLIENT_SECRET"] ?? "",
+  // Chave para criptografar os tokens dos organizadores no banco (se faltar, deriva do JWT_SECRET).
+  tokenKey: env["TOKEN_ENCRYPTION_KEY"] || env["JWT_SECRET"] || "dev-only-token-key-change-me",
   // E-mails: SMTP_URL ex. smtps://seuemail%40gmail.com:SENHA_DE_APP@smtp.gmail.com:465 (Gmail) ou o SMTP do Resend.
   smtpUrl: env["SMTP_URL"] ?? "",
   // Atalho para Gmail: só o e-mail e a "senha de app" (16 letras) — o servidor é preenchido sozinho.

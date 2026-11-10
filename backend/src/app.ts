@@ -12,6 +12,7 @@ import { ordersRouter } from "./routes/orders.js";
 import { organizerRouter } from "./routes/organizer.js";
 import { ticketsRouter } from "./routes/tickets.js";
 import { webhooksRouter } from "./routes/webhooks.js";
+import { mpCallbackRouter, mpOrganizerRouter } from "./routes/mercadopago.js";
 import { imagesRouter } from "./routes/images.js";
 
 export function createApp() {
@@ -39,7 +40,9 @@ export function createApp() {
   api.use("/orders", ordersRouter);
   api.use("/tickets", ticketsRouter);
   api.use("/checkin", checkinRouter);
+  api.use("/organizer/mercadopago", mpOrganizerRouter);
   api.use("/organizer", organizerRouter);
+  api.use("/mp", mpCallbackRouter);
   api.use("/admin", adminRouter);
   api.use("/webhooks", webhooksRouter);
   api.use("/images", imagesRouter);

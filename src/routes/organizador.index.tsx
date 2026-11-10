@@ -10,11 +10,12 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import {
   AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { addStaff, becomeOrganizer, myEventsQuery, payoutInfoQuery, removeEvent, removeStaff, savePayoutInfo, staffQuery } from "@/services/organizer";
+import { addStaff, becomeOrganizer, mpConnectionQuery, myEventsQuery, payoutInfoQuery, removeEvent, removeStaff, savePayoutInfo, staffQuery } from "@/services/organizer";
 import { hasRole } from "@/services/session";
 import { brl, fmtDate, fmtTime } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import { PrivateBadges } from "@/components/event-promos";
+import { MercadoPagoCard } from "@/components/mp-connect";
 import type { AuthUser, OrganizerEvent } from "@/types";
 
 export const Route = createFileRoute("/organizador/")({
@@ -65,6 +66,7 @@ function Dashboard() {
         <Button asChild className="hidden sm:inline-flex"><Link to="/organizador/novo"><CalendarPlus />Criar evento</Link></Button>
       </div>
 
+      <MercadoPagoCard />
       <PayoutInfoCard />
 
       {isLoading && <p className="mt-8 text-sm text-muted-foreground">Carregando…</p>}
@@ -96,6 +98,7 @@ function Dashboard() {
 function PayoutInfoCard() {
   const qc = useQueryClient();
   const { data } = useQuery(payoutInfoQuery());
+  const mp = useQuery(mpConnectionQuery()).data;
   const [editing, setEditing] = useState(false);
   const [pixKey, setPixKey] = useState("");
   const [holder, setHolder] = useState("");
@@ -105,6 +108,8 @@ function PayoutInfoCard() {
   });
   if (!data) return null;
   const missing = !data.pixKey;
+  // Com o Mercado Pago conectado, a chave Pix só serve de reserva: não precisa pedir.
+  if (missing && !editing && mp?.connected) return null;
   if (!editing && !missing)
     return (
       <div className="mt-5 flex items-center justify-between gap-3 rounded-xl border bg-card px-4 py-3 text-sm">
@@ -186,7 +191,7 @@ function OrganizerEventCard({ ev }: { ev: OrganizerEvent }) {
         </dl>
         {ev.stats.revenue > 0 && (
           <div className="mt-2 flex justify-between rounded-lg bg-surface px-3 py-2 text-xs">
-            <span className="text-muted-foreground">Já recebido <span className="text-foreground">{brl(ev.stats.paidOut)}</span></span>
+            <span className="text-muted-foreground">Já recebido <span className="text-foreground">{brl(ev.stats.paidOut + (ev.stats.receivedDirect ?? 0))}</span></span>
             <span className="text-muted-foreground">A receber <span className="font-semibold text-primary">{brl(ev.stats.toReceive)}</span></span>
           </div>
         )}

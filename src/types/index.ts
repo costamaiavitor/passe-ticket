@@ -147,6 +147,8 @@ export interface OrganizerEvent extends EventDetail {
   stats: {
     ticketsSold: number; revenue: number; checkedIn: number; paidOut: number; toReceive: number;
     buyers?: number; awaitingPayment?: number; courtesies?: number;
+    /** Vendas que caíram direto na conta Mercado Pago conectada do organizador (split). */
+    receivedDirect?: number;
   };
 }
 
@@ -173,6 +175,8 @@ export interface PayoutRow {
   eventId: string; title: string; slug: string; startsAt: string; status: string; tickets: number;
   organizer: { id: string; name: string; email: string; pixKey: string; holder: string };
   revenue: number; platformFees: number; paidOut: number; balance: number;
+  /** Vendas que caíram direto na conta Mercado Pago do organizador (não entram no saldo a repassar). */
+  direct?: number;
   history: Array<{ id: string; amount: number; note: string; paidAt: string }>;
 }
 
