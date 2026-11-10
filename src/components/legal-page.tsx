@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 
-export const CONTACT_EMAIL = "costamaiavitor@gmail.com";
+export const CONTACT_EMAIL = "booticketss@gmail.com";
 export const LEGAL_UPDATED_AT = "5 de novembro de 2026";
 
 /** Moldura das páginas legais (Privacidade e Termos), no visual do site. */
