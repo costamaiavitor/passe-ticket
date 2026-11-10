@@ -20,9 +20,12 @@ adminRouter.get("/users", async (req, res) => {
 });
 
 adminRouter.patch("/users/:id/roles", async (req, res) => {
-  const { roles } = parse(z.object({ roles: z.array(z.enum(["buyer", "organizer", "staff", "admin"])).min(1) }), req.body);
-  const r = await run("UPDATE users SET roles = ? WHERE id = ?", JSON.stringify([...new Set(roles)]), String(req.params.id));
-  if (!r.changes) throw notFound("Usuário não encontrado.");
+  // "admin" não se dá por aqui: só o e-mail em ADMIN_EMAILS (confirmado pelo Google) é admin.
+  const { roles } = parse(z.object({ roles: z.array(z.enum(["buyer", "organizer", "staff"])).min(1) }), req.body);
+  const cur = await one<{ roles: string }>("SELECT roles FROM users WHERE id = ?", String(req.params.id));
+  if (!cur) throw notFound("Usuário não encontrado.");
+  const keepAdmin = (JSON.parse(cur.roles) as string[]).includes("admin");
+  await run("UPDATE users SET roles = ? WHERE id = ?", JSON.stringify([...new Set([...roles, ...(keepAdmin ? ["admin"] : [])])]), String(req.params.id));
   res.json({ ok: true });
 });
 

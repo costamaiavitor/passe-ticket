@@ -1,7 +1,7 @@
 // Testes de robustez: alguém tentando burlar o site, dados malformados, ações simultâneas e pagamentos fora de hora.
 process.env["NODE_ENV"] = "test";
 process.env["PAYMENT_PROVIDER"] = "mock";
-process.env["ADMIN_EMAILS"] = "chefe@t.dev";
+process.env["ADMIN_EMAILS"] = "chefe@t.dev,adm@t.dev";
 process.env["GOOGLE_CLIENT_ID"] = "test-client.apps.googleusercontent.com";
 process.env["MP_WEBHOOK_SECRET"] = "segredo-de-teste-do-webhook";
 
@@ -40,8 +40,9 @@ const PW = "senha12345";
 const T: Record<string, string> = {};
 
 async function user(key: string, cpf: string, roles = '["buyer"]') {
-  await run("INSERT INTO users (id, name, email, cpf, password_hash, roles, created_at) VALUES (?,?,?,?,?,?,?)",
-    key, `Pessoa ${key}`, `${key}@t.dev`, cpf, await hashPassword(PW), roles, now());
+  // O admin de teste está em ADMIN_EMAILS e tem o Google ligado (só assim o admin vale).
+  await run("INSERT INTO users (id, name, email, cpf, password_hash, roles, created_at, google_sub) VALUES (?,?,?,?,?,?,?,?)",
+    key, `Pessoa ${key}`, `${key}@t.dev`, cpf, await hashPassword(PW), roles, now(), key === "adm" ? "g-adm" : null);
   T[key] = (await api("/auth/login", { body: { email: `${key}@t.dev`, password: PW } })).body.accessToken;
 }
 
@@ -374,5 +375,19 @@ describe("Robustez do Booticket", () => {
     const r = await api("/auth/me/cpf", { method: "PUT", token: g.body.accessToken, body: { cpf: CPFS[3] } });
     assert.equal(r.status, 409);
     assert.equal(r.body.code, "CPF_TAKEN");
+  });
+
+  it("admin é só o e-mail autorizado: conta marcada como admin no banco perde o acesso, e ninguém dá admin pelo painel", async () => {
+    // Alguém conseguiu marcar uma conta como admin direto no banco (ou era admin antes da regra).
+    await run("INSERT INTO users (id, name, email, cpf, password_hash, roles, created_at, google_sub) VALUES (?,?,?,?,?,?,?,?)",
+      "intruso", "Intruso", "intruso@t.dev", "71020030216", await hashPassword(PW), '["buyer","admin"]', now(), "g-intruso");
+    const l = await api("/auth/login", { body: { email: "intruso@t.dev", password: PW } });
+    assert.ok(!l.body.user.roles.includes("admin"), "perdeu o admin ao entrar");
+    assert.equal((await api("/admin/payouts", { token: l.body.accessToken })).status, 403);
+    // O admin de verdade não consegue dar admin para outra conta pela API.
+    assert.equal((await api("/admin/users/ana/roles", { method: "PATCH", token: T["adm"], body: { roles: ["buyer", "admin"] } })).status, 400);
+    // Mudar outras funções continua possível, e o admin de verdade continua admin.
+    assert.equal((await api("/admin/users/ana/roles", { method: "PATCH", token: T["adm"], body: { roles: ["buyer", "organizer"] } })).status, 200);
+    assert.equal((await api("/admin/payouts", { token: T["adm"] })).status, 200);
   });
 });
