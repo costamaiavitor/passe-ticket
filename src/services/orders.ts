@@ -4,7 +4,7 @@ import { http, USE_MOCKS } from "./http";
 
 const mocks = () => import("@/mocks/store");
 
-export async function createOrder(input: { eventId: string; batchId: string; holders: Holder[] }): Promise<Order> {
+export async function createOrder(input: { eventId: string; batchId: string; holders: Holder[]; accessCode?: string; couponCode?: string }): Promise<Order> {
   if (USE_MOCKS) return (await mocks()).mockCreateOrder(input);
   return http<Order>("/orders", { method: "POST", body: JSON.stringify(input) });
 }

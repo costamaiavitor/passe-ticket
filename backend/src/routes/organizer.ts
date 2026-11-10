@@ -3,6 +3,8 @@ import { Router } from "express";
 import { z } from "zod";
 import { all, now, one, run, tx } from "../db.js";
 import { toEventDetail, type BatchRow, type EventRow } from "../domain/events.js";
+import { courtesyEventId, createCoupon, issueCourtesy, listCourtesies, revokeCourtesy, toCoupon, type CouponRow } from "../domain/promos.js";
+import { isValidCpf, onlyDigits } from "../lib/cpf.js";
 import { removeEvent } from "../domain/orders.js";
 import { config } from "../config.js";
 import { eventEditedEmail, eventForReviewEmail, sendEmail } from "../lib/email.js";
@@ -39,8 +41,26 @@ const eventSchema = z.object({
   transferDeadline: iso.nullable().default(null),
   maxTicketsPerCpf: z.number().int().min(1).max(20).default(2),
   status: z.enum(["draft", "published"]).default("published"),
+  // "unlisted" = privado: não aparece na lista nem na busca, só com o link.
+  visibility: z.enum(["public", "unlisted"]).default("public"),
+  // Palavra-senha para comprar ('' = sem senha).
+  accessCode: z.string().trim().max(40).default(""),
   batches: z.array(batchSchema).default([]),
 });
+const couponSchema = z.object({
+  code: z.string().trim().min(3).max(30),
+  kind: z.enum(["percent", "fixed"]),
+  value: z.number().int().min(1), // % (1–100) ou centavos por ingresso
+  maxUses: z.number().int().min(1).max(1_000_000).nullable().optional(),
+});
+const courtesySchema = z.object({
+  name: z.string().trim().min(3).max(120),
+  cpf: z.string().max(20),
+  email: z.string().trim().toLowerCase().email().or(z.literal("")).optional(),
+});
+
+/** Link difícil de adivinhar para evento privado: "festa-da-lua-k3x9p2qa". */
+const privateSlug = (title: string) => `${slugify(title) || "evento"}-${randomUUID().replace(/-/g, "").slice(0, 8)}`;
 
 const slugify = (s: string) =>
   s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 60);
@@ -65,23 +85,26 @@ organizerRouter.get("/events", async (req, res) => {
 
 /** Evento visto pelo organizador: dados públicos + números de vendas e repasses. */
 async function organizerView(e: EventRow) {
-  const s = (await one<{ sold: number; revenue: number; checked: number; paid_out: number; buyers: number; pending: number }>(
+  const s = (await one<{ sold: number; revenue: number; checked: number; paid_out: number; buyers: number; pending: number; courtesies: number }>(
     `SELECT
        (SELECT COUNT(*) FROM tickets WHERE event_id = ? AND status IN ('valid','used')) sold,
        (SELECT COALESCE(SUM(subtotal), 0) FROM orders WHERE event_id = ? AND status = 'paid') revenue,
        (SELECT COUNT(*) FROM tickets WHERE event_id = ? AND status = 'used') checked,
        (SELECT COALESCE(SUM(amount), 0) FROM organizer_payouts WHERE event_id = ?) paid_out,
-       (SELECT COUNT(DISTINCT user_id) FROM orders WHERE event_id = ? AND status = 'paid') buyers,
-       (SELECT COALESCE(SUM(quantity), 0) FROM orders WHERE event_id = ? AND status = 'pending') pending`,
-    e.id, e.id, e.id, e.id, e.id, e.id,
+       (SELECT COUNT(DISTINCT user_id) FROM orders WHERE event_id = ? AND status = 'paid' AND kind = 'sale') buyers,
+       (SELECT COALESCE(SUM(quantity), 0) FROM orders WHERE event_id = ? AND status = 'pending') pending,
+       (SELECT COUNT(*) FROM tickets t JOIN orders o ON o.id = t.order_id
+          WHERE t.event_id = ? AND o.kind = 'courtesy' AND t.status IN ('valid','used')) courtesies`,
+    e.id, e.id, e.id, e.id, e.id, e.id, e.id,
   ))!;
   return {
     ...(await toEventDetail(e)),
     reviewNote: e.review_note ?? "",
+    accessCode: e.access_code ?? "",
     // O organizador recebe o valor cheio dos ingressos (a taxa de 10% é do Passe).
     stats: {
       ticketsSold: s.sold, revenue: s.revenue, checkedIn: s.checked, paidOut: s.paid_out,
-      toReceive: Math.max(0, s.revenue - s.paid_out), buyers: s.buyers, awaitingPayment: s.pending,
+      toReceive: Math.max(0, s.revenue - s.paid_out), buyers: s.buyers, awaitingPayment: s.pending, courtesies: Number(s.courtesies),
     },
   };
 }
@@ -105,30 +128,46 @@ organizerRouter.get("/events/:id", async (req, res) => {
 });
 
 organizerRouter.post("/events", async (req, res) => {
-  const d = parse(eventSchema, req.body);
+  const d = parse(eventSchema.extend({
+    coupons: z.array(couponSchema).max(50).default([]),
+    // Cortesias já na criação: "batchIndex" é a posição do tipo de ingresso na lista de lotes enviada.
+    courtesies: z.array(courtesySchema.extend({ batchIndex: z.number().int().min(0) })).max(200).default([]),
+  }), req.body);
+  for (const c of d.courtesies) {
+    if (!isValidCpf(onlyDigits(c.cpf))) throw badRequest("INVALID_CPF", `CPF inválido na cortesia de ${c.name}.`);
+    if (!d.batches[c.batchIndex]) throw badRequest("INVALID_BATCH", `Escolha o tipo de ingresso da cortesia de ${c.name}.`);
+  }
   const a = user(req);
   const isAdmin = a.roles.includes("admin");
   // Eventos de organizadores passam pela aprovação do Passe antes de ir ao ar (evita evento falso).
   const status = d.status === "draft" ? "draft" : isAdmin ? "published" : "review";
   const id = randomUUID();
-  let slug = slugify(d.title) || "evento";
+  let slug = d.visibility === "unlisted" ? privateSlug(d.title) : slugify(d.title) || "evento";
   if (await one("SELECT 1 FROM events WHERE slug = ?", slug)) slug = `${slug}-${id.slice(0, 6)}`;
+  const batchIds: string[] = [];
   await tx(async () => {
     await run(
       `INSERT INTO events (id, slug, organizer_id, title, category, cover_url, starts_at, venue, city, address, description,
-        important_info, refund_policy, max_transfers, transfer_deadline, max_per_cpf, status, created_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        important_info, refund_policy, max_transfers, transfer_deadline, max_per_cpf, status, created_at, visibility, access_code)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       id, slug, a.id, d.title, d.category, d.coverUrl, new Date(d.startsAt).toISOString(), d.venue, d.city, d.address, d.description,
       JSON.stringify(d.importantInfo), d.refundPolicy, d.maxTransfers,
-      d.transferDeadline ? new Date(d.transferDeadline).toISOString() : null, d.maxTicketsPerCpf, status, now(),
+      d.transferDeadline ? new Date(d.transferDeadline).toISOString() : null, d.maxTicketsPerCpf, status, now(), d.visibility, d.accessCode,
     );
-    for (const [i, b] of d.batches.entries()) await insertBatch(id, b, i);
+    for (const [i, b] of d.batches.entries()) batchIds.push(await insertBatch(id, b, i));
+    for (const c of d.coupons) await createCoupon(id, c);
   });
+  // Cortesias depois do evento criado. Se alguma falhar (ex.: CPF já no limite), as outras seguem e o motivo volta na resposta.
+  const courtesyErrors: string[] = [];
+  for (const c of d.courtesies) {
+    try { await issueCourtesy(a.id, id, { batchId: batchIds[c.batchIndex]!, name: c.name, cpf: c.cpf, email: c.email || undefined }); }
+    catch (e) { courtesyErrors.push(`${c.name}: ${e instanceof Error ? e.message : "erro"}`); }
+  }
   if (status === "review") {
     const org = await one<{ name: string }>("SELECT name FROM users WHERE id = ?", a.id);
     for (const to of config.adminEmails) await sendEmail(eventForReviewEmail(to, d.title, org?.name ?? "Organizador"));
   }
-  res.status(201).json(await toEventDetail((await one<EventRow>("SELECT * FROM events WHERE id = ?", id))!));
+  res.status(201).json({ ...(await toEventDetail((await one<EventRow>("SELECT * FROM events WHERE id = ?", id))!)), courtesyErrors });
 });
 
 organizerRouter.patch("/events/:id", async (req, res) => {
@@ -168,6 +207,7 @@ organizerRouter.patch("/events/:id", async (req, res) => {
     refundPolicy: ["refund_policy", (v) => v], maxTransfers: ["max_transfers", (v) => v],
     transferDeadline: ["transfer_deadline", (v: string | null) => (v ? new Date(v).toISOString() : null)],
     maxTicketsPerCpf: ["max_per_cpf", (v) => v], status: ["status", (v) => v],
+    visibility: ["visibility", (v) => v], accessCode: ["access_code", (v) => v],
   };
   const sets: string[] = [];
   const vals: (string | number | null)[] = [];
@@ -177,6 +217,8 @@ organizerRouter.patch("/events/:id", async (req, res) => {
     sets.push(`${m[0]} = ?`);
     vals.push(m[1](v as never) as string | number | null);
   }
+  // Ficou privado: o link muda para um difícil de adivinhar (o antigo, que talvez já circulou, para de funcionar).
+  if (d.visibility === "unlisted" && cur.visibility !== "unlisted") { sets.push("slug = ?"); vals.push(privateSlug(d.title ?? cur.title)); }
   if (sets.length) await run(`UPDATE events SET ${sets.join(", ")} WHERE id = ?`, ...vals, req.params.id);
   if (changed.length) for (const to of config.adminEmails) await sendEmail(eventEditedEmail(to, d.title ?? cur.title, cur.slug, changed));
   res.json(await toEventDetail((await one<EventRow>("SELECT * FROM events WHERE id = ?", req.params.id))!));
@@ -240,21 +282,86 @@ organizerRouter.get("/events/:id/tickets", async (req, res) => {
   const rows = await all<{
     id: string; holder_name: string; holder_cpf: string; status: string; checked_in_at: string | null; batch: string;
     owner_email: string; buyer_name: string; buyer_email: string; buyer_id: string; owner_id: string;
-    order_id: string; unit_price: number; paid_at: string | null; transfers: number;
+    order_id: string; unit_price: number; paid_at: string | null; transfers: number; kind: string; discount: number; quantity: number;
   }>(
     `SELECT t.id, t.holder_name, t.holder_cpf, t.status, t.checked_in_at, t.transfers, t.owner_id, b.name batch,
             uo.email owner_email, ub.name buyer_name, ub.email buyer_email, ub.id buyer_id,
-            o.id order_id, o.unit_price, o.paid_at
+            o.id order_id, o.unit_price, o.paid_at, o.kind, o.discount, o.quantity
      FROM tickets t JOIN batches b ON b.id = t.batch_id JOIN orders o ON o.id = t.order_id
        JOIN users uo ON uo.id = t.owner_id JOIN users ub ON ub.id = o.user_id
      WHERE t.event_id = ? AND t.status IN ('valid','used') ORDER BY o.paid_at DESC, t.holder_name`, id,
   );
   res.json(rows.map((t) => ({
     id: t.id, holderName: t.holder_name, holderCpf: maskCpf(t.holder_cpf), status: t.status, checkedInAt: t.checked_in_at,
-    batchName: t.batch, price: t.unit_price, paidAt: t.paid_at, orderId: t.order_id,
+    // Preço pago por ingresso (já com o desconto do cupom, se houve).
+    batchName: t.batch, price: Math.round(t.unit_price - (t.discount ?? 0) / Math.max(1, t.quantity)), paidAt: t.paid_at, orderId: t.order_id,
+    courtesy: t.kind === "courtesy",
     buyerName: t.buyer_name, buyerEmail: t.buyer_email, ownerEmail: t.owner_email,
     transferred: t.transfers > 0 || t.owner_id !== t.buyer_id,
   })));
+});
+
+// ---- Cupons de desconto ----
+organizerRouter.get("/events/:id/coupons", async (req, res) => {
+  const id = String(req.params.id);
+  await assertEventOwner(user(req), id);
+  const rows = await all<CouponRow>("SELECT * FROM coupons WHERE event_id = ? ORDER BY created_at DESC", id);
+  res.json(await Promise.all(rows.map(toCoupon)));
+});
+
+organizerRouter.post("/events/:id/coupons", async (req, res) => {
+  const id = String(req.params.id);
+  await assertEventOwner(user(req), id);
+  await assertEditable(id);
+  res.status(201).json(await createCoupon(id, parse(couponSchema, req.body)));
+});
+
+async function ownCoupon(req: Parameters<typeof user>[0], couponId: string) {
+  const c = await one<CouponRow>("SELECT * FROM coupons WHERE id = ?", couponId);
+  if (!c) throw notFound("Cupom não encontrado.");
+  await assertEventOwner(user(req), c.event_id);
+  return c;
+}
+
+/** Pausar/reativar ou mudar o limite de usos. */
+organizerRouter.patch("/coupons/:id", async (req, res) => {
+  const c = await ownCoupon(req, String(req.params.id));
+  const d = parse(z.object({ active: z.boolean().optional(), maxUses: z.number().int().min(1).max(1_000_000).nullable().optional() }), req.body);
+  if (d.active !== undefined) await run("UPDATE coupons SET active = ? WHERE id = ?", d.active ? 1 : 0, c.id);
+  if (d.maxUses !== undefined) await run("UPDATE coupons SET max_uses = ? WHERE id = ?", d.maxUses, c.id);
+  res.json(await toCoupon((await one<CouponRow>("SELECT * FROM coupons WHERE id = ?", c.id))!));
+});
+
+/** Exclui o cupom. Se já foi usado, só desativa (o histórico das compras com desconto fica). */
+organizerRouter.delete("/coupons/:id", async (req, res) => {
+  const c = await ownCoupon(req, String(req.params.id));
+  if (await one("SELECT 1 FROM orders WHERE coupon_id = ? LIMIT 1", c.id)) {
+    await run("UPDATE coupons SET active = 0 WHERE id = ?", c.id);
+    return void res.json({ deleted: false });
+  }
+  await run("DELETE FROM coupons WHERE id = ?", c.id);
+  res.json({ deleted: true });
+});
+
+// ---- Ingressos de cortesia ----
+organizerRouter.get("/events/:id/courtesies", async (req, res) => {
+  const id = String(req.params.id);
+  await assertEventOwner(user(req), id);
+  res.json(await listCourtesies(id));
+});
+
+organizerRouter.post("/events/:id/courtesies", async (req, res) => {
+  const id = String(req.params.id);
+  await assertEventOwner(user(req), id);
+  const d = parse(courtesySchema.extend({ batchId: z.string().min(1) }), req.body);
+  res.status(201).json(await issueCourtesy(user(req).id, id, { ...d, email: d.email || undefined }));
+});
+
+organizerRouter.delete("/courtesies/:ticketId", async (req, res) => {
+  const ticketId = String(req.params.ticketId);
+  await assertEventOwner(user(req), await courtesyEventId(ticketId));
+  await revokeCourtesy(ticketId);
+  res.json({ ok: true });
 });
 
 /** Remove o evento: apaga se não houver vendas; com vendas, cancela e estorna os compradores. */

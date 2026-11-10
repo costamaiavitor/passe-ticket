@@ -38,7 +38,12 @@ function toTicket(t: JoinedTicket, pending?: { id: string; toCpf: string; create
 }
 
 export async function listMyTickets(userId: string) {
-  const rows = await all<JoinedTicket>(`${SELECT} WHERE t.owner_id = ? AND t.status IN ('valid','used') ORDER BY e.starts_at, t.created_at`, userId);
+  // Cortesias que o organizador deu e ainda aguardam a pessoa aceitar não aparecem como ingresso do organizador.
+  const rows = await all<JoinedTicket>(
+    `${SELECT} WHERE t.owner_id = ? AND t.status IN ('valid','used')
+       AND NOT EXISTS (SELECT 1 FROM orders o JOIN ticket_transfers tt ON tt.ticket_id = t.id AND tt.status = 'pending'
+                       WHERE o.id = t.order_id AND o.kind = 'courtesy' AND o.user_id = t.owner_id)
+     ORDER BY e.starts_at, t.created_at`, userId);
   const pending = await pendingByTicket(rows.map((t) => t.id));
   return rows.map((t) => toTicket(t, pending.get(t.id)));
 }

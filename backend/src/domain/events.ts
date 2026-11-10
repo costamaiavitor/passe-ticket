@@ -5,7 +5,11 @@ export interface EventRow {
   starts_at: string; venue: string; city: string; address: string; description: string; important_info: string;
   refund_policy: string; max_transfers: number; transfer_deadline: string | null; max_per_cpf: number;
   featured: number; status: string; created_at: string; review_note?: string;
+  visibility: "public" | "unlisted"; access_code: string;
 }
+
+/** Palavra-senha comparada sem diferenciar maiúsculas, acentos e espaços nas pontas. */
+export const normalizeCode = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
 export interface BatchRow {
   id: string; event_id: string; name: string; price: number; total: number; sold: number; reserved: number;
   sales_start: string; sales_end: string; status: "active" | "paused" | "closed"; position: number;
@@ -96,6 +100,9 @@ export async function toEventDetail(e: EventRow) {
     refundPolicy: e.refund_policy,
     maxTicketsPerCpf: e.max_per_cpf,
     status: e.status,
+    visibility: e.visibility ?? "public",
+    // Só avisa que existe senha; a senha em si nunca sai para o público.
+    requiresAccessCode: !!e.access_code,
     batches: (() => { const st = batchStatuses(batches); return batches.map((b) => toBatch(b, st.get(b.id))); })(),
   };
 }

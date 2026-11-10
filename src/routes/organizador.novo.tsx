@@ -2,12 +2,14 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState, type FormEvent } from "react";
 import { ArrowLeft, Check, CheckCircle2, Copy, Minus, Plus, Share2, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { SiteHeader } from "@/components/site-header";
 import { RequireAuth } from "@/components/require-auth";
 import { EventCard } from "@/components/event-card";
 import { AGES, ageToInfo, CATEGORIES, centsFrom, Chips, COVERS, CoverPicker, inputCls, Label, origin, presetCover, Section, TextField, TICKET_NAMES } from "@/components/event-form";
+import { AccessFields, CouponDrafts, CourtesyDrafts, type DraftCourtesy } from "@/components/event-promos";
 import { Button } from "@/components/ui/button";
-import { createEvent, type NewEvent } from "@/services/organizer";
+import { createEvent, type NewCoupon, type NewEvent } from "@/services/organizer";
 import { hasRole } from "@/services/session";
 import { brl, categoryLabel, platformFee } from "@/utils/format";
 import { cn } from "@/lib/utils";
@@ -62,6 +64,10 @@ function CreateEvent() {
   const [info, setInfo] = useState("");
   const [maxPerCpf, setMaxPerCpf] = useState(2);
   const [batches, setBatches] = useState<BatchForm[]>([newBatch("Pista")]);
+  const [visibility, setVisibility] = useState<"public" | "unlisted">("public");
+  const [accessCode, setAccessCode] = useState("");
+  const [coupons, setCoupons] = useState<NewCoupon[]>([]);
+  const [courtesies, setCourtesies] = useState<DraftCourtesy[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
   const [created, setCreated] = useState<OrganizerEvent | null>(null);
 
@@ -70,7 +76,12 @@ function CreateEvent() {
 
   const m = useMutation({
     mutationFn: (data: NewEvent) => createEvent(data),
-    onSuccess: (ev) => { void qc.invalidateQueries({ queryKey: ["organizer-events"] }); setCreated(ev); window.scrollTo({ top: 0 }); },
+    onSuccess: (ev) => {
+      void qc.invalidateQueries({ queryKey: ["organizer-events"] });
+      if (ev.courtesyErrors?.length)
+        toast.error(`Evento criado, mas algumas cortesias não foram enviadas: ${ev.courtesyErrors.join(" · ")}`, { duration: 15000 });
+      setCreated(ev); window.scrollTo({ top: 0 });
+    },
   });
 
   const updateBatch = (key: number, patch: Partial<BatchForm>) =>
@@ -88,6 +99,9 @@ function CreateEvent() {
       const n = Number(b.total);
       if (!Number.isInteger(n) || n < 1) return `Informe quantos ingressos “${lotName(batches, b)}” terá.`;
     }
+    if (accessCode.trim() === "" && accessCode !== "") return "Digite a palavra-senha ou desmarque a opção.";
+    for (const c of courtesies)
+      if (!batches.some((b) => String(b.key) === c.batchKey)) return `Escolha de novo o tipo de ingresso da cortesia de ${c.name} (o tipo foi removido).`;
     return null;
   };
 
@@ -105,10 +119,13 @@ function CreateEvent() {
       title: title.trim(), category, coverUrl, startsAt: new Date(startsAt).toISOString(),
       venue: venue.trim(), city: city.trim(), address: address.trim(), description: description.trim(),
       importantInfo, maxTicketsPerCpf: maxPerCpf, maxTransfers: 1,
+      visibility, accessCode: accessCode.trim(),
       batches: batches.map((b) => ({
         name: lotName(batches, b), ticketType: b.type.trim(), price: b.price, total: Number(b.total),
         salesStart, salesEnd: new Date(startsAt).toISOString(),
       })),
+      coupons,
+      courtesies: courtesies.map((c) => ({ name: c.name, cpf: c.cpf, email: c.email, batchIndex: batches.findIndex((b) => String(b.key) === c.batchKey) })),
     });
   };
 
@@ -220,6 +237,19 @@ function CreateEvent() {
               <span className="text-sm">Avisos importantes <span className="text-muted-foreground">(um por linha)</span></span>
               <textarea value={info} onChange={(e) => setInfo(e.target.value)} rows={3} placeholder={"Documento com foto obrigatório\nProibida a entrada de bebidas"} className={cn(inputCls, "h-auto py-2")} />
             </label>
+          </Section>
+
+          <Section n={5} title="Acesso, cupons e cortesias" hint="Tudo opcional. Dá para mudar depois em Editar.">
+            <AccessFields isNew visibility={visibility} onVisibility={setVisibility} accessCode={accessCode} onAccessCode={setAccessCode} />
+            <div>
+              <Label>Cupons de desconto</Label>
+              <CouponDrafts value={coupons} onChange={setCoupons} />
+            </div>
+            <div>
+              <Label>Ingressos de cortesia</Label>
+              <CourtesyDrafts value={courtesies} onChange={setCourtesies}
+                batches={batches.filter((b) => b.type.trim()).map((b) => ({ key: String(b.key), label: lotName(batches, b) }))} />
+            </div>
           </Section>
 
           {(formError || m.error) && <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{formError ?? m.error?.message}</p>}

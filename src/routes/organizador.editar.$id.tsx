@@ -9,6 +9,7 @@ import {
   AGES, ageToInfo, CATEGORIES, centsFrom, Chips, CoverPicker, fromLocalParts, inputCls, Label, Section, splitInfo,
   TextField, TICKET_NAMES, toLocalParts,
 } from "@/components/event-form";
+import { AccessFields, CouponsManager, CourtesiesManager } from "@/components/event-promos";
 import { Button } from "@/components/ui/button";
 import { addBatch, deleteBatch, eventPanelQuery, updateBatch, updateEvent, type BatchEdit, type EventEdit } from "@/services/organizer";
 import { brl, categoryLabel, platformFee } from "@/utils/format";
@@ -73,6 +74,8 @@ function EditEvent({ ev }: { ev: EventPanel }) {
   const [age, setAge] = useState(info0.age);
   const [info, setInfo] = useState(info0.rest.join("\n"));
   const [maxPerCpf, setMaxPerCpf] = useState(ev.maxTicketsPerCpf);
+  const [visibility, setVisibility] = useState<"public" | "unlisted">(ev.visibility ?? "public");
+  const [accessCode, setAccessCode] = useState(ev.accessCode ?? "");
   const [lots, setLots] = useState<LotForm[]>(() => ev.salesByBatch.map((b) => ({
     key: nextKey++, id: b.id, name: b.name, type: b.ticketType ?? "", price: b.price, total: String(b.total),
     taken: b.sold + b.reserved, paused: b.status !== "active", removed: false,
@@ -90,6 +93,7 @@ function EditEvent({ ev }: { ev: EventPanel }) {
     if (venue.trim().length < 2) return "Informe o nome do local.";
     if (city.trim().length < 2) return "Informe a cidade.";
     if (!visible.length) return "O evento precisa ter pelo menos um tipo de ingresso.";
+    if (accessCode !== "" && accessCode.trim() === "") return "Digite a palavra-senha ou desmarque a opção.";
     for (const l of visible) {
       const label = l.id ? l.name : newLotName(lots, l) || "novo ingresso";
       if (!l.id && !l.type.trim()) return "Informe o tipo de cada ingresso novo (ex.: Pista, Camarote).";
@@ -107,15 +111,17 @@ function EditEvent({ ev }: { ev: EventPanel }) {
       const next: Required<Omit<EventEdit, "maxTransfers">> = {
         title: title.trim(), category, coverUrl, startsAt, venue: venue.trim(), city: city.trim(), address: address.trim(),
         description: description.trim(), importantInfo, maxTicketsPerCpf: maxPerCpf,
+        visibility, accessCode: accessCode.trim(),
       };
       const prev: typeof next = {
         title: ev.title, category: ev.category, coverUrl: ev.coverUrl, startsAt: ev.startsAt, venue: ev.venue, city: ev.city,
         address: ev.address, description: ev.description, importantInfo: ev.importantInfo, maxTicketsPerCpf: ev.maxTicketsPerCpf,
+        visibility: ev.visibility ?? "public", accessCode: ev.accessCode ?? "",
       };
       const diff: EventEdit = {};
       for (const k of Object.keys(next) as (keyof typeof next)[])
         if (JSON.stringify(next[k]) !== JSON.stringify(prev[k])) (diff as Record<string, unknown>)[k] = next[k];
-      if (Object.keys(diff).length) await updateEvent(ev.id, diff);
+      const saved = Object.keys(diff).length ? await updateEvent(ev.id, diff) : null;
 
       // 2) Lotes existentes: preço, quantidade, pausa; e as vendas acompanham a nova data do evento.
       for (const l of lots.filter((x) => x.id)) {
@@ -134,8 +140,11 @@ function EditEvent({ ev }: { ev: EventPanel }) {
       const salesStart = new Date(Date.now() - 60_000).toISOString();
       for (const l of visible.filter((x) => !x.id))
         await addBatch(ev.id, { name: newLotName(lots, l), ticketType: l.type.trim(), price: l.price, total: Number(l.total), salesStart, salesEnd: startsAt });
+      return saved;
     },
-    onSuccess: () => {
+    onSuccess: (saved) => {
+      if (saved && saved.slug !== ev.slug)
+        toast.info(`O evento agora é privado. Novo link: ${window.location.origin}/eventos/${saved.slug}`, { duration: 15000 });
       void qc.invalidateQueries({ queryKey: ["organizer-events"] });
       void qc.invalidateQueries({ queryKey: ["event-panel", ev.id] });
       void qc.invalidateQueries({ queryKey: ["events"] });
@@ -277,8 +286,23 @@ function EditEvent({ ev }: { ev: EventPanel }) {
           </label>
         </Section>
 
+        <Section n={5} title="Quem pode ver e comprar">
+          <AccessFields visibility={visibility} onVisibility={setVisibility} accessCode={accessCode} onAccessCode={setAccessCode} />
+        </Section>
+
         {(formError || save.error) && <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{formError ?? save.error?.message}</p>}
         <Button type="submit" size="lg" className="hidden w-full md:flex" disabled={save.isPending}>{save.isPending ? "Salvando…" : "Salvar alterações"}</Button>
+
+        <div className="pt-6">
+          <h2 className="text-lg font-semibold tracking-tight">Cupons e cortesias</h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">Estes são salvos na hora, sem precisar do botão “Salvar alterações”.</p>
+        </div>
+        <Section n={6} title="Cupons de desconto" hint="O desconto sai do valor do ingresso. A taxa de 10% é calculada já com o desconto.">
+          <CouponsManager eventId={ev.id} />
+        </Section>
+        <Section n={7} title="Ingressos de cortesia" hint="A cortesia ocupa uma vaga do tipo de ingresso escolhido.">
+          <CourtesiesManager eventId={ev.id} batches={ev.salesByBatch.map((b) => ({ id: b.id, name: b.name }))} />
+        </Section>
       </div>
 
       <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/90 p-4 backdrop-blur md:hidden">

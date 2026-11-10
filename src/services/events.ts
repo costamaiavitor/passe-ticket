@@ -31,3 +31,11 @@ export const eventsQuery = (f: EventFilters = {}) =>
   queryOptions({ queryKey: ["events", f], queryFn: () => listEvents(f) });
 export const eventQuery = (id: string) =>
   queryOptions({ queryKey: ["event", id], queryFn: () => getEvent(id) });
+
+/** Confere a palavra-senha do evento antes de liberar a compra. */
+export const checkAccessCode = (eventId: string, code: string) =>
+  http<{ ok: true }>(`/events/${encodeURIComponent(eventId)}/access-code`, { method: "POST", body: JSON.stringify({ code }) });
+
+/** Prévia do cupom: devolve o tipo e o valor do desconto (a compra recalcula no servidor). */
+export const previewCoupon = (eventId: string, code: string, quantity: number) =>
+  http<{ code: string; kind: "percent" | "fixed"; value: number }>(`/events/${encodeURIComponent(eventId)}/coupon`, { method: "POST", body: JSON.stringify({ code, quantity }) });

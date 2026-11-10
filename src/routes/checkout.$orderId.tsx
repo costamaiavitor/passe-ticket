@@ -58,6 +58,7 @@ function Checkout() {
 
       <dl className="mt-6 space-y-1.5 rounded-xl border bg-card p-5 text-sm">
         <div className="flex justify-between text-muted-foreground"><dt>Subtotal</dt><dd>{brl(order.subtotal)}</dd></div>
+        {!!order.discount && <div className="flex justify-between text-primary"><dt>Cupom {order.couponCode}</dt><dd>− {brl(order.discount)}</dd></div>}
         <div className="flex justify-between text-muted-foreground"><dt>Taxa da plataforma</dt><dd>{brl(order.fee)}</dd></div>
         <div className="flex justify-between pt-1 font-medium"><dt>Total</dt><dd>{brl(order.total)}</dd></div>
       </dl>

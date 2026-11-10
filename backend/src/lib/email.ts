@@ -143,6 +143,21 @@ export function payoutEmail(to: string, name: string, eventTitle: string, amount
   };
 }
 
+/** Cortesia: se a pessoa já tem conta com o CPF, o ingresso já está lá; senão, ela cria a conta e aceita. */
+export function courtesyEmail(to: string, name: string, eventTitle: string, ready: boolean): Email {
+  const link = `${config.publicUrl}/ingressos`;
+  const how = ready
+    ? "O ingresso já está na sua conta, em Meus ingressos."
+    : "Para receber, entre no Passe (ou crie sua conta) com o seu CPF e aceite o ingresso em Meus ingressos.";
+  return {
+    to,
+    subject: `Você ganhou uma cortesia: ${eventTitle}`,
+    html: layout("Você ganhou um ingresso!", `<p>Olá, ${esc(name)}! O organizador de <strong>${esc(eventTitle)}</strong> te deu um ingresso de cortesia.</p><p>${how}</p>`,
+      { label: "Ver meus ingressos", url: link }),
+    text: `Você ganhou uma cortesia para ${eventTitle}. ${how} ${link}`,
+  };
+}
+
 export function transferOfferEmail(to: string, name: string, fromName: string, eventTitle: string): Email {
   const link = `${config.publicUrl}/ingressos`;
   return {

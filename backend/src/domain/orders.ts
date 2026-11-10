@@ -5,7 +5,8 @@ import { isValidCpf, onlyDigits } from "../lib/cpf.js";
 import { badRequest, conflict, forbidden, HttpError, notFound } from "../lib/errors.js";
 import { payments, type CardPaymentInput, type PaymentInfo } from "../payments.js";
 import { eventCancelledEmail, purchaseEmail, sendEmail } from "../lib/email.js";
-import { batchStatuses, type BatchRow, type EventRow } from "./events.js";
+import { batchStatuses, normalizeCode, type BatchRow, type EventRow } from "./events.js";
+import { discountFor, findUsableCoupon } from "./promos.js";
 
 export interface OrderRow {
   id: string; user_id: string; event_id: string; batch_id: string; quantity: number; unit_price: number;
@@ -13,6 +14,7 @@ export interface OrderRow {
   status: "pending" | "paid" | "expired" | "cancelled" | "refund_required" | "refunded";
   payment_provider: string; payment_id: string | null; payment_data: string; expires_at: string;
   paid_at: string | null; created_at: string; paid_payment_id: string | null;
+  coupon_id?: string | null; discount?: number; kind?: "sale" | "courtesy";
   /** Só no retorno de approveOrder: o pedido acabou de ser pago nesta chamada. */
   justPaid?: boolean;
 }
@@ -27,7 +29,9 @@ export async function toOrder(o: OrderRow) {
   return {
     id: o.id, status: o.status, eventId: o.event_id, eventTitle: ev?.title ?? "", eventSlug: ev?.slug ?? "",
     eventStartsAt: ev?.starts_at ?? "", batchId: o.batch_id, batchName: b?.name ?? "", quantity: o.quantity,
-    unitPrice: o.unit_price, subtotal: o.subtotal, fee: o.fee, total: o.total,
+    // subtotal = valor dos ingressos antes do desconto; discount = desconto do cupom (o total já vem com ele).
+    unitPrice: o.unit_price, subtotal: o.subtotal + (o.discount ?? 0), discount: o.discount ?? 0, fee: o.fee, total: o.total,
+    couponCode: o.coupon_id ? (await one<{ code: string }>("SELECT code FROM coupons WHERE id = ?", o.coupon_id))?.code ?? null : null,
     payment: o.status === "pending" ? (JSON.parse(o.payment_data) as PaymentInfo) : null,
     // Cartão em análise pelo Mercado Pago: o checkout mostra "pagamento em análise" e continua consultando.
     cardPending: o.status === "pending"
@@ -40,7 +44,7 @@ export async function toOrder(o: OrderRow) {
 export interface Holder { name: string; cpf: string }
 
 /** Cria o pedido reservando o estoque. Regras de CPF, estoque e janela de vendas são validadas aqui. */
-export async function createOrder(userId: string, input: { eventId: string; batchId: string; holders: Holder[] }) {
+export async function createOrder(userId: string, input: { eventId: string; batchId: string; holders: Holder[]; accessCode?: string; couponCode?: string }) {
   await expireStaleOrders();
   const holders = input.holders.map((h) => ({ name: h.name.trim(), cpf: onlyDigits(h.cpf) }));
   if (holders.length < 1 || holders.length > config.maxTicketsPerOrder)
@@ -58,6 +62,8 @@ export async function createOrder(userId: string, input: { eventId: string; batc
     const ev = await one<EventRow>("SELECT * FROM events WHERE id = ? OR slug = ? FOR UPDATE", input.eventId, input.eventId);
     if (!ev || ev.status !== "published") throw notFound("Evento não encontrado.");
     if (ev.starts_at < now()) throw badRequest("EVENT_STARTED", "As vendas deste evento já foram encerradas.");
+    if (ev.access_code && normalizeCode(input.accessCode ?? "") !== normalizeCode(ev.access_code))
+      throw new HttpError(403, "ACCESS_CODE", "Palavra-senha incorreta. Peça a senha para o organizador do evento.");
     const b = await one<BatchRow>("SELECT * FROM batches WHERE id = ? AND event_id = ? FOR UPDATE", input.batchId, ev.id);
     if (!b) throw notFound("Lote não encontrado.");
     const siblings = await all<BatchRow>("SELECT * FROM batches WHERE event_id = ?", ev.id);
@@ -79,16 +85,20 @@ export async function createOrder(userId: string, input: { eventId: string; batc
         throw conflict("CPF_LIMIT", `O CPF ${cpf.slice(0, 3)}.***.***-${cpf.slice(9)} atingiu o limite de ${ev.max_per_cpf} ingressos neste evento.`);
     }
 
+    // Cupom: o desconto sai do valor do ingresso (o organizador recebe menos); a taxa é calculada sobre o valor já com desconto.
+    const coupon = input.couponCode?.trim() ? await findUsableCoupon(ev.id, input.couponCode, holders.length, true) : null;
+    const discount = coupon ? discountFor(coupon, b.price, holders.length) : 0;
+
     const id = randomUUID();
-    const subtotal = b.price * holders.length;
+    const subtotal = b.price * holders.length - discount;
     const fee = platformFee(subtotal);
     const t = now();
     const expires = new Date(Date.now() + config.reservationMinutes * 60_000).toISOString();
     await run("UPDATE batches SET reserved = reserved + ? WHERE id = ?", holders.length, b.id);
     await run(
-      `INSERT INTO orders (id, user_id, event_id, batch_id, quantity, unit_price, subtotal, fee, total, status, payment_provider, expires_at, created_at)
-       VALUES (?,?,?,?,?,?,?,?,?, 'pending', ?, ?, ?)`,
-      id, userId, ev.id, b.id, holders.length, b.price, subtotal, fee, subtotal + fee, payments.name, expires, t,
+      `INSERT INTO orders (id, user_id, event_id, batch_id, quantity, unit_price, subtotal, fee, total, status, payment_provider, expires_at, created_at, coupon_id, discount)
+       VALUES (?,?,?,?,?,?,?,?,?, 'pending', ?, ?, ?, ?, ?)`,
+      id, userId, ev.id, b.id, holders.length, b.price, subtotal, fee, subtotal + fee, payments.name, expires, t, coupon?.id ?? null, discount,
     );
     for (const h of holders)
       await run(

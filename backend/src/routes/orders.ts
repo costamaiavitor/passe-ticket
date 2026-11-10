@@ -13,6 +13,8 @@ const createSchema = z.object({
   eventId: z.string().min(1),
   batchId: z.string().min(1),
   holders: z.array(z.object({ name: z.string(), cpf: z.string() })).min(1),
+  accessCode: z.string().max(60).optional(),
+  couponCode: z.string().max(40).optional(),
 });
 
 ordersRouter.post("/", rateLimit({ windowMs: 60_000, max: config.isTest ? 1000 : 20, key: (r) => `order:${r.auth?.id}` }), async (req, res) => {
@@ -21,7 +23,7 @@ ordersRouter.post("/", rateLimit({ windowMs: 60_000, max: config.isTest ? 1000 :
 });
 
 ordersRouter.get("/", async (req, res) => {
-  const rows = await all<OrderRow>("SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC", user(req).id);
+  const rows = await all<OrderRow>("SELECT * FROM orders WHERE user_id = ? AND kind = 'sale' ORDER BY created_at DESC", user(req).id);
   res.json(await Promise.all(rows.map(toOrder)));
 });
 

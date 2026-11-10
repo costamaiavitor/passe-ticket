@@ -14,6 +14,7 @@ import { addStaff, becomeOrganizer, myEventsQuery, payoutInfoQuery, removeEvent,
 import { hasRole } from "@/services/session";
 import { brl, fmtDate, fmtTime } from "@/utils/format";
 import { cn } from "@/lib/utils";
+import { PrivateBadges } from "@/components/event-promos";
 import type { AuthUser, OrganizerEvent } from "@/types";
 
 export const Route = createFileRoute("/organizador/")({
@@ -155,6 +156,17 @@ function OrganizerEventCard({ ev }: { ev: OrganizerEvent }) {
         <h2 className="font-medium leading-snug"><Link to="/organizador/evento/$id" params={{ id: ev.id }} className="hover:underline">{ev.title}</Link></h2>
         <p className="mt-1 text-sm text-muted-foreground">{fmtDate(ev.startsAt)} · {fmtTime(ev.startsAt)}</p>
         <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground"><MapPin className="size-3.5" />{ev.venue}, {ev.city}</p>
+        {(ev.visibility === "unlisted" || !!ev.accessCode) && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <PrivateBadges visibility={ev.visibility} hasCode={!!ev.accessCode} />
+            {ev.visibility === "unlisted" && ev.status === "published" && (
+              <button type="button" className="text-xs text-primary hover:underline"
+                onClick={() => { void navigator.clipboard.writeText(`${window.location.origin}/eventos/${ev.slug}`); toast.success("Link do evento copiado."); }}>
+                Copiar link
+              </button>
+            )}
+          </div>
+        )}
 
         {ev.status === "review" && (
           <p className="mt-4 rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">

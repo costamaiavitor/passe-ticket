@@ -1,6 +1,6 @@
 // Área do organizador: criar eventos, acompanhar vendas e montar a equipe da portaria.
 import { queryOptions } from "@tanstack/react-query";
-import type { Attendee, AuthUser, EventCategory, EventPanel, OrganizerEvent, StaffMember } from "@/types";
+import type { Attendee, AuthUser, Coupon, Courtesy, EventCategory, EventPanel, OrganizerEvent, StaffMember } from "@/types";
 import { API_BASE, http, setAccessToken, USE_MOCKS } from "./http";
 import { setSession } from "./session";
 
@@ -37,12 +37,20 @@ export interface NewEvent {
   importantInfo: string[];
   maxTicketsPerCpf: number;
   maxTransfers: number;
+  visibility: "public" | "unlisted";
+  accessCode: string;
   batches: NewBatch[];
+  coupons?: NewCoupon[];
+  /** batchIndex = posição do tipo de ingresso em batches. */
+  courtesies?: Array<NewCourtesy & { batchIndex: number }>;
 }
+
+export interface NewCoupon { code: string; kind: "percent" | "fixed"; value: number; maxUses?: number | null }
+export interface NewCourtesy { name: string; cpf: string; email?: string | undefined }
 
 export async function createEvent(data: NewEvent) {
   needsBackend();
-  return http<OrganizerEvent>("/organizer/events", { method: "POST", body: JSON.stringify({ ...data, status: "published" }) });
+  return http<OrganizerEvent & { courtesyErrors?: string[] }>("/organizer/events", { method: "POST", body: JSON.stringify({ ...data, status: "published" }) });
 }
 
 async function listMyEvents(): Promise<OrganizerEvent[]> {
@@ -54,7 +62,7 @@ export const myEventsQuery = () => queryOptions({ queryKey: ["organizer-events"]
 // ---- Editar evento e lotes ----
 const ev = (id: string) => `/organizer/events/${encodeURIComponent(id)}`;
 const lot = (id: string) => `/organizer/batches/${encodeURIComponent(id)}`;
-export type EventEdit = Partial<Omit<NewEvent, "batches">>;
+export type EventEdit = Partial<Omit<NewEvent, "batches" | "coupons" | "courtesies">>;
 export interface BatchEdit { name?: string; ticketType?: string | null; price?: number; total?: number; status?: "active" | "paused"; salesStart?: string; salesEnd?: string }
 
 export const updateEvent = (id: string, d: EventEdit) => http<OrganizerEvent>(ev(id), { method: "PATCH", body: JSON.stringify(d) });
@@ -62,6 +70,21 @@ export const updateBatch = (id: string, d: BatchEdit) => http<OrganizerEvent>(lo
 export const addBatch = (eventId: string, d: NewBatch & { ticketType: string }) =>
   http<OrganizerEvent>(`${ev(eventId)}/batches`, { method: "POST", body: JSON.stringify(d) });
 export const deleteBatch = (id: string) => http<OrganizerEvent>(lot(id), { method: "DELETE" });
+
+// ---- Cupons ----
+export const couponsQuery = (eventId: string) =>
+  queryOptions({ queryKey: ["coupons", eventId], queryFn: () => http<Coupon[]>(`${ev(eventId)}/coupons`) });
+export const createCoupon = (eventId: string, d: NewCoupon) => http<Coupon>(`${ev(eventId)}/coupons`, { method: "POST", body: JSON.stringify(d) });
+export const updateCoupon = (id: string, d: { active?: boolean; maxUses?: number | null }) =>
+  http<Coupon>(`/organizer/coupons/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(d) });
+export const deleteCoupon = (id: string) => http<{ deleted: boolean }>(`/organizer/coupons/${encodeURIComponent(id)}`, { method: "DELETE" });
+
+// ---- Cortesias ----
+export const courtesiesQuery = (eventId: string) =>
+  queryOptions({ queryKey: ["courtesies", eventId], queryFn: () => http<Courtesy[]>(`${ev(eventId)}/courtesies`) });
+export const giveCourtesy = (eventId: string, d: NewCourtesy & { batchId: string }) =>
+  http<Courtesy>(`${ev(eventId)}/courtesies`, { method: "POST", body: JSON.stringify(d) });
+export const revokeCourtesy = (ticketId: string) => http<{ ok: true }>(`/organizer/courtesies/${encodeURIComponent(ticketId)}`, { method: "DELETE" });
 
 /** Remove o evento: apaga se não houver vendas; com vendas, cancela e estorna os compradores. */
 export const removeEvent = (eventId: string) =>

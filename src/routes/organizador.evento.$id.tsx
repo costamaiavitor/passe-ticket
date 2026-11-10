@@ -68,7 +68,7 @@ function Panel() {
       {/* Números */}
       <section className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi icon={TicketIcon} label="Ingressos vendidos" value={`${ev.stats.ticketsSold}`} sub={`de ${capacity} · ${pct(ev.stats.ticketsSold, capacity)}% da lotação`} />
-        <Kpi icon={Users} label="Compradores" value={`${ev.stats.buyers ?? 0}`} sub={ev.stats.awaitingPayment ? `${ev.stats.awaitingPayment} aguardando pagamento` : "pagamentos confirmados"} />
+        <Kpi icon={Users} label="Compradores" value={`${ev.stats.buyers ?? 0}`} sub={[ev.stats.awaitingPayment ? `${ev.stats.awaitingPayment} aguardando pagamento` : "pagamentos confirmados", ev.stats.courtesies ? `${ev.stats.courtesies} cortesia(s)` : ""].filter(Boolean).join(" · ")} />
         <Kpi icon={Wallet} label="Receita dos ingressos" value={brl(ev.stats.revenue)} sub={`a receber ${brl(ev.stats.toReceive)}`} highlight />
         <Kpi icon={CheckCircle2} label="Já entraram" value={`${ev.stats.checkedIn}`} sub={`de ${ev.stats.ticketsSold} · ${pct(ev.stats.checkedIn, ev.stats.ticketsSold)}%`} />
       </section>
@@ -169,7 +169,7 @@ function Attendees({ ev }: { ev: EventPanel }) {
               <StatusPill a={a} />
             </div>
             <p className="mt-2 text-xs text-muted-foreground">{a.batchName} · {brl(a.price)}{a.paidAt ? ` · ${fmtDate(a.paidAt)} ${fmtTime(a.paidAt)}` : ""}</p>
-            <p className="mt-0.5 truncate text-xs text-muted-foreground">Comprado por {a.buyerName} · {a.buyerEmail}</p>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">{a.courtesy ? "Cortesia do organizador" : `Comprado por ${a.buyerName} · ${a.buyerEmail}`}</p>
             {a.transferred && <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground"><Repeat className="size-3" />Transferido para {a.ownerEmail}</p>}
           </li>
         ))}
@@ -188,8 +188,8 @@ function Attendees({ ev }: { ev: EventPanel }) {
               <tr key={a.id} className="border-b last:border-0">
                 <td className="py-2.5 pr-3 font-medium">{a.holderName}{a.transferred && <Repeat className="ml-1.5 inline size-3 text-muted-foreground" aria-label="transferido" />}</td>
                 <td className="py-2.5 pr-3 font-mono text-xs text-muted-foreground">{a.holderCpf}</td>
-                <td className="py-2.5 pr-3">{a.batchName}<span className="block text-xs text-muted-foreground">{brl(a.price)}</span></td>
-                <td className="py-2.5 pr-3">{a.buyerName}<span className="block text-xs text-muted-foreground">{a.buyerEmail}</span></td>
+                <td className="py-2.5 pr-3">{a.batchName}<span className="block text-xs text-muted-foreground">{a.courtesy ? "Cortesia" : brl(a.price)}</span></td>
+                <td className="py-2.5 pr-3">{a.courtesy ? <span className="text-muted-foreground">Cortesia do organizador</span> : <>{a.buyerName}<span className="block text-xs text-muted-foreground">{a.buyerEmail}</span></>}</td>
                 <td className="py-2.5 pr-3 text-xs text-muted-foreground">{a.paidAt ? `${fmtDate(a.paidAt)} ${fmtTime(a.paidAt)}` : "—"}</td>
                 <td className="py-2.5"><StatusPill a={a} /></td>
               </tr>
@@ -214,7 +214,7 @@ function downloadCsv(title: string, rows: Attendee[]) {
   const cell = (v: string) => `"${(/^[=+\-@\t\r]/.test(v) ? `'${v}` : v).replace(/"/g, '""')}"`;
   const head = ["Titular", "CPF", "Lote", "Valor", "Comprador", "E-mail do comprador", "Data da compra", "Entrada", "Transferido para"];
   const lines = rows.map((a) => [
-    a.holderName, a.holderCpf, a.batchName, (a.price / 100).toFixed(2).replace(".", ","), a.buyerName, a.buyerEmail,
+    a.holderName, a.holderCpf, a.batchName, a.courtesy ? "Cortesia" : (a.price / 100).toFixed(2).replace(".", ","), a.courtesy ? "Cortesia" : a.buyerName, a.courtesy ? "" : a.buyerEmail,
     a.paidAt ? `${fmtDate(a.paidAt)} ${fmtTime(a.paidAt)}` : "", a.status === "used" ? `Entrou ${a.checkedInAt ? fmtTime(a.checkedInAt) : ""}` : "Não entrou",
     a.transferred ? a.ownerEmail : "",
   ].map(cell).join(";"));

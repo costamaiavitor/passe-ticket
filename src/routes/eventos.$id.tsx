@@ -1,14 +1,14 @@
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Calendar, MapPin, Minus, Plus, Info, Repeat, Undo2 } from "lucide-react";
+import { Calendar, MapPin, Minus, Plus, Info, Repeat, Undo2, KeyRound, Tag, X } from "lucide-react";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { AvailabilityBadge } from "@/components/availability-badge";
 import { Button } from "@/components/ui/button";
 import { HoldersForm } from "@/components/holders-form";
 import { createOrder } from "@/services/orders";
 import { useSession } from "@/services/session";
-import { eventQuery } from "@/services/events";
+import { checkAccessCode, eventQuery, previewCoupon } from "@/services/events";
 import { ApiError } from "@/services/http";
 import { brl, fmtDate, fmtTime, MAX_TICKETS_PER_CPF, platformFee } from "@/utils/format";
 import { cn } from "@/lib/utils";
@@ -31,6 +31,8 @@ export const Route = createFileRoute("/eventos/$id")({
           { property: "og:description", content: loaderData.description },
           { property: "og:type", content: "website" },
           { name: "twitter:card", content: "summary_large_image" },
+          // Evento privado: buscadores (Google) não devem listar.
+          ...(loaderData.visibility === "unlisted" ? [{ name: "robots", content: "noindex" }] : []),
         ]
       : [{ title: "Evento indisponível — Passe" }, { name: "robots", content: "noindex" }],
   }),
@@ -54,7 +56,34 @@ function EventPage() {
   // Cada ingresso tem um titular (CPF); limite por CPF é validado no backend.
   const maxQty = Math.min(10, remaining);
   const subtotal = (batch?.price ?? 0) * qty;
-  const fee = platformFee(subtotal);
+  // Palavra-senha: a compra só libera depois de conferida (o servidor confere de novo na compra).
+  const [unlocked, setUnlocked] = useState(!ev.requiresAccessCode);
+  const [code, setCode] = useState("");
+  const [codeError, setCodeError] = useState<string | null>(null);
+  const [checkingCode, setCheckingCode] = useState(false);
+  const unlock = async () => {
+    if (!code.trim()) return setCodeError("Digite a palavra-senha.");
+    setCheckingCode(true); setCodeError(null);
+    try { await checkAccessCode(ev.id, code); setUnlocked(true); }
+    catch (e) { setCodeError(e instanceof Error ? e.message : "Palavra-senha incorreta."); }
+    finally { setCheckingCode(false); }
+  };
+  // Cupom de desconto.
+  const [couponOpen, setCouponOpen] = useState(false);
+  const [couponInput, setCouponInput] = useState("");
+  const [coupon, setCoupon] = useState<{ code: string; kind: "percent" | "fixed"; value: number } | null>(null);
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [applying, setApplying] = useState(false);
+  const applyCoupon = async () => {
+    if (!couponInput.trim()) return;
+    setApplying(true); setCouponError(null);
+    try { setCoupon(await previewCoupon(ev.id, couponInput, qty)); setCouponOpen(false); }
+    catch (e) { setCouponError(e instanceof Error ? e.message : "Cupom inválido."); }
+    finally { setApplying(false); }
+  };
+  const discount = !coupon ? 0
+    : Math.min(subtotal, coupon.kind === "percent" ? Math.round((subtotal * coupon.value) / 100) : coupon.value * qty);
+  const fee = platformFee(subtotal - discount);
   const { user } = useSession();
   const navigate = useNavigate();
   const [step, setStep] = useState<"select" | "holders">("select");
@@ -73,7 +102,11 @@ function EventPage() {
     if (!batch) return;
     setSubmitting(true); setOrderError(null);
     try {
-      const order = await createOrder({ eventId: ev.id, batchId: batch.id, holders });
+      const order = await createOrder({
+        eventId: ev.id, batchId: batch.id, holders,
+        ...(ev.requiresAccessCode ? { accessCode: code } : {}),
+        ...(coupon ? { couponCode: coupon.code } : {}),
+      });
       navigate({ to: "/checkout/$orderId", params: { orderId: order.id } });
     } catch (e) {
       setOrderError(e instanceof Error ? e.message : "Não foi possível reservar.");
@@ -149,10 +182,45 @@ function EventPage() {
               <p className="mt-2 text-xs text-muted-foreground">Cada ingresso exige um titular com CPF próprio (máx. {ev.maxTicketsPerCpf ?? MAX_TICKETS_PER_CPF} por CPF).</p>
               <dl className="mt-5 space-y-1.5 border-t pt-4 text-sm">
                 <Row k="Subtotal" v={brl(subtotal)} />
+                {coupon && (
+                  <div className="flex items-center justify-between text-primary">
+                    <dt className="flex items-center gap-1.5"><Tag className="size-3.5" />Cupom {coupon.code}
+                      {step === "select" && <button type="button" aria-label="Remover cupom" onClick={() => setCoupon(null)} className="text-muted-foreground hover:text-foreground"><X className="size-3.5" /></button>}
+                    </dt>
+                    <dd>− {brl(discount)}</dd>
+                  </div>
+                )}
                 <Row k="Taxa da plataforma (10%)" v={brl(fee)} />
-                <Row k="Total" v={brl(subtotal + fee)} strong />
+                <Row k="Total" v={brl(subtotal - discount + fee)} strong />
               </dl>
-              {step === "select" ? (
+              {!coupon && step === "select" && unlocked && (
+                couponOpen ? (
+                  <div className="mt-3">
+                    <div className="flex gap-2">
+                      <input value={couponInput} onChange={(e) => setCouponInput(e.target.value.toUpperCase())} placeholder="Código do cupom" maxLength={30}
+                        onKeyDown={(e) => { if (e.key === "Enter") void applyCoupon(); }}
+                        className="h-9 min-w-0 flex-1 rounded-md border bg-surface px-3 text-sm uppercase outline-none focus:border-primary/50" />
+                      <Button size="sm" variant="secondary" disabled={applying} onClick={() => void applyCoupon()}>{applying ? "…" : "Aplicar"}</Button>
+                    </div>
+                    {couponError && <p className="mt-1.5 text-xs text-destructive">{couponError}</p>}
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => setCouponOpen(true)} className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"><Tag className="size-3.5" />Tenho um cupom de desconto</button>
+                )
+              )}
+              {!unlocked ? (
+                <div className="mt-5 rounded-lg border border-primary/40 bg-primary/5 p-3">
+                  <p className="flex items-center gap-2 text-sm font-medium"><KeyRound className="size-4 text-primary" />Este evento pede uma palavra-senha</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Peça a senha para quem organiza a festa.</p>
+                  <div className="mt-3 flex gap-2">
+                    <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Palavra-senha" maxLength={60}
+                      onKeyDown={(e) => { if (e.key === "Enter") void unlock(); }}
+                      className="h-10 min-w-0 flex-1 rounded-md border bg-surface px-3 text-sm outline-none focus:border-primary/50" />
+                    <Button disabled={checkingCode} onClick={() => void unlock()}>{checkingCode ? "…" : "Liberar"}</Button>
+                  </div>
+                  {codeError && <p className="mt-1.5 text-xs text-destructive">{codeError}</p>}
+                </div>
+              ) : step === "select" ? (
                 <Button className="mt-5 w-full" onClick={goToHolders}>{user ? "Continuar" : "Entrar para comprar"}</Button>
               ) : (
                 <HoldersForm key={`${batch.id}-${qty}`} qty={qty} defaultName={user?.name} loading={submitting} error={orderError}

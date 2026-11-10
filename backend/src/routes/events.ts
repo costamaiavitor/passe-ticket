@@ -1,10 +1,12 @@
 import { Router } from "express";
 import { z } from "zod";
 import { all } from "../db.js";
-import { findEvent, toEventDetail, toEventSummaries, type EventRow } from "../domain/events.js";
+import { config } from "../config.js";
+import { findEvent, normalizeCode, toEventDetail, toEventSummaries, type EventRow } from "../domain/events.js";
 import { expireStaleOrdersThrottled } from "../domain/orders.js";
-import { notFound } from "../lib/errors.js";
-import { optionalAuth, parse } from "../lib/http.js";
+import { findUsableCoupon } from "../domain/promos.js";
+import { HttpError, notFound } from "../lib/errors.js";
+import { optionalAuth, parse, rateLimit } from "../lib/http.js";
 
 export const eventsRouter = Router();
 
@@ -24,7 +26,8 @@ eventsRouter.get("/", async (req, res) => {
   const f = parse(filters, req.query);
   // Sem processo rodando em segundo plano na Vercel: reservas vencidas são liberadas aqui.
   await expireStaleOrdersThrottled();
-  const where = ["status = 'published'", "starts_at >= ?"];
+  // Eventos privados não aparecem na lista nem na busca: só quem tem o link chega neles.
+  const where = ["status = 'published'", "visibility = 'public'", "starts_at >= ?"];
   const params: string[] = [hoursAgo(12)];
   if (f.q) { where.push("(title ILIKE ? OR city ILIKE ? OR venue ILIKE ?)"); params.push(`%${f.q}%`, `%${f.q}%`, `%${f.q}%`); }
   if (f.city) { where.push("city = ?"); params.push(f.city); }
@@ -36,6 +39,33 @@ eventsRouter.get("/", async (req, res) => {
   if (f.maxPrice) list = list.filter((e) => e.priceFrom <= f.maxPrice!);
   if (f.onlyAvailable === "true") list = list.filter((e) => e.availability !== "soldout");
   res.json(list);
+});
+
+// Poucas tentativas por minuto: impede descobrir a palavra-senha ou cupons na base do chute.
+const guessLimit = (name: string) =>
+  rateLimit({ windowMs: 60_000, max: config.isTest ? 1000 : 10, key: (r) => `${name}:${r.ip}:${String(r.params.id)}` });
+
+async function publicEvent(idOrSlug: string) {
+  const e = await findEvent(idOrSlug);
+  if (!e || e.status !== "published") throw notFound("Evento não encontrado");
+  return e;
+}
+
+/** Confere a palavra-senha antes de liberar a compra (a compra confere de novo no servidor). */
+eventsRouter.post("/:id/access-code", guessLimit("code"), async (req, res) => {
+  const e = await publicEvent(String(req.params.id));
+  const { code } = parse(z.object({ code: z.string().max(60) }), req.body);
+  if (e.access_code && normalizeCode(code) !== normalizeCode(e.access_code))
+    throw new HttpError(403, "ACCESS_CODE", "Palavra-senha incorreta. Peça a senha para o organizador do evento.");
+  res.json({ ok: true });
+});
+
+/** Prévia do cupom (mostra o desconto antes de ir para o pagamento). */
+eventsRouter.post("/:id/coupon", guessLimit("coupon"), async (req, res) => {
+  const e = await publicEvent(String(req.params.id));
+  const { code, quantity } = parse(z.object({ code: z.string().min(1).max(40), quantity: z.number().int().min(1).max(20).default(1) }), req.body);
+  const c = await findUsableCoupon(e.id, code, quantity);
+  res.json({ code: c.code, kind: c.kind, value: c.value });
 });
 
 eventsRouter.get("/:id", optionalAuth, async (req, res) => {

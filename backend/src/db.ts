@@ -205,6 +205,28 @@ DO $$ BEGIN
     ALTER TABLE events ADD CONSTRAINT events_status_v2 CHECK (status IN ('draft','review','published','rejected','cancelled'));
   END IF;
 END $$;
+
+-- Evento privado (só com o link) e palavra-senha para comprar ('' = sem senha).
+ALTER TABLE events ADD COLUMN IF NOT EXISTS visibility TEXT NOT NULL DEFAULT 'public';
+ALTER TABLE events ADD COLUMN IF NOT EXISTS access_code TEXT NOT NULL DEFAULT '';
+
+-- Cupons de desconto (percentual ou valor fixo por ingresso). max_uses conta ingressos; NULL = sem limite.
+CREATE TABLE IF NOT EXISTS coupons (
+  id TEXT PRIMARY KEY,
+  event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  code TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('percent','fixed')),
+  value INTEGER NOT NULL CHECK (value > 0),
+  max_uses INTEGER,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL,
+  UNIQUE (event_id, code)
+);
+
+-- Pedidos: cupom usado, desconto aplicado e tipo (venda normal ou cortesia dada pelo organizador).
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS coupon_id TEXT REFERENCES coupons(id) ON DELETE SET NULL;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'sale';
 `;
 
 type Param = string | number | boolean | null;

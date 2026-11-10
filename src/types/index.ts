@@ -37,6 +37,10 @@ export interface EventDetail extends EventSummary {
   refundPolicy: string;
   maxTicketsPerCpf?: number;
   status?: "draft" | "review" | "published" | "rejected" | "cancelled";
+  /** "unlisted" = privado: só abre com o link. */
+  visibility?: "public" | "unlisted";
+  /** Pede palavra-senha para comprar (a senha em si nunca vem para o público). */
+  requiresAccessCode?: boolean;
   batches: Batch[];
 }
 
@@ -70,6 +74,9 @@ export interface Order {
   quantity: number;
   unitPrice: number;
   subtotal: number;
+  /** Desconto do cupom (o total já vem com ele). */
+  discount?: number;
+  couponCode?: string | null;
   fee: number;
   total: number;
   payment: { method: "pix"; pixCode: string; pixQrBase64?: string; ticketUrl?: string } | null;
@@ -134,10 +141,12 @@ export interface OrganizerEvent extends EventDetail {
   status: EventStatus;
   maxTicketsPerCpf: number;
   reviewNote?: string;
+  /** Palavra-senha para comprar ('' = sem senha). Só o organizador vê. */
+  accessCode?: string;
   /** revenue = valor dos ingressos vendidos (o que o organizador recebe); paidOut = já repassado. */
   stats: {
     ticketsSold: number; revenue: number; checkedIn: number; paidOut: number; toReceive: number;
-    buyers?: number; awaitingPayment?: number;
+    buyers?: number; awaitingPayment?: number; courtesies?: number;
   };
 }
 
@@ -153,7 +162,7 @@ export interface EventPanel extends OrganizerEvent {
 export interface Attendee {
   id: string; holderName: string; holderCpf: string; status: "valid" | "used"; checkedInAt: string | null;
   batchName: string; price: number; paidAt: string | null; orderId: string;
-  buyerName: string; buyerEmail: string; ownerEmail: string; transferred: boolean;
+  buyerName: string; buyerEmail: string; ownerEmail: string; transferred: boolean; courtesy?: boolean;
 }
 
 /** Evento aguardando aprovação (tela do admin). */
@@ -168,3 +177,14 @@ export interface PayoutRow {
 }
 
 export interface StaffMember { id: string; name: string; email: string }
+
+/** Cupom de desconto do evento. value = % (1–100) ou centavos por ingresso. */
+export interface Coupon {
+  id: string; code: string; kind: "percent" | "fixed"; value: number; maxUses: number | null; active: boolean; uses: number; createdAt: string;
+}
+
+/** Ingresso de cortesia dado pelo organizador. */
+export interface Courtesy {
+  id: string; holderName: string; holderCpf: string; batchName: string; createdAt: string;
+  state: "delivered" | "waiting" | "declined" | "used";
+}
