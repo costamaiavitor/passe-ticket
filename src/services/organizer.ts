@@ -51,6 +51,18 @@ async function listMyEvents(): Promise<OrganizerEvent[]> {
 }
 export const myEventsQuery = () => queryOptions({ queryKey: ["organizer-events"], queryFn: listMyEvents });
 
+// ---- Editar evento e lotes ----
+const ev = (id: string) => `/organizer/events/${encodeURIComponent(id)}`;
+const lot = (id: string) => `/organizer/batches/${encodeURIComponent(id)}`;
+export type EventEdit = Partial<Omit<NewEvent, "batches">>;
+export interface BatchEdit { name?: string; ticketType?: string | null; price?: number; total?: number; status?: "active" | "paused"; salesStart?: string; salesEnd?: string }
+
+export const updateEvent = (id: string, d: EventEdit) => http<OrganizerEvent>(ev(id), { method: "PATCH", body: JSON.stringify(d) });
+export const updateBatch = (id: string, d: BatchEdit) => http<OrganizerEvent>(lot(id), { method: "PATCH", body: JSON.stringify(d) });
+export const addBatch = (eventId: string, d: NewBatch & { ticketType: string }) =>
+  http<OrganizerEvent>(`${ev(eventId)}/batches`, { method: "POST", body: JSON.stringify(d) });
+export const deleteBatch = (id: string) => http<OrganizerEvent>(lot(id), { method: "DELETE" });
+
 /** Remove o evento: apaga se não houver vendas; com vendas, cancela e estorna os compradores. */
 export const removeEvent = (eventId: string) =>
   http<{ deleted: boolean; refunded: number; refundFailed: number; errors: string[] }>(`/organizer/events/${encodeURIComponent(eventId)}`, { method: "DELETE" });

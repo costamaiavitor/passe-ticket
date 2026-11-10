@@ -143,7 +143,10 @@ export interface OrganizerEvent extends EventDetail {
 
 /** Painel de um evento (organizador). */
 export interface EventPanel extends OrganizerEvent {
-  salesByBatch: Array<{ id: string; name: string; price: number; total: number; sold: number; reserved: number; revenue: number }>;
+  salesByBatch: Array<{
+    id: string; name: string; price: number; total: number; sold: number; reserved: number; revenue: number;
+    status: "active" | "paused" | "closed"; ticketType: string | null; salesStart: string; salesEnd: string;
+  }>;
 }
 
 /** Um ingresso vendido, na lista de participantes do organizador. */

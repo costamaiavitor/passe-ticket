@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
-import { BarChart3, CalendarPlus, ExternalLink, MapPin, QrCode, Trash2, Users } from "lucide-react";
+import { BarChart3, CalendarPlus, ExternalLink, MapPin, Pencil, QrCode, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { RequireAuth } from "@/components/require-auth";
@@ -184,7 +184,12 @@ function OrganizerEventCard({ ev }: { ev: OrganizerEvent }) {
           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-elevated"><div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} /></div>
         </div>
 
-        <Button asChild size="sm" className="mt-5 w-full"><Link to="/organizador/evento/$id" params={{ id: ev.id }}><BarChart3 />Vendas e compradores</Link></Button>
+        <div className={cn("mt-5 grid gap-2", ev.status !== "cancelled" && "grid-cols-[1fr_auto]")}>
+          <Button asChild size="sm"><Link to="/organizador/evento/$id" params={{ id: ev.id }}><BarChart3 />Vendas e compradores</Link></Button>
+          {ev.status !== "cancelled" && (
+            <Button asChild size="sm" variant="secondary"><Link to="/organizador/editar/$id" params={{ id: ev.id }}><Pencil />Editar</Link></Button>
+          )}
+        </div>
         <div className="mt-2 grid grid-cols-2 gap-2">
           <Button variant="outline" size="sm" onClick={() => setStaffOpen(true)}><Users />Equipe</Button>
           <Button asChild variant="outline" size="sm"><Link to="/eventos/$id" params={{ id: ev.slug }}><ExternalLink />Ver página</Link></Button>

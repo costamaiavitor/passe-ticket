@@ -254,13 +254,48 @@ describe("Robustez do Passe", () => {
     assert.equal((await api(`/events/${ev.id}`)).body.status, "published");
   });
 
-  it("editar o conteúdo de um evento já aprovado manda de volta para análise", async () => {
+  it("editar evento já aprovado: continua à venda e o admin recebe e-mail com o que mudou", async () => {
+    const { sentEmails } = await import("../src/lib/email.js");
     const ev = await event("Festa Original");
-    const r = await api(`/organizer/events/${ev.id}`, { method: "PATCH", token: T["org"], body: { title: "Show Famoso Falso" } });
+    const r = await api(`/organizer/events/${ev.id}`, { method: "PATCH", token: T["org"],
+      body: { title: "Festa Original 2", venue: "Clube Novo", coverUrl: "https://exemplo.com/foto.jpg" } });
     assert.equal(r.status, 200);
-    assert.equal((await api(`/events/${ev.id}`)).status, 404, "sai do ar até nova aprovação");
-    assert.equal((await api(`/admin/events/${ev.id}/approve`, { method: "POST", token: T["adm"] })).status, 200);
-    assert.equal((await api(`/events/${ev.id}`)).body.title, "Show Famoso Falso");
+    const pub = (await api(`/events/${ev.id}`)).body;
+    assert.equal(pub.status, "published");
+    assert.equal(pub.venue, "Clube Novo");
+    const mail = sentEmails.find((m) => m.subject === "Evento editado: Festa Original 2");
+    assert.ok(mail && /nome/.test(mail.text) && /local/.test(mail.text) && /foto de capa/.test(mail.text));
+  });
+
+  it("editar lotes: preço e quantidade mudam, não dá para ficar abaixo do vendido, excluir só sem compras", async () => {
+    const ev = await event("Festa Lotes Editáveis", { total: 10, price: 1000 });
+    const lot = ev.batches[0];
+    const o = await buy(T["ana"]!, ev, [["Ana Souza", CPFS[3]!]]);
+    await api(`/orders/${o.body.id}/simulate-payment`, { method: "POST", token: T["ana"] });
+    // muda preço e quantidade
+    const p = await api(`/organizer/batches/${lot.id}`, { method: "PATCH", token: T["org"], body: { price: 2500, total: 20 } });
+    assert.equal(p.status, 200);
+    assert.equal(p.body.batches[0].price, 2500);
+    assert.equal(p.body.batches[0].total, 20);
+    // quem já comprou não paga a diferença
+    assert.equal((await api(`/orders/${o.body.id}`, { token: T["ana"] })).body.subtotal, 1000);
+    // o painel soma o que foi pago de verdade, não o preço novo
+    const panel = (await api(`/organizer/events/${ev.id}`, { token: T["org"] })).body;
+    assert.equal(panel.salesByBatch[0].revenue, 1000);
+    assert.equal(panel.salesByBatch[0].status, "active");
+    // não pode ficar com menos vagas do que já vendeu
+    assert.equal((await api(`/organizer/batches/${lot.id}`, { method: "PATCH", token: T["org"], body: { total: 0 } })).status, 400);
+    // lote com compra não pode ser excluído (só pausado)
+    assert.equal((await api(`/organizer/batches/${lot.id}`, { method: "DELETE", token: T["org"] })).status, 409);
+    assert.equal((await api(`/organizer/batches/${lot.id}`, { method: "PATCH", token: T["org"], body: { status: "paused" } })).status, 200);
+    // lote novo sem compras pode ser excluído; outro organizador não mexe
+    const add = await api(`/organizer/events/${ev.id}/batches`, { token: T["org"], body: {
+      name: "VIP — 1º lote", ticketType: "VIP", price: 5000, total: 5, salesStart: new Date().toISOString(), salesEnd: future() } });
+    assert.equal(add.status, 201);
+    const vip = add.body.batches.find((b: any) => b.ticketType === "VIP");
+    assert.equal((await api(`/organizer/batches/${vip.id}`, { method: "DELETE", token: T["org2"] })).status, 403);
+    assert.equal((await api(`/organizer/batches/${vip.id}`, { method: "PATCH", token: T["org2"], body: { price: 1 } })).status, 403);
+    assert.equal((await api(`/organizer/batches/${vip.id}`, { method: "DELETE", token: T["org"] })).status, 200);
   });
 
   // ---------------- Contas e segurança ----------------

@@ -1,12 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { ArrowLeft, Check, CheckCircle2, Copy, ImagePlus, Minus, Plus, Share2, Trash2 } from "lucide-react";
+import { useMemo, useState, type FormEvent } from "react";
+import { ArrowLeft, Check, CheckCircle2, Copy, Minus, Plus, Share2, Trash2 } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { RequireAuth } from "@/components/require-auth";
 import { EventCard } from "@/components/event-card";
+import { AGES, ageToInfo, CATEGORIES, centsFrom, Chips, COVERS, CoverPicker, inputCls, Label, origin, presetCover, Section, TextField, TICKET_NAMES } from "@/components/event-form";
 import { Button } from "@/components/ui/button";
-import { createEvent, uploadCover, type NewEvent } from "@/services/organizer";
+import { createEvent, type NewEvent } from "@/services/organizer";
 import { hasRole } from "@/services/session";
 import { brl, categoryLabel, platformFee } from "@/utils/format";
 import { cn } from "@/lib/utils";
@@ -33,17 +34,6 @@ export const Route = createFileRoute("/organizador/novo")({
   ),
 });
 
-// Capas prontas (servidas pelo próprio site em /covers) para ninguém travar por falta de foto.
-const COVERS = [
-  { file: "festa.jpg", label: "Festa" },
-  { file: "show.jpg", label: "Show" },
-  { file: "teatro.jpg", label: "Teatro" },
-  { file: "conferencia.jpg", label: "Palestra" },
-];
-const CATEGORIES: EventCategory[] = ["festas", "shows", "teatro", "conferencias", "esportes"];
-const AGES = ["Livre", "14", "16", "18"];
-const TICKET_NAMES = ["Pista", "Camarote", "Open bar", "VIP", "Meia-entrada"];
-
 interface BatchForm { key: number; type: string; price: number; total: string }
 let nextKey = 1;
 const newBatch = (type = ""): BatchForm => ({ key: nextKey++, type, price: 0, total: "" });
@@ -56,23 +46,12 @@ function lotName(batches: BatchForm[], b: BatchForm) {
   return `${t} — ${n}º lote`;
 }
 
-const origin = () => (typeof window === "undefined" ? "" : window.location.origin);
-
 function CreateEvent() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState<EventCategory>("festas");
-  const [cover, setCover] = useState(COVERS[0]!.file);
-  const [customCover, setCustomCover] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const pickPhoto = async (file: File) => {
-    setUploadError(null); setUploading(true);
-    try { setCustomCover(await uploadCover(file)); }
-    catch (e) { setUploadError(e instanceof Error ? e.message : "Não foi possível enviar a foto."); }
-    finally { setUploading(false); }
-  };
+  const [coverChoice, setCoverChoice] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("22:00");
   const [venue, setVenue] = useState("");
@@ -86,7 +65,7 @@ function CreateEvent() {
   const [formError, setFormError] = useState<string | null>(null);
   const [created, setCreated] = useState<OrganizerEvent | null>(null);
 
-  const coverUrl = customCover.trim() || `${origin()}/covers/${cover}`;
+  const coverUrl = coverChoice || presetCover(COVERS[0]!.file);
   const startsAt = date && time ? `${date}T${time}:00-03:00` : "";
 
   const m = useMutation({
@@ -103,7 +82,6 @@ function CreateEvent() {
     if (new Date(startsAt).getTime() < Date.now() + 60 * 60_000) return "A data do evento precisa ser no futuro.";
     if (venue.trim().length < 2) return "Informe o nome do local.";
     if (city.trim().length < 2) return "Informe a cidade.";
-    if (customCover.trim() && !/^https?:\/\/.+/i.test(customCover.trim())) return "O link da capa precisa começar com https://";
     if (!batches.length) return "Adicione pelo menos um tipo de ingresso.";
     for (const b of batches) {
       if (!b.type.trim()) return "Informe o tipo de cada ingresso (ex.: Pista, Camarote).";
@@ -119,7 +97,7 @@ function CreateEvent() {
     setFormError(err);
     if (err) return;
     const importantInfo = [
-      age === "Livre" ? "Classificação livre" : `Proibido para menores de ${age} anos`,
+      ageToInfo(age),
       ...info.split("\n").map((l) => l.trim()).filter(Boolean),
     ];
     const salesStart = new Date(Date.now() - 60_000).toISOString();
@@ -158,34 +136,7 @@ function CreateEvent() {
               <Label>Categoria</Label>
               <Chips options={CATEGORIES.map((c) => ({ value: c, label: categoryLabel[c] ?? c }))} value={category} onChange={(v) => setCategory(v as EventCategory)} />
             </div>
-            <div>
-              <Label>Capa</Label>
-              {/* Foto da galeria (ou câmera, no celular): reduzida no aparelho antes de enviar. */}
-              <label className={cn("mb-2 flex cursor-pointer items-center gap-3 rounded-lg border-2 border-dashed p-3 transition-colors",
-                customCover ? "border-primary bg-primary/5" : "hover:border-primary/50", uploading && "pointer-events-none opacity-60")}>
-                <input type="file" accept="image/*" className="sr-only" disabled={uploading}
-                  onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void pickPhoto(f); }} />
-                {customCover
-                  ? <img src={customCover} alt="Sua foto" className="size-16 shrink-0 rounded-md object-cover" />
-                  : <span className="grid size-16 shrink-0 place-items-center rounded-md bg-elevated"><ImagePlus className="size-6 text-primary" /></span>}
-                <span className="min-w-0">
-                  <span className="block text-sm font-medium">{uploading ? "Enviando foto…" : customCover ? "Sua foto ✓ (toque para trocar)" : "Enviar foto da galeria"}</span>
-                  <span className="block text-xs text-muted-foreground">JPG ou PNG. Fotos na horizontal ficam melhores.</span>
-                </span>
-              </label>
-              {uploadError && <p className="mb-2 text-sm text-destructive">{uploadError}</p>}
-              <p className="mb-2 text-xs text-muted-foreground">Ou escolha uma capa pronta:</p>
-              <div className="grid grid-cols-4 gap-2">
-                {COVERS.map((c) => (
-                  <button key={c.file} type="button" onClick={() => { setCover(c.file); setCustomCover(""); }}
-                    className={cn("relative aspect-[4/3] overflow-hidden rounded-md border-2 transition-colors",
-                      !customCover && cover === c.file ? "border-primary" : "border-transparent opacity-70 hover:opacity-100")}>
-                    <img src={`/covers/${c.file}`} alt={c.label} className="size-full object-cover" />
-                    {!customCover && cover === c.file && <span className="absolute right-1 top-1 grid size-5 place-items-center rounded-full bg-primary text-primary-foreground"><Check className="size-3" /></span>}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <CoverPicker value={coverUrl} onChange={setCoverChoice} />
           </Section>
 
           <Section n={2} title="Quando e onde">
@@ -322,47 +273,3 @@ function Created({ ev, onDone }: { ev: OrganizerEvent; onDone: () => void }) {
     </section>
   );
 }
-
-// ---------- pedaços de formulário no estilo do site ----------
-const inputCls = "h-10 w-full rounded-md border bg-surface px-3 text-sm outline-none placeholder:text-muted-foreground/70 focus:border-primary/50";
-
-const Label = ({ children }: { children: ReactNode }) => <span className="mb-1.5 block text-sm">{children}</span>;
-
-function Section({ n, title, hint, children }: { n: number; title: string; hint?: string; children: ReactNode }) {
-  return (
-    <section className="rounded-xl border bg-card p-4 md:p-6">
-      <div className="flex items-center gap-3">
-        <span className="grid size-6 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">{n}</span>
-        <h2 className="font-medium">{title}</h2>
-      </div>
-      {hint && <p className="mt-1 pl-9 text-xs text-muted-foreground">{hint}</p>}
-      <div className="mt-4 space-y-4">{children}</div>
-    </section>
-  );
-}
-
-function TextField({ label, value, onChange, ...rest }: { label: string; value: string; onChange: (v: string) => void } & Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange">) {
-  return (
-    <label className="block space-y-1.5">
-      <span className="text-sm">{label}</span>
-      <input {...rest} value={value} onChange={(e) => onChange(e.target.value)} className={inputCls} />
-    </label>
-  );
-}
-
-function Chips({ options, value, onChange }: { options: { value: string; label: string }[]; value: string; onChange: (v: string) => void }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {options.map((o) => (
-        <button key={o.value} type="button" onClick={() => onChange(o.value)}
-          className={cn("rounded-full border px-3.5 py-1.5 text-sm transition-colors",
-            value === o.value ? "border-primary bg-primary text-primary-foreground" : "text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground")}>
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-/** "R$ 1.234,56" digitado → centavos. Os dígitos entram da direita, como numa maquininha. */
-const centsFrom = (v: string) => Math.min(Number(v.replace(/\D/g, "") || "0"), 99_999_99);

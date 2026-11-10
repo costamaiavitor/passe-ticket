@@ -109,6 +109,18 @@ export function eventForReviewEmail(to: string, eventTitle: string, organizer: s
   };
 }
 
+/** Organizador editou um evento que já está à venda: o evento continua no ar e o admin confere as mudanças. */
+export function eventEditedEmail(to: string, eventTitle: string, slug: string, changes: string[]): Email {
+  const link = `${config.publicUrl}/eventos/${slug}`;
+  return {
+    to,
+    subject: `Evento editado: ${eventTitle}`,
+    html: layout("Um evento publicado foi editado", `<p>O organizador alterou <strong>${esc(eventTitle)}</strong>, que continua à venda.</p><p>Mudou: ${esc(changes.join(", "))}.</p><p>Se algo estiver errado, remova o evento no painel.</p>`,
+      { label: "Ver evento", url: link }),
+    text: `O organizador alterou ${eventTitle} (${changes.join(", ")}). Veja em ${link}`,
+  };
+}
+
 export function eventReviewedEmail(to: string, name: string, eventTitle: string, approved: boolean, reason: string, slug: string): Email {
   const link = approved ? `${config.publicUrl}/eventos/${slug}` : `${config.publicUrl}/organizador`;
   return {

@@ -5,7 +5,7 @@ import { all, now, one, run, tx } from "../db.js";
 import { toEventDetail, type BatchRow, type EventRow } from "../domain/events.js";
 import { removeEvent } from "../domain/orders.js";
 import { config } from "../config.js";
-import { eventForReviewEmail, sendEmail } from "../lib/email.js";
+import { eventEditedEmail, eventForReviewEmail, sendEmail } from "../lib/email.js";
 import { maskCpf } from "../lib/cpf.js";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
 import { assertEventOwner, parse, requireRole, user } from "../lib/http.js";
@@ -91,11 +91,16 @@ organizerRouter.get("/events/:id", async (req, res) => {
   const id = String(req.params.id);
   await assertEventOwner(user(req), id);
   const e = (await one<EventRow>("SELECT * FROM events WHERE id = ?", id))!;
-  const lots = await all<{ id: string; name: string; price: number; total: number; sold: number; reserved: number }>(
-    "SELECT id, name, price, total, sold, reserved FROM batches WHERE event_id = ? ORDER BY position, price", id);
+  // Receita pelo valor que cada pessoa realmente pagou (o preço do lote pode ter mudado depois).
+  const lots = await all<BatchRow & { revenue: number }>(
+    `SELECT b.*, COALESCE((SELECT SUM(o.subtotal) FROM orders o WHERE o.batch_id = b.id AND o.status = 'paid'), 0) revenue
+     FROM batches b WHERE b.event_id = ? ORDER BY b.position, b.price`, id);
   res.json({
     ...(await organizerView(e)),
-    salesByBatch: lots.map((b) => ({ id: b.id, name: b.name, price: b.price, total: b.total, sold: b.sold, reserved: b.reserved, revenue: b.sold * b.price })),
+    salesByBatch: lots.map((b) => ({
+      id: b.id, name: b.name, price: b.price, total: b.total, sold: b.sold, reserved: b.reserved, revenue: Number(b.revenue),
+      status: b.status, ticketType: b.ticket_type, salesStart: b.sales_start, salesEnd: b.sales_end,
+    })),
   });
 });
 
@@ -131,21 +136,29 @@ organizerRouter.patch("/events/:id", async (req, res) => {
   // Cancelar só pelo "Remover" (DELETE), que estorna os compradores. Aqui só rascunho/publicado.
   const d = parse(eventSchema.omit({ batches: true }).partial().extend({ status: z.enum(["draft", "published"]).optional() }), req.body);
   const isAdmin = user(req).roles.includes("admin");
-  const cur = (await one<{ status: string; title: string }>("SELECT status, title FROM events WHERE id = ?", String(req.params.id)))!;
+  const cur = (await one<EventRow>("SELECT * FROM events WHERE id = ?", String(req.params.id)))!;
   if (cur.status === "cancelled") throw conflict("EVENT_CANCELLED", "Este evento foi cancelado e não pode mais ser editado.");
   if (d.status === "draft") {
     const sold = await one("SELECT 1 FROM orders WHERE event_id = ? AND status IN ('paid','pending')", String(req.params.id));
     if (sold) throw conflict("HAS_SALES", "Este evento já tem vendas. Para tirar do ar, use “Remover” (os compradores são reembolsados).");
   }
+  let changed: string[] = [];
   if (!isAdmin) {
-    // Publicar é decisão do admin; e mudar o conteúdo de um evento já aprovado passa por nova análise
-    // (senão daria para aprovar um evento inofensivo e depois trocar por outro).
-    const contentKeys = ["title", "category", "coverUrl", "startsAt", "venue", "city", "address", "description"] as const;
-    const editsContent = contentKeys.some((k) => d[k] !== undefined);
+    // Publicar é decisão do admin. Editar um evento já aprovado NÃO tira ele do ar (as vendas continuam),
+    // mas o admin recebe um e-mail com o que mudou, para conferir que não virou outro evento.
     if (d.status === "published" && cur.status !== "published") d.status = "review" as never;
-    if (cur.status === "published" && editsContent) {
-      d.status = "review" as never;
-      for (const to of config.adminEmails) await sendEmail(eventForReviewEmail(to, d.title ?? cur.title, "Organizador (edição de evento publicado)"));
+    if (cur.status === "published") {
+      const labels: Record<string, string> = { title: "nome", category: "categoria", coverUrl: "foto de capa", startsAt: "data/horário",
+        venue: "local", city: "cidade", address: "endereço", description: "descrição", importantInfo: "avisos", maxTicketsPerCpf: "limite por CPF" };
+      const old: Record<string, unknown> = { title: cur.title, category: cur.category, coverUrl: cur.cover_url, startsAt: cur.starts_at,
+        venue: cur.venue, city: cur.city, address: cur.address, description: cur.description, importantInfo: cur.important_info,
+        maxTicketsPerCpf: cur.max_per_cpf };
+      changed = Object.keys(labels).filter((k) => {
+        const v = d[k as keyof typeof d];
+        if (v === undefined) return false;
+        const nv = k === "startsAt" ? new Date(v as string).toISOString() : k === "importantInfo" ? JSON.stringify(v) : v;
+        return nv !== old[k];
+      }).map((k) => labels[k]!);
     }
   }
   const map: Record<string, [string, (v: never) => unknown]> = {
@@ -165,11 +178,18 @@ organizerRouter.patch("/events/:id", async (req, res) => {
     vals.push(m[1](v as never) as string | number | null);
   }
   if (sets.length) await run(`UPDATE events SET ${sets.join(", ")} WHERE id = ?`, ...vals, req.params.id);
+  if (changed.length) for (const to of config.adminEmails) await sendEmail(eventEditedEmail(to, d.title ?? cur.title, cur.slug, changed));
   res.json(await toEventDetail((await one<EventRow>("SELECT * FROM events WHERE id = ?", req.params.id))!));
 });
 
+async function assertEditable(eventId: string) {
+  const e = await one<{ status: string }>("SELECT status FROM events WHERE id = ?", eventId);
+  if (e?.status === "cancelled") throw conflict("EVENT_CANCELLED", "Este evento foi cancelado e não pode mais ser editado.");
+}
+
 organizerRouter.post("/events/:id/batches", async (req, res) => {
   await assertEventOwner(user(req), req.params.id);
+  await assertEditable(String(req.params.id));
   const b = parse(batchSchema, req.body);
   const { n } = (await one<{ n: number }>("SELECT COUNT(*) n FROM batches WHERE event_id = ?", req.params.id))!;
   await insertBatch(req.params.id, b, n);
@@ -180,14 +200,32 @@ organizerRouter.patch("/batches/:id", async (req, res) => {
   const b = await one<BatchRow>("SELECT * FROM batches WHERE id = ?", req.params.id);
   if (!b) throw notFound("Lote não encontrado.");
   await assertEventOwner(user(req), b.event_id);
+  await assertEditable(b.event_id);
   const d = parse(batchSchema.partial(), req.body);
   if (d.total !== undefined && d.total < b.sold + b.reserved)
     throw conflict("TOTAL_BELOW_SOLD", `Já existem ${b.sold + b.reserved} ingressos vendidos/reservados neste lote.`);
   const next = { ...b, ...{ name: d.name ?? b.name, price: d.price ?? b.price, total: d.total ?? b.total, status: d.status ?? b.status,
     sales_start: d.salesStart ? new Date(d.salesStart).toISOString() : b.sales_start,
-    sales_end: d.salesEnd ? new Date(d.salesEnd).toISOString() : b.sales_end } };
-  await run("UPDATE batches SET name = ?, price = ?, total = ?, status = ?, sales_start = ?, sales_end = ? WHERE id = ?",
-    next.name, next.price, next.total, next.status, next.sales_start, next.sales_end, b.id);
+    sales_end: d.salesEnd ? new Date(d.salesEnd).toISOString() : b.sales_end,
+    ticket_type: d.ticketType !== undefined ? (d.ticketType || null) : b.ticket_type } };
+  if (next.sales_end <= next.sales_start) throw badRequest("INVALID_DATES", `Lote "${next.name}": fim das vendas antes do início.`);
+  // Quem já pagou mantém o preço antigo; o novo preço vale só para as próximas compras.
+  await run("UPDATE batches SET name = ?, price = ?, total = ?, status = ?, sales_start = ?, sales_end = ?, ticket_type = ? WHERE id = ?",
+    next.name, next.price, next.total, next.status, next.sales_start, next.sales_end, next.ticket_type, b.id);
+  res.json(await toEventDetail((await one<EventRow>("SELECT * FROM events WHERE id = ?", b.event_id))!));
+});
+
+/** Exclui um lote que nunca teve pedido. Com pedidos, só dá para pausar (o histórico de vendas fica). */
+organizerRouter.delete("/batches/:id", async (req, res) => {
+  const b = await one<BatchRow>("SELECT * FROM batches WHERE id = ?", req.params.id);
+  if (!b) throw notFound("Lote não encontrado.");
+  await assertEventOwner(user(req), b.event_id);
+  await assertEditable(b.event_id);
+  if (await one("SELECT 1 FROM orders WHERE batch_id = ? LIMIT 1", b.id))
+    throw conflict("BATCH_HAS_ORDERS", `O lote "${b.name}" já tem compras. Em vez de excluir, pause as vendas dele.`);
+  const { n } = (await one<{ n: number }>("SELECT COUNT(*) n FROM batches WHERE event_id = ?", b.event_id))!;
+  if (n <= 1) throw conflict("LAST_BATCH", "O evento precisa ter pelo menos um tipo de ingresso.");
+  await run("DELETE FROM batches WHERE id = ?", b.id);
   res.json(await toEventDetail((await one<EventRow>("SELECT * FROM events WHERE id = ?", b.event_id))!));
 });
 

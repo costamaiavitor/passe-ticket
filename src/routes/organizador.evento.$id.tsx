@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { ArrowLeft, CheckCircle2, Download, ExternalLink, MapPin, QrCode, Repeat, Search, Ticket as TicketIcon, Users, Wallet } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Download, ExternalLink, MapPin, Pencil, QrCode, Repeat, Search, Ticket as TicketIcon, Users, Wallet } from "lucide-react";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { RequireAuth } from "@/components/require-auth";
 import { Button } from "@/components/ui/button";
@@ -56,6 +56,9 @@ function Panel() {
           <p className="mt-1 text-sm text-muted-foreground">{fmtDate(ev.startsAt)} · {fmtTime(ev.startsAt)}</p>
           <p className="mt-0.5 flex items-center gap-1.5 text-sm text-muted-foreground"><MapPin className="size-3.5" />{ev.venue}, {ev.city}</p>
           <div className="mt-4 flex flex-wrap gap-2">
+            {ev.status !== "cancelled" && (
+              <Button asChild size="sm"><Link to="/organizador/editar/$id" params={{ id: ev.id }}><Pencil />Editar evento</Link></Button>
+            )}
             <Button asChild variant="outline" size="sm"><Link to="/eventos/$id" params={{ id: ev.slug }}><ExternalLink />Página do evento</Link></Button>
             <Button asChild variant="outline" size="sm"><Link to="/portaria"><QrCode />Leitor da portaria</Link></Button>
           </div>
