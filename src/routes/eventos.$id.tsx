@@ -225,7 +225,7 @@ function EventPage() {
               )}
             </>
           ) : (
-            <p className="text-sm text-muted-foreground">
+            <p className="mt-5 text-sm text-muted-foreground">
               {ev.status === "cancelled" ? "Este evento foi cancelado. As vendas foram encerradas."
                 : ev.batches.some((b) => b.total - b.sold > 0 && b.status !== "soldout") ? "Nenhum ingresso à venda no momento. Volte mais tarde."
                 : "Ingressos esgotados para este evento."}
