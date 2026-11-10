@@ -15,7 +15,7 @@ import { brl, fmtDate, fmtTime } from "@/utils/format";
 import type { Order } from "@/types";
 
 export const Route = createFileRoute("/checkout/$orderId")({
-  head: () => ({ meta: [{ title: "Pagamento — Booticket" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Pagamento — BooTickets" }, { name: "robots", content: "noindex" }] }),
   component: () => (
     <div className="min-h-screen">
       <SiteHeader />

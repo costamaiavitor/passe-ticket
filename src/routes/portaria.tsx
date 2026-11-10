@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import type { ScanResult } from "@/types";
 
 export const Route = createFileRoute("/portaria")({
-  head: () => ({ meta: [{ title: "Portaria — Booticket" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Portaria — BooTickets" }, { name: "robots", content: "noindex" }] }),
   component: () => (
     <div className="min-h-screen">
       <SiteHeader />

@@ -12,9 +12,9 @@ import type { EventCategory } from "@/types";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Booticket — Eventos e ingressos com segurança" },
+      { title: "BooTickets — Eventos e ingressos com segurança" },
       { name: "description", content: "Descubra shows, festas e conferências. Ingressos nominais com QR Code único e transferência segura." },
-      { property: "og:title", content: "Booticket — Eventos e ingressos com segurança" },
+      { property: "og:title", content: "BooTickets — Eventos e ingressos com segurança" },
       { property: "og:description", content: "Ingressos nominais com QR Code único e transferência segura." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

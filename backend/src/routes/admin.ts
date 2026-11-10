@@ -89,7 +89,7 @@ interface PayoutRow {
 
 /**
  * Quanto cada organizador tem a receber, por evento. O organizador recebe o valor cheio dos ingressos
- * (subtotal dos pedidos pagos); a taxa de 10% fica com o Booticket e cobre as tarifas do Mercado Pago.
+ * (subtotal dos pedidos pagos); a taxa de 10% fica com o BooTickets e cobre as tarifas do Mercado Pago.
  */
 adminRouter.get("/payouts", async (_req, res) => {
   const rows = await all<PayoutRow>(

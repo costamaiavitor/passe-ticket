@@ -25,7 +25,7 @@ export function MercadoPagoCard() {
   const connect = useMutation({ mutationFn: connectMercadoPago, onSuccess: (url) => { window.location.href = url; } });
   const off = useMutation({
     mutationFn: disconnectMercadoPago,
-    onSuccess: () => { setConfirmOff(false); void qc.invalidateQueries({ queryKey: ["mp-connection"] }); toast.success("Conta desconectada. As próximas vendas voltam a ser repassadas pelo Booticket."); },
+    onSuccess: () => { setConfirmOff(false); void qc.invalidateQueries({ queryKey: ["mp-connection"] }); toast.success("Conta desconectada. As próximas vendas voltam a ser repassadas pelo BooTickets."); },
   });
   if (!data?.available) return null;
 
@@ -38,7 +38,7 @@ export function MercadoPagoCard() {
             <div>
               <p className="text-sm font-medium">Recebendo direto no Mercado Pago</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Cada venda cai na sua conta na hora do pagamento. A taxa de serviço (10%, paga pelo comprador) vai para o Booticket e a tarifa do Mercado Pago é descontada da sua parte.
+                Cada venda cai na sua conta na hora do pagamento. A taxa de serviço (10%, paga pelo comprador) vai para o BooTickets e a tarifa do Mercado Pago é descontada da sua parte.
               </p>
               {data.problem && <p className="mt-2 flex items-center gap-1.5 text-xs text-warning"><AlertTriangle className="size-3.5" />{data.problem}</p>}
             </div>
@@ -48,7 +48,7 @@ export function MercadoPagoCard() {
         {data.problem && <Button size="sm" className="mt-3" disabled={connect.isPending} onClick={() => connect.mutate()}>Conectar de novo</Button>}
         {confirmOff && (
           <div className="mt-3 rounded-lg border border-destructive/40 p-3 text-sm">
-            <p>Desconectar? As próximas vendas voltam a cair na conta do Booticket e você recebe por repasse via Pix.</p>
+            <p>Desconectar? As próximas vendas voltam a cair na conta do BooTickets e você recebe por repasse via Pix.</p>
             <div className="mt-2 flex gap-2">
               <Button size="sm" variant="destructive" disabled={off.isPending} onClick={() => off.mutate()}>Desconectar</Button>
               <Button size="sm" variant="ghost" onClick={() => setConfirmOff(false)}>Voltar</Button>
@@ -65,7 +65,7 @@ export function MercadoPagoCard() {
         <div>
           <p className="font-medium">Receba as vendas direto no seu Mercado Pago</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Conecte sua conta e o dinheiro de cada ingresso cai nela na hora, sem esperar repasse. Você entra no Mercado Pago e autoriza o Booticket. Não pedimos sua senha.
+            Conecte sua conta e o dinheiro de cada ingresso cai nela na hora, sem esperar repasse. Você entra no Mercado Pago e autoriza o BooTickets. Não pedimos sua senha.
           </p>
         </div>
       </div>

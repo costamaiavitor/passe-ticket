@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import type { PayoutRow, ReviewEvent } from "@/types";
 
 export const Route = createFileRoute("/admin")({
-  head: () => ({ meta: [{ title: "Admin — Booticket" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Admin — BooTickets" }, { name: "robots", content: "noindex" }] }),
   component: () => (
     <div className="min-h-screen">
       <SiteHeader />
@@ -143,7 +143,7 @@ function Payouts() {
     <>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Total a repassar</p><p className="mt-1 text-2xl font-semibold text-primary">{brl(total)}</p></div>
-        <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Taxas do Booticket (antes das tarifas do Mercado Pago)</p><p className="mt-1 text-2xl font-semibold">{brl(fees)}</p></div>
+        <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Taxas do BooTickets (antes das tarifas do Mercado Pago)</p><p className="mt-1 text-2xl font-semibold">{brl(fees)}</p></div>
       </div>
       <p className="mt-3 text-xs text-muted-foreground">
         Como funciona: faça o Pix para o organizador pelo app do banco e depois registre aqui. O organizador recebe um e-mail e vê o valor em “Já recebido”.

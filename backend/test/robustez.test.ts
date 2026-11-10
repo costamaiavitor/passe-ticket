@@ -59,7 +59,7 @@ async function event(title: string, opts: { total?: number; price?: number; maxP
 const buy = (token: string, ev: any, holders: Array<[string, string]>) =>
   api("/orders", { token, body: { eventId: ev.id, batchId: ev.batches[0].id, holders: holders.map(([name, cpf]) => ({ name, cpf })) } });
 
-describe("Robustez do Booticket", () => {
+describe("Robustez do BooTickets", () => {
   before(async () => {
     await user("org", CPFS[0]!, '["buyer","organizer"]');
     await user("org2", CPFS[1]!, '["buyer","organizer"]');

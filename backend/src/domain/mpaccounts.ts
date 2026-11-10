@@ -1,5 +1,5 @@
 // Split 1:1 do Mercado Pago: cada organizador conecta a própria conta (OAuth) e as vendas dos eventos dele
-// são criadas nessa conta, com a taxa do Booticket separada automaticamente (application_fee).
+// são criadas nessa conta, com a taxa do BooTickets separada automaticamente (application_fee).
 // Docs: https://www.mercadopago.com.br/developers/pt/docs/split-payments/split-1-1/integration-configuration/integrate-marketplace
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { config } from "../config.js";
@@ -35,7 +35,7 @@ export const redirectUri = () => `${config.publicUrl}/api/v1/mp/oauth/callback`;
 // ---------- Conectar ----------
 /** Começa a conexão: devolve o link de autorização do Mercado Pago (com state e PKCE, válidos por 10 min). */
 export async function startConnect(userId: string) {
-  if (!splitAvailable()) throw new HttpError(503, "SPLIT_DISABLED", "A conexão com o Mercado Pago ainda não está ativada no Booticket.");
+  if (!splitAvailable()) throw new HttpError(503, "SPLIT_DISABLED", "A conexão com o Mercado Pago ainda não está ativada no BooTickets.");
   const state = randomBytes(24).toString("base64url");
   const verifier = randomBytes(48).toString("base64url");
   const challenge = createHash("sha256").update(verifier).digest("base64url");
@@ -72,7 +72,7 @@ async function saveTokens(userId: string, t: OAuthTokens) {
   );
 }
 
-/** Desconecta: as próximas vendas voltam a cair na conta do Booticket (com repasse manual). As antigas continuam
+/** Desconecta: as próximas vendas voltam a cair na conta do BooTickets (com repasse manual). As antigas continuam
  *  usando a conta do organizador para estornos — por isso o token não é apagado. */
 export async function disconnect(userId: string) {
   await run("UPDATE mp_accounts SET disconnected_at = ? WHERE user_id = ? AND disconnected_at IS NULL", now(), userId);
@@ -111,7 +111,7 @@ export async function sellerAuth(userId: string, opts: { includeDisconnected?: b
   }
 }
 
-/** Conta onde os pagamentos de um pedido existem: a do organizador (split) ou a do Booticket (undefined). */
+/** Conta onde os pagamentos de um pedido existem: a do organizador (split) ou a do BooTickets (undefined). */
 export async function authForOrder(o: { seller_id?: string | null }): Promise<PayAuth | undefined> {
   if (!o.seller_id) return undefined;
   const auth = await sellerAuth(o.seller_id, { includeDisconnected: true });

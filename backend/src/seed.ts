@@ -12,7 +12,7 @@ const { hashPassword } = await import("./lib/crypto.js");
 
 const PASSWORD = "passe1234";
 const users = [
-  { name: "Admin Booticket", email: "admin@passe.dev", cpf: "52998224725", roles: ["buyer", "admin"] },
+  { name: "Admin BooTickets", email: "admin@passe.dev", cpf: "52998224725", roles: ["buyer", "admin"] },
   { name: "Noite Produções", email: "produtor@passe.dev", cpf: "11144477735", roles: ["buyer", "organizer"] },
   { name: "Equipe Portaria", email: "portaria@passe.dev", cpf: "39053344705", roles: ["buyer", "staff"] },
   { name: "Cliente Teste", email: "cliente@passe.dev", cpf: "15350946056", roles: ["buyer"] },

@@ -21,9 +21,9 @@ export const Route = createFileRoute("/eventos/")({
   validateSearch: searchSchema,
   head: () => ({
     meta: [
-      { title: "Explorar eventos — Booticket" },
+      { title: "Explorar eventos — BooTickets" },
       { name: "description", content: "Filtre eventos por cidade, data, categoria e preço." },
-      { property: "og:title", content: "Explorar eventos — Booticket" },
+      { property: "og:title", content: "Explorar eventos — BooTickets" },
       { property: "og:description", content: "Filtre eventos por cidade, data, categoria e preço." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

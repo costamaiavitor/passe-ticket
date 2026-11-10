@@ -248,7 +248,7 @@ CREATE TABLE IF NOT EXISTS mp_oauth_states (
   verifier TEXT NOT NULL,
   expires_at TEXT NOT NULL
 );
--- Pedido pago direto na conta do organizador: quem é o vendedor e quanto ficou de taxa para o Booticket.
+-- Pedido pago direto na conta do organizador: quem é o vendedor e quanto ficou de taxa para o BooTickets.
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS seller_id TEXT REFERENCES users(id);
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS application_fee INTEGER NOT NULL DEFAULT 0;
 

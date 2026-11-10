@@ -80,7 +80,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Booticket" },
+      { title: "BooTickets" },
       { name: "description", content: "Marketplace de eventos e ingressos." },
     ],
     links: [
@@ -91,9 +91,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: appCss,
       },
       // Ícone da aba: o mesmo ingresso do logo (o ?v= força o navegador a trocar o ícone antigo guardado em cache).
-      { rel: "icon", href: "/favicon.svg?v=2", type: "image/svg+xml" },
-      { rel: "icon", href: "/favicon.ico?v=2", sizes: "any" },
-      { rel: "apple-touch-icon", href: "/apple-touch-icon.png?v=2" },
+      { rel: "icon", href: "/favicon.png?v=3", type: "image/png" },
+      { rel: "icon", href: "/favicon.ico?v=3", sizes: "any" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png?v=3" },
     ],
   }),
   shellComponent: RootShell,

@@ -11,7 +11,7 @@ import { fmtDate, fmtTime } from "@/utils/format";
 import type { Ticket } from "@/types";
 
 export const Route = createFileRoute("/ingressos")({
-  head: () => ({ meta: [{ title: "Meus ingressos — Booticket" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Meus ingressos — BooTickets" }, { name: "robots", content: "noindex" }] }),
   component: () => (
     <div className="min-h-screen">
       <SiteHeader />

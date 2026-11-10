@@ -59,7 +59,7 @@ const readCookie = (req: Request, name: string) =>
 const limiter = rateLimit({ windowMs: 60_000, max: config.isTest ? 1000 : 10, key: (req) => `auth:${req.ip}` });
 
 const cpfTaken = () => conflict("CPF_TAKEN",
-  "Esse CPF já está em outra conta do Booticket. Entre nessa conta ou use “Esqueci minha senha”. Se não foi você, fale com o suporte.");
+  "Esse CPF já está em outra conta do BooTickets. Entre nessa conta ou use “Esqueci minha senha”. Se não foi você, fale com o suporte.");
 
 const registerSchema = z.object({
   name: z.string().trim().min(3).max(120),

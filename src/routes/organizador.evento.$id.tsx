@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import type { Attendee, EventPanel } from "@/types";
 
 export const Route = createFileRoute("/organizador/evento/$id")({
-  head: () => ({ meta: [{ title: "Painel do evento — Booticket" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Painel do evento — BooTickets" }, { name: "robots", content: "noindex" }] }),
   component: () => (
     <div className="min-h-screen">
       <SiteHeader />

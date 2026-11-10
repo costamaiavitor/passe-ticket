@@ -29,11 +29,11 @@ export interface CardPaymentInput {
 
 export interface CardPaymentResult { id: string; status: "approved" | "pending" | "rejected"; statusDetail: string }
 
-/** Conta onde o pagamento é criado. Sem ela, usa a conta do Booticket. */
+/** Conta onde o pagamento é criado. Sem ela, usa a conta do BooTickets. */
 export interface PayAuth { accessToken: string }
 /**
  * Split 1:1: o pagamento é criado na conta do organizador (token dele, obtido por OAuth) e
- * applicationFeeCents vai automaticamente para a conta do Booticket.
+ * applicationFeeCents vai automaticamente para a conta do BooTickets.
  */
 export interface Split extends PayAuth { applicationFeeCents: number }
 
@@ -99,7 +99,7 @@ const mock: PaymentProvider = {
 
 /** Só para testes: muda o status de um pagamento simulado. */
 export const mockStatuses = new Map<string, PaymentStatus>();
-/** Só para testes: conta (token) onde cada pagamento simulado foi criado, e a taxa do Booticket (split). */
+/** Só para testes: conta (token) onde cada pagamento simulado foi criado, e a taxa do BooTickets (split). */
 export const mockAccounts = new Map<string, string>();
 export const mockFees = new Map<string, number>();
 
@@ -137,7 +137,7 @@ const mercadopago: PaymentProvider = {
         payer: { email: payerEmail },
         external_reference: orderId,
         date_of_expiration: expiresAt,
-        // Split 1:1: a taxa do Booticket vai para a conta do Booticket; o restante fica com o organizador.
+        // Split 1:1: a taxa do BooTickets vai para a conta do BooTickets; o restante fica com o organizador.
         ...(split ? { application_fee: split.applicationFeeCents / 100 } : {}),
         // O Mercado Pago só aceita aviso em endereço público com https; sem ele, o checkout confirma pelo polling.
         ...(config.publicUrl.startsWith("https://") ? { notification_url: `${config.publicUrl}/api/v1/webhooks/mercadopago` } : {}),
@@ -163,7 +163,7 @@ const mercadopago: PaymentProvider = {
         ...(i.issuerId ? { issuer_id: Number(i.issuerId) || i.issuerId } : {}),
         payer: { email: i.payerEmail, ...(i.identification ? { identification: i.identification } : {}) },
         external_reference: i.orderId,
-        statement_descriptor: "BOOTICKET",
+        statement_descriptor: "BOOTICKETS",
         ...(i.split ? { application_fee: i.split.applicationFeeCents / 100 } : {}),
         ...(config.publicUrl.startsWith("https://") ? { notification_url: `${config.publicUrl}/api/v1/webhooks/mercadopago` } : {}),
       }),

@@ -1,3 +1,4 @@
+import { BrandLogo } from "@/components/brand-logo";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { CalendarPlus, LogOut, ScanLine, Search, ShieldCheck, Ticket } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,11 +11,8 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
       <div className="flex h-16 w-full items-center gap-4 px-4 sm:gap-10 sm:px-6 lg:px-10">
-        <Link to="/" className="flex items-center gap-2 font-semibold tracking-tight">
-          <span className="grid size-7 place-items-center rounded-md bg-primary text-primary-foreground">
-            <Ticket className="size-4" />
-          </span>
-          Booticket
+        <Link to="/" aria-label="BooTickets — página inicial">
+          <BrandLogo />
         </Link>
         <nav className="hidden items-center gap-8 text-sm text-muted-foreground md:flex">
           <Link to="/eventos" className="transition-colors hover:text-foreground" activeProps={{ className: "text-foreground" }}>Explorar</Link>
@@ -61,7 +59,7 @@ export function SiteFooter() {
   return (
     <footer className="mt-24 border-t">
       <div className="container-page flex flex-col gap-2 py-8 text-sm text-muted-foreground md:flex-row md:justify-between">
-        <span>© 2026 Booticket. Ingressos com segurança.</span>
+        <span>© 2026 BooTickets. Ingressos com segurança.</span>
         <nav className="flex flex-wrap gap-x-5 gap-y-1">
           <Link to="/termos" className="hover:text-foreground">Termos de Uso</Link>
           <Link to="/privacidade" className="hover:text-foreground">Privacidade</Link>

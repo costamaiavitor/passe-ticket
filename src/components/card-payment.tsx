@@ -62,15 +62,15 @@ export function CardPayment({ order, payerEmail, onDone }: { order: Order; payer
               style: {
                 theme: "dark",
                 customVariables: {
-                  baseColor: "#B8F34A",
+                  baseColor: "#A03DFD",
                   baseColorFirstVariant: "#A5DD3F",
                   baseColorSecondVariant: "#93C736",
                   textPrimaryColor: "#F5F7FA",
                   textSecondaryColor: "#9299A7",
                   inputBackgroundColor: "#10131A",
                   formBackgroundColor: "#171A21",
-                  outlinePrimaryColor: "#B8F34A",
-                  buttonTextColor: "#14200A",
+                  outlinePrimaryColor: "#A03DFD",
+                  buttonTextColor: "#FFFFFF",
                   borderRadiusMedium: "8px",
                   borderRadiusLarge: "12px",
                 },
@@ -113,7 +113,7 @@ export function CardPayment({ order, payerEmail, onDone }: { order: Order; payer
       <div id={containerId} />
       {error && <p className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
       <p className="mt-3 text-xs text-muted-foreground">
-        Os dados do cartão vão direto para o Mercado Pago e não passam pelo Booticket. Parcelamento em até {MAX_INSTALLMENTS}x; juros, quando houver, são mostrados antes de confirmar.
+        Os dados do cartão vão direto para o Mercado Pago e não passam pelo BooTickets. Parcelamento em até {MAX_INSTALLMENTS}x; juros, quando houver, são mostrados antes de confirmar.
       </p>
     </div>
   );

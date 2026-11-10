@@ -4,8 +4,8 @@ import { CONTACT_EMAIL, LegalPage, LegalSection } from "@/components/legal-page"
 export const Route = createFileRoute("/termos")({
   head: () => ({
     meta: [
-      { title: "Termos de Uso — Booticket" },
-      { name: "description", content: "Regras de uso do Booticket para compradores e organizadores de eventos." },
+      { title: "Termos de Uso — BooTickets" },
+      { name: "description", content: "Regras de uso do BooTickets para compradores e organizadores de eventos." },
     ],
   }),
   component: Terms,
@@ -15,10 +15,10 @@ function Terms() {
   return (
     <LegalPage
       title="Termos de Uso"
-      intro="Ao criar uma conta, comprar ingressos ou publicar eventos no Booticket, você concorda com estes termos. Leia com atenção."
+      intro="Ao criar uma conta, comprar ingressos ou publicar eventos no BooTickets, você concorda com estes termos. Leia com atenção."
     >
-      <LegalSection n={1} title="O que é o Booticket">
-        <p>O Booticket é uma plataforma que conecta <strong>organizadores de eventos</strong> e <strong>compradores de ingressos</strong>. O Booticket intermedeia a venda e emite os ingressos; <strong>quem realiza o evento é o organizador</strong>, que é responsável pela sua realização, conteúdo, segurança e pelas informações divulgadas.</p>
+      <LegalSection n={1} title="O que é o BooTickets">
+        <p>O BooTickets é uma plataforma que conecta <strong>organizadores de eventos</strong> e <strong>compradores de ingressos</strong>. O BooTickets intermedeia a venda e emite os ingressos; <strong>quem realiza o evento é o organizador</strong>, que é responsável pela sua realização, conteúdo, segurança e pelas informações divulgadas.</p>
       </LegalSection>
 
       <LegalSection n={2} title="Sua conta">
@@ -31,7 +31,7 @@ function Terms() {
 
       <LegalSection n={3} title="Compra de ingressos">
         <ul>
-          <li>O preço de cada ingresso é definido pelo organizador. O Booticket cobra uma <strong>taxa de serviço de 10%</strong>, mostrada antes do pagamento.</li>
+          <li>O preço de cada ingresso é definido pelo organizador. O BooTickets cobra uma <strong>taxa de serviço de 10%</strong>, mostrada antes do pagamento.</li>
           <li>Os ingressos são <strong>nominais</strong>: cada um tem um titular com CPF, que deve apresentar documento com foto na entrada.</li>
           <li>Há limite de ingressos por CPF em cada evento, definido pelo organizador.</li>
           <li>Pedidos não pagos dentro do prazo exibido no checkout são cancelados e os ingressos voltam à venda.</li>
@@ -75,7 +75,7 @@ function Terms() {
       </LegalSection>
 
       <LegalSection n={8} title="Responsabilidade">
-        <p>O Booticket se esforça para manter o site no ar e seguro, mas não se responsabiliza pela realização, qualidade ou segurança do evento, que cabem ao organizador. Nada nestes termos limita os direitos garantidos pelo Código de Defesa do Consumidor.</p>
+        <p>O BooTickets se esforça para manter o site no ar e seguro, mas não se responsabiliza pela realização, qualidade ou segurança do evento, que cabem ao organizador. Nada nestes termos limita os direitos garantidos pelo Código de Defesa do Consumidor.</p>
       </LegalSection>
 
       <LegalSection n={9} title="Privacidade">

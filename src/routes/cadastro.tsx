@@ -9,9 +9,9 @@ export const Route = createFileRoute("/cadastro")({
     typeof s["redirect"] === "string" && s["redirect"].startsWith("/") ? { redirect: s["redirect"] } : {},
   head: () => ({
     meta: [
-      { title: "Criar conta — Booticket" },
+      { title: "Criar conta — BooTickets" },
       { name: "description", content: "Crie sua conta para comprar e vender ingressos." },
-      { property: "og:title", content: "Criar conta — Booticket" },
+      { property: "og:title", content: "Criar conta — BooTickets" },
       { property: "og:description", content: "Crie sua conta para comprar e vender ingressos." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

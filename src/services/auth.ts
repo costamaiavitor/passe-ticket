@@ -30,7 +30,7 @@ export async function register(data: { name: string; email: string; cpf: string;
   return { user: r.user };
 }
 
-/** Entrar com Google: a API confere o token do Google e devolve a sessão do Booticket. */
+/** Entrar com Google: a API confere o token do Google e devolve a sessão do BooTickets. */
 export async function loginWithGoogle(credential: string) {
   const r = await http<AuthResponse>("/auth/google", { method: "POST", body: JSON.stringify({ credential }) });
   setAccessToken(r.accessToken);
