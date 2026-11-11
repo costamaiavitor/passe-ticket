@@ -14,6 +14,7 @@ import { Toaster } from "@/components/ui/sonner";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { restoreSession } from "@/services/auth";
+import { DEFAULT_SHARE_IMAGE } from "@/lib/seo";
 
 function NotFoundComponent() {
   return (
@@ -82,6 +83,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "BooTickets" },
       { name: "description", content: "Marketplace de eventos e ingressos." },
+      { property: "og:site_name", content: "BooTickets" },
+      { property: "og:locale", content: "pt_BR" },
+      // Páginas sem foto própria mostram o fantasma do BooTickets na prévia do link.
+      { property: "og:image", content: DEFAULT_SHARE_IMAGE },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:image", content: DEFAULT_SHARE_IMAGE },
     ],
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },

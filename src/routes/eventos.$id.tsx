@@ -12,6 +12,7 @@ import { checkAccessCode, eventQuery, previewCoupon } from "@/services/events";
 import { ApiError } from "@/services/http";
 import { brl, fmtDate, fmtTime, MAX_TICKETS_PER_CPF, platformFee } from "@/utils/format";
 import { cn } from "@/lib/utils";
+import { shareMeta, shareText } from "@/lib/seo";
 
 export const Route = createFileRoute("/eventos/$id")({
   loader: async ({ context, params }) => {
@@ -26,11 +27,15 @@ export const Route = createFileRoute("/eventos/$id")({
     meta: loaderData
       ? [
           { title: `${loaderData.title} — BooTickets` },
-          { name: "description", content: loaderData.description },
-          { property: "og:title", content: loaderData.title },
-          { property: "og:description", content: loaderData.description },
+          { name: "description", content: shareText(loaderData.description) },
           { property: "og:type", content: "website" },
-          { name: "twitter:card", content: "summary_large_image" },
+          // Prévia do link no WhatsApp/Instagram: foto da capa, data e local.
+          ...shareMeta({
+            title: loaderData.title,
+            description: shareText(`${fmtDate(loaderData.startsAt)} · ${fmtTime(loaderData.startsAt)} · ${loaderData.venue}, ${loaderData.city}. ${loaderData.description}`),
+            image: loaderData.coverUrl, imageAlt: `Capa de ${loaderData.title}`,
+            url: `/eventos/${loaderData.visibility === "unlisted" ? loaderData.id : loaderData.slug || loaderData.id}`,
+          }),
           // Evento privado: buscadores (Google) não devem listar.
           ...(loaderData.visibility === "unlisted" ? [{ name: "robots", content: "noindex" }] : []),
         ]
