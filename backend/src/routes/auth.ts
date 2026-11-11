@@ -25,11 +25,11 @@ const cookieOpts = () => ({
 
 export async function rolesOf(u: Pick<UserRow, "roles" | "email" | "id"> & { google_sub?: string | null }): Promise<Role[]> {
   const roles = new Set(JSON.parse(u.roles) as Role[]);
-  // Admin é SÓ quem está em ADMIN_EMAILS e provou ser dono do e-mail (login com Google). Cadastro com senha não
-  // confirma o e-mail, então alguém poderia se cadastrar antes com o e-mail de um futuro admin.
+  // Admin é SÓ quem tem conta com um e-mail de ADMIN_EMAILS (com senha ou Google, tanto faz).
+  // Atenção: o cadastro com senha não confirma o e-mail, então só ponha na lista e-mails de quem já tem conta.
   // Com ADMIN_EMAILS configurado (produção), qualquer outra conta marcada como admin no banco perde o acesso.
   if (config.adminEmails.length) {
-    const allowed = config.adminEmails.includes(u.email) && !!u.google_sub;
+    const allowed = config.adminEmails.includes(u.email);
     if (allowed !== roles.has("admin")) {
       if (allowed) roles.add("admin"); else roles.delete("admin");
       await run("UPDATE users SET roles = ? WHERE id = ?", JSON.stringify([...roles]), u.id);

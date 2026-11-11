@@ -300,10 +300,11 @@ describe("Robustez do BooTickets", () => {
   });
 
   // ---------------- Contas e segurança ----------------
-  it("e-mail de admin só vira admin com e-mail confirmado (Google), não com cadastro por senha", async () => {
-    const reg = await api("/auth/register", { body: { name: "Impostor", email: "chefe@t.dev", cpf: CPFS[6], password: PW } });
+  it("conta com e-mail da lista de admins vira admin, entrando com senha ou com Google", async () => {
+    const reg = await api("/auth/register", { body: { name: "Chefe", email: "chefe@t.dev", cpf: CPFS[6], password: PW } });
     assert.equal(reg.status, 201);
-    assert.ok(!reg.body.user.roles.includes("admin"), "cadastro com senha não pode virar admin");
+    assert.ok(reg.body.user.roles.includes("admin"), "e-mail da lista vira admin mesmo com senha");
+    assert.equal((await api("/admin/payouts", { token: reg.body.accessToken })).status, 200);
     google.verifyIdToken = async () => ({ sub: "g-chefe", email: "chefe@t.dev", name: "Chefe" });
     const g = await api("/auth/google", { body: { credential: "x".repeat(40) } });
     assert.equal(g.status, 200);
