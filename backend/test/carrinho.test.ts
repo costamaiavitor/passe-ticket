@@ -145,4 +145,37 @@ describe("Carrinho", () => {
     ] } });
     assert.equal(again.status, 201, JSON.stringify(again.body));
   });
+  it("não deixa comprar dois lotes da mesma categoria, a não ser na virada de lote", async () => {
+    const ev = await event("Virada no Carrinho", { batches: [
+      lot({ name: "Pista — 1º lote", ticketType: "Pista", price: 5000, total: 2 }),
+      lot({ name: "Pista — 2º lote", ticketType: "Pista", price: 7000, total: 5 }),
+      lot({ name: "VIP", ticketType: "VIP", price: 9000, total: 5 }),
+    ] });
+    const [p1, p2, vip] = ev.batches;
+    const h = (...ks: string[]) => ks.map((k) => ({ name: "Pessoa Teste", cpf: C[k]! }));
+    // 1 do 1º lote + 1 do 2º (ainda sobra 1 no 1º): recusado
+    let r = await api("/orders", { token: T["ana"], body: { eventId: ev.id, items: [{ batchId: p1.id, holders: h("ana") }, { batchId: p2.id, holders: h("bia") }] } });
+    assert.equal(r.status, 409);
+    assert.equal(r.body.code, "BATCH_UPCOMING");
+    // só o 2º lote: recusado
+    r = await api("/orders", { token: T["ana"], body: { eventId: ev.id, batchId: p2.id, holders: h("ana") } });
+    assert.equal(r.status, 409);
+    // virada: leva os 2 que restam do 1º lote + 1 do 2º, e ainda 1 VIP (outra categoria)
+    r = await api("/orders", { token: T["ana"], body: { eventId: ev.id, items: [
+      { batchId: p1.id, holders: h("ana", "bia") }, { batchId: p2.id, holders: h("cau") }, { batchId: vip.id, holders: h("org") },
+    ] } });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    assert.equal(r.body.subtotal, 2 * 5000 + 7000 + 9000);
+  });
+
+  it("lotes sem tipo: \"1º Lote\" e \"2º Lote\" são a mesma categoria; \"VIP\" é outra", async () => {
+    const ev = await event("Sem Tipo", { batches: [
+      lot({ name: "1º Lote", ticketType: "", price: 5000, total: 5 }),
+      lot({ name: "2º Lote", ticketType: "", price: 7000, total: 5 }),
+      lot({ name: "VIP", ticketType: "", price: 9000, total: 5 }),
+    ] });
+    const st = Object.fromEntries(((await api(`/events/${ev.id}`)).body.batches as any[]).map((b) => [b.name, b.status]));
+    assert.deepEqual(st, { "1º Lote": "active", "2º Lote": "upcoming", "VIP": "active" });
+  });
 });
+

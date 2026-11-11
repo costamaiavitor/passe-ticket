@@ -28,26 +28,36 @@ export function batchStatus(b: BatchRow, at = new Date().toISOString()) {
 }
 
 /**
- * Virada automática de lote: dentro do mesmo tipo de ingresso, na ordem de cadastro, um lote só abre
+ * Categoria do lote (Pista, Feminino, VIP…): o tipo de ingresso; se o lote não tem tipo, o nome sem o
+ * "1º lote"/"2º lote" (assim "1º Lote" e "2º Lote" são a mesma categoria e "VIP" é outra).
+ */
+export function categoryOf(b: Pick<BatchRow, "ticket_type" | "name">) {
+  const t = b.ticket_type?.trim();
+  if (t) return t.toLowerCase();
+  const rest = b.name.toLowerCase().replace(/\d+\s*[ºo°ª]?\s*lote/g, "").replace(/\blote\b/g, "").replace(/[—–\-·|:()]/g, " ").replace(/\s+/g, " ").trim();
+  return rest || "lote";
+}
+
+/**
+ * Virada automática de lote: dentro da mesma categoria, na ordem de cadastro, um lote só abre
  * depois que todos os anteriores esgotaram ou encerraram. Os seguintes ficam "upcoming" (em breve).
- * Lotes sem tipo são independentes, como antes.
  */
 export function batchStatuses(batches: BatchRow[], at = new Date().toISOString()) {
   const result = new Map<string, PublicBatchStatus>();
   const blocked = new Set<string>();
   for (const b of [...batches].sort((x, y) => x.position - y.position)) {
     const base = batchStatus(b, at);
-    const group = b.ticket_type?.trim().toLowerCase();
-    const st: PublicBatchStatus = group && blocked.has(group) && (base === "active" || base === "paused") ? "upcoming" : base;
+    const group = categoryOf(b);
+    const st: PublicBatchStatus = blocked.has(group) && (base === "active" || base === "paused") ? "upcoming" : base;
     result.set(b.id, st);
-    if (group && base !== "soldout" && base !== "closed") blocked.add(group);
+    if (base !== "soldout" && base !== "closed") blocked.add(group);
   }
   return result;
 }
 
 export function toBatch(b: BatchRow, status: PublicBatchStatus = batchStatus(b)) {
   return {
-    id: b.id, name: b.name, price: b.price, total: b.total, ticketType: b.ticket_type,
+    id: b.id, name: b.name, price: b.price, total: b.total, ticketType: b.ticket_type, category: categoryOf(b),
     // "sold" público inclui reservas em andamento: é o que não está mais disponível.
     sold: b.sold + b.reserved,
     salesStart: b.sales_start, salesEnd: b.sales_end, status,

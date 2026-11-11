@@ -51,24 +51,45 @@ function EventPage() {
   const { id } = Route.useParams();
   const { data: ev } = useSuspenseQuery(eventQuery(id));
   const buyable = ev.batches.filter((b) => b.status === "active" && b.sold < b.total);
-  // Carrinho: quantos ingressos de cada lote. Com um lote só, já começa com 1.
+  // Uma linha por categoria (Masculino, Feminino, VIP…): só o lote atual de cada uma fica à venda.
+  // Se a pessoa pedir mais do que sobrou no lote atual, o resto vem do próximo lote da mesma categoria (virada).
+  const catOf = (b: (typeof ev.batches)[number]) => b.category ?? b.ticketType?.toLowerCase() ?? b.id;
+  const groups = buyable.map((cur) => {
+    const after = ev.batches.slice(ev.batches.indexOf(cur) + 1);
+    const next = after.filter((b) => catOf(b) === catOf(cur) && b.status === "upcoming" && b.sold < b.total);
+    const pool = [cur, ...next];
+    return { key: catOf(cur), cur, pool, capacity: pool.reduce((s, b) => s + b.total - b.sold, 0) };
+  });
+  // Carrinho: quantos ingressos de cada categoria. Com uma categoria só, já começa com 1.
   // Fica guardado no navegador: quem escolhe, entra na conta e volta encontra o carrinho como deixou.
   const cartKey = `bt-cart:${ev.id}`;
-  const [cart, setCart] = useState<Record<string, number>>(() => (buyable.length === 1 ? { [buyable[0]!.id]: 1 } : {}));
+  const [cart, setCart] = useState<Record<string, number>>(() => (groups.length === 1 ? { [groups[0]!.key]: 1 } : {}));
   useEffect(() => {
     try {
       const saved = JSON.parse(sessionStorage.getItem(cartKey) ?? "null") as Record<string, number> | null;
-      if (saved) setCart(Object.fromEntries(buyable.filter((b) => saved[b.id]).map((b) => [b.id, Math.min(saved[b.id]!, b.total - b.sold)])));
+      if (saved) setCart(Object.fromEntries(groups.filter((g) => saved[g.key]).map((g) => [g.key, Math.min(saved[g.key]!, g.capacity)])));
     } catch { /* sem acesso ao armazenamento: segue com o carrinho vazio */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cartKey]);
 
-  const lines = buyable.filter((b) => (cart[b.id] ?? 0) > 0).map((b) => ({ b, n: cart[b.id]! }));
+  /** Divide a quantidade da categoria entre o lote atual e, na virada, o próximo. */
+  const split = (g: (typeof groups)[number], n: number) => {
+    const out: { b: (typeof ev.batches)[number]; n: number }[] = [];
+    let rest = n;
+    for (const b of g.pool) {
+      if (rest <= 0) break;
+      const take = Math.min(rest, b.total - b.sold);
+      if (take > 0) out.push({ b, n: take });
+      rest -= take;
+    }
+    return out;
+  };
+  const lines = groups.flatMap((g) => split(g, cart[g.key] ?? 0));
   const qty = lines.reduce((s, l) => s + l.n, 0);
-  const setLineQty = (b: (typeof buyable)[number], n: number) => setCart((c) => {
-    const others = Object.entries(c).reduce((s, [id, v]) => (id === b.id ? s : s + v), 0);
+  const setGroupQty = (g: (typeof groups)[number], n: number) => setCart((c) => {
+    const others = Object.entries(c).reduce((s, [k, v]) => (k === g.key ? s : s + v), 0);
     // Cada ingresso tem um titular (CPF); até 10 por compra. Limite por CPF é validado no backend.
-    const next = { ...c, [b.id]: Math.max(0, Math.min(n, b.total - b.sold, MAX_PER_ORDER - others)) };
+    const next = { ...c, [g.key]: Math.max(0, Math.min(n, g.capacity, MAX_PER_ORDER - others)) };
     // Só grava quando a pessoa mexe no carrinho (assim abrir a página nunca apaga o que estava guardado).
     try { sessionStorage.setItem(cartKey, JSON.stringify(next)); } catch { /* ignora */ }
     return next;
@@ -178,23 +199,31 @@ function EventPage() {
           <h2 className="font-medium">Ingressos</h2>
           <div className="mt-4 space-y-2">
             {/* Só aparecem os lotes à venda agora: próximos lotes, esgotados e pausados ficam escondidos. */}
-            {buyable.map((b) => {
-              const n = cart[b.id] ?? 0;
+            {groups.map((g) => {
+              const n = cart[g.key] ?? 0;
+              const b = g.cur;
               const left = b.total - b.sold;
+              const parts = split(g, n);
               return (
-                <div key={b.id} className={cn("flex items-center gap-3 rounded-lg border px-4 py-3 transition-colors",
-                  n > 0 ? "border-primary bg-primary/5" : "")}>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">{b.name}</p>
-                    <p className="text-xs text-muted-foreground"><span className="font-medium text-foreground">{brl(b.price)}</span> · {left} disponíveis</p>
+                <div key={g.key} className={cn("rounded-lg border px-4 py-3 transition-colors", n > 0 ? "border-primary bg-primary/5" : "")}>
+                  <div className="flex items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium">{b.name}</p>
+                      <p className="text-xs text-muted-foreground"><span className="font-medium text-foreground">{brl(b.price)}</span> · {left} disponíveis</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Button size="icon" variant="outline" className="size-8" disabled={step === "holders" || n === 0}
+                        onClick={() => setGroupQty(g, n - 1)} aria-label={`Tirar um ingresso ${b.name}`}><Minus /></Button>
+                      <span className="w-5 text-center tabular-nums" aria-live="polite">{n}</span>
+                      <Button size="icon" variant="outline" className="size-8" disabled={step === "holders" || n >= g.capacity || qty >= MAX_PER_ORDER}
+                        onClick={() => setGroupQty(g, n + 1)} aria-label={`Adicionar um ingresso ${b.name}`}><Plus /></Button>
+                    </div>
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <Button size="icon" variant="outline" className="size-8" disabled={step === "holders" || n === 0}
-                      onClick={() => setLineQty(b, n - 1)} aria-label={`Tirar um ingresso ${b.name}`}><Minus /></Button>
-                    <span className="w-5 text-center tabular-nums" aria-live="polite">{n}</span>
-                    <Button size="icon" variant="outline" className="size-8" disabled={step === "holders" || n >= left || qty >= MAX_PER_ORDER}
-                      onClick={() => setLineQty(b, n + 1)} aria-label={`Adicionar um ingresso ${b.name}`}><Plus /></Button>
-                  </div>
+                  {parts.length > 1 && (
+                    <p className="mt-2 text-xs text-primary">
+                      Virada de lote: {parts.map((p) => `${p.n} no ${p.b.name} (${brl(p.b.price)})`).join(" + ")}
+                    </p>
+                  )}
                 </div>
               );
             })}
@@ -202,7 +231,7 @@ function EventPage() {
           {buyable.length > 0 ? (
             <>
               <p className="mt-3 text-xs text-muted-foreground">
-                Dá para juntar lotes diferentes na mesma compra (até {MAX_PER_ORDER} ingressos). Cada ingresso exige um titular com CPF próprio
+                Dá para juntar categorias diferentes na mesma compra (até {MAX_PER_ORDER} ingressos). Cada ingresso exige um titular com CPF próprio
                 (máx. {ev.maxTicketsPerCpf ?? MAX_TICKETS_PER_CPF} por CPF).
               </p>
               <dl className="mt-5 space-y-1.5 border-t pt-4 text-sm">

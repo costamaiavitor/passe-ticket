@@ -11,6 +11,8 @@ export interface Batch {
   status: "active" | "paused" | "closed" | "soldout" | "upcoming";
   /** Tipo de ingresso (Pista, Camarote…): lotes do mesmo tipo abrem um depois do outro. */
   ticketType?: string | null;
+  /** Categoria (tipo, ou o nome sem "1º lote"): só um lote por categoria fica à venda por vez. */
+  category?: string;
 }
 
 export interface EventSummary {

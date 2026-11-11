@@ -5,7 +5,7 @@ import { isValidCpf, onlyDigits } from "../lib/cpf.js";
 import { badRequest, conflict, forbidden, HttpError, notFound } from "../lib/errors.js";
 import { payments, type CardPaymentInput, type PaymentInfo } from "../payments.js";
 import { eventCancelledEmail, purchaseEmail, sendEmail } from "../lib/email.js";
-import { batchStatuses, normalizeCode, type BatchRow, type EventRow } from "./events.js";
+import { batchStatus, batchStatuses, categoryOf, normalizeCode, type BatchRow, type EventRow } from "./events.js";
 import { discountFor, findUsableCoupon } from "./promos.js";
 import { authForOrder, sellerAuth } from "./mpaccounts.js";
 
@@ -99,15 +99,23 @@ export async function createOrder(userId: string, input: {
     const siblings = await all<BatchRow>("SELECT * FROM batches WHERE event_id = ? ORDER BY id FOR UPDATE", ev.id);
     const statuses = batchStatuses(siblings);
     const lines: { b: BatchRow; holders: Holder[] }[] = [];
+    const left = (b: BatchRow) => b.total - b.sold - b.reserved;
+    const wanted = new Map(items.map((it) => [it.batchId, it.holders.length]));
     for (const it of items) {
       const b = siblings.find((x) => x.id === it.batchId);
       if (!b) throw notFound("Lote não encontrado.");
       const st = statuses.get(b.id);
       if (st === "soldout") throw conflict("SOLD_OUT", `O lote ${b.name} esgotou.`);
-      if (st === "upcoming") throw conflict("BATCH_UPCOMING", `O lote ${b.name} abre quando o lote anterior esgotar.`);
-      if (st !== "active") throw conflict("BATCH_UNAVAILABLE", `O lote ${b.name} não está à venda no momento.`);
-      if (b.total - b.sold - b.reserved < it.holders.length)
-        throw conflict("NOT_ENOUGH_STOCK", `Restam apenas ${b.total - b.sold - b.reserved} ingressos no lote ${b.name}.`);
+      if (st === "upcoming") {
+        // Virada de lote: o próximo lote da mesma categoria só entra junto se este pedido levar
+        // tudo o que resta dos lotes anteriores (ex.: sobram 2 no 1º lote e a pessoa quer 3).
+        const before = siblings.filter((x) => categoryOf(x) === categoryOf(b) && x.position < b.position
+          && !["soldout", "closed"].includes(statuses.get(x.id) ?? ""));
+        const turnover = batchStatus(b) === "active" && before.every((x) => wanted.get(x.id) === left(x));
+        if (!turnover) throw conflict("BATCH_UPCOMING", `O lote ${b.name} abre quando o lote anterior esgotar.`);
+      } else if (st !== "active") throw conflict("BATCH_UNAVAILABLE", `O lote ${b.name} não está à venda no momento.`);
+      if (left(b) < it.holders.length)
+        throw conflict("NOT_ENOUGH_STOCK", `Restam apenas ${left(b)} ingressos no lote ${b.name}.`);
       lines.push({ b, holders: it.holders });
     }
 
