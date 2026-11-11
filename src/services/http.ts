@@ -1,5 +1,9 @@
 // Camada HTTP central. Base: VITE_API_URL + /api/v1.
-export const API_BASE = (import.meta.env["VITE_API_URL"] as string | undefined)?.replace(/\/$/, "");
+const ENV_API = (import.meta.env["VITE_API_URL"] as string | undefined)?.replace(/\/$/, "");
+// Em produção o site e a API ficam no mesmo endereço (Vercel). No navegador usamos sempre o endereço
+// da própria página: assim bootickets.com.br, www e o *.vercel.app funcionam sem esbarrar no CORS
+// e o cookie de login fica no mesmo domínio do site.
+export const API_BASE = ENV_API && import.meta.env.PROD && typeof window !== "undefined" ? window.location.origin : ENV_API;
 export const USE_MOCKS = !API_BASE;
 
 export class ApiError extends Error {

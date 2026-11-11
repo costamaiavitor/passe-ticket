@@ -20,8 +20,13 @@ export const config = {
     (env["VERCEL_PROJECT_PRODUCTION_URL"] ? `https://${env["VERCEL_PROJECT_PRODUCTION_URL"]}` : "") ||
     `http://localhost:${env["PORT"] ?? 3333}`
   ).replace(/\/$/, ""),
-  corsOrigins: (env["CORS_ORIGINS"] ?? "http://localhost:8080,http://localhost:5173,http://localhost:3000")
-    .split(",").map((s) => s.trim()).filter(Boolean),
+  corsOrigins: [
+    ...(env["CORS_ORIGINS"] ?? "http://localhost:8080,http://localhost:5173,http://localhost:3000").split(","),
+    // O domínio de produção (e o www) sempre podem chamar a API.
+    ...(env["VERCEL_PROJECT_PRODUCTION_URL"]
+      ? [`https://${env["VERCEL_PROJECT_PRODUCTION_URL"]}`, `https://www.${env["VERCEL_PROJECT_PRODUCTION_URL"].replace(/^www\./, "")}`]
+      : []),
+  ].map((s) => s.trim().replace(/\/$/, "")).filter(Boolean),
   // Endereço do site (para onde o organizador volta depois de conectar o Mercado Pago).
   // Na Vercel o site e a API estão no mesmo endereço; localmente o site roda na 8080.
   siteUrl: (env["SITE_URL"] ||
