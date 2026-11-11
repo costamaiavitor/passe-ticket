@@ -1,7 +1,10 @@
 import { BrandLogo } from "@/components/brand-logo";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { CalendarPlus, LogOut, ScanLine, Search, ShieldCheck, Ticket } from "lucide-react";
+import { CalendarPlus, LogOut, Menu, ScanLine, Search, ShieldCheck, Ticket } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { logout } from "@/services/auth";
 import { hasRole, useSession } from "@/services/session";
 
@@ -11,7 +14,7 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
       <div className="flex h-16 w-full items-center gap-4 px-4 sm:gap-10 sm:px-6 lg:px-10">
-        <Link to="/" aria-label="BooTickets — página inicial">
+        <Link to="/" aria-label="BooTickets — página inicial" className="shrink-0">
           <BrandLogo />
         </Link>
         <nav className="hidden items-center gap-8 text-sm text-muted-foreground md:flex">
@@ -26,21 +29,39 @@ export function SiteHeader() {
           <Button asChild variant="ghost" size="icon" aria-label="Buscar eventos"><Link to="/eventos"><Search /></Link></Button>
           {user ? (
             <>
+              {/* Computador e tablet: todos os botões à vista. */}
               <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex">
                 <Link to="/organizador"><CalendarPlus />{hasRole(user, "organizer") ? "Meus eventos" : "Criar evento"}</Link>
               </Button>
-              <Button asChild variant="ghost" size="icon" className="sm:hidden" aria-label={hasRole(user, "organizer") ? "Meus eventos" : "Criar evento"}>
-                <Link to="/organizador"><CalendarPlus /></Link>
-              </Button>
               {user.roles.includes("admin") && (
-                <Button asChild variant="ghost" size="icon" aria-label="Admin" title="Admin"><Link to="/admin"><ShieldCheck /></Link></Button>
+                <Button asChild variant="ghost" size="icon" className="hidden sm:inline-flex" aria-label="Admin" title="Admin"><Link to="/admin"><ShieldCheck /></Link></Button>
               )}
               {hasRole(user, "staff", "organizer") && (
                 <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex"><Link to="/portaria"><ScanLine />Portaria</Link></Button>
               )}
-              <Button asChild size="sm"><Link to="/ingressos"><Ticket />Meus ingressos</Link></Button>
-              <Button variant="ghost" size="icon" aria-label="Sair" title={`Sair (${user.email})`}
+              <Button asChild size="sm"><Link to="/ingressos" aria-label="Meus ingressos"><Ticket /><span className="hidden min-[400px]:inline">Meus ingressos</span></Link></Button>
+              <Button variant="ghost" size="icon" className="hidden sm:inline-flex" aria-label="Sair" title={`Sair (${user.email})`}
                 onClick={async () => { await logout(); navigate({ to: "/" }); }}><LogOut /></Button>
+              {/* Celular: o resto fica num menu, para nada sair da tela. */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="sm:hidden" aria-label="Menu"><Menu /></Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel className="truncate font-normal text-muted-foreground">{user.email}</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild><Link to="/ingressos"><Ticket />Meus ingressos</Link></DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link to="/organizador"><CalendarPlus />{hasRole(user, "organizer") ? "Meus eventos" : "Criar evento"}</Link></DropdownMenuItem>
+                  {hasRole(user, "staff", "organizer") && (
+                    <DropdownMenuItem asChild><Link to="/portaria"><ScanLine />Portaria</Link></DropdownMenuItem>
+                  )}
+                  {user.roles.includes("admin") && (
+                    <DropdownMenuItem asChild><Link to="/admin"><ShieldCheck />Admin</Link></DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={async () => { await logout(); navigate({ to: "/" }); }}><LogOut />Sair</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </>
           ) : (
             <>

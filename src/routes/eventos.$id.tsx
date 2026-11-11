@@ -120,7 +120,7 @@ function EventPage() {
         <img src={ev.coverUrl} alt={ev.title} width={1280} height={768} className="size-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
       </div>
-      <main className="container-page -mt-24 relative grid gap-10 lg:grid-cols-[1fr_380px]">
+      <main className="container-page -mt-24 relative grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div>
           {ev.status === "cancelled" ? (
             <span className="rounded-full bg-destructive/15 px-2.5 py-1 text-xs font-medium text-destructive">Evento cancelado</span>

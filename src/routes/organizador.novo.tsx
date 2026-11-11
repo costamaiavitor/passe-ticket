@@ -145,7 +145,7 @@ function CreateEvent() {
       <h1 className="mt-3 text-2xl font-semibold tracking-tight md:text-3xl">Crie seu evento</h1>
       <p className="mt-1 text-sm text-muted-foreground">Preencha o essencial. Dá para ajustar depois.</p>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px] lg:items-start">
+      <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
         <div className="space-y-4">
           <Section n={1} title="O evento">
             <TextField label="Nome do evento" value={title} onChange={setTitle} placeholder="Ex.: Baile da Lua — Edição Verão" maxLength={140} />
