@@ -26,12 +26,28 @@ interface OrderPaymentRow { id: string; order_id: string; method: string; status
 
 export const platformFee = (subtotal: number) => Math.round(subtotal * config.feeRate);
 
+/** Quantos ingressos de cada lote o pedido tem (o carrinho pode misturar lotes). */
+export async function orderBatches(orderId: string, statuses?: string[]) {
+  const where = statuses ? ` AND status IN (${statuses.map(() => "?").join(",")})` : "";
+  return all<{ batch_id: string; n: number }>(
+    `SELECT batch_id, COUNT(*)::int n FROM tickets WHERE order_id = ?${where} GROUP BY batch_id ORDER BY batch_id`, orderId, ...(statuses ?? []));
+}
+
 export async function toOrder(o: OrderRow) {
   const ev = await one<{ title: string; slug: string; starts_at: string }>("SELECT title, slug, starts_at FROM events WHERE id = ?", o.event_id);
-  const b = await one<{ name: string }>("SELECT name FROM batches WHERE id = ?", o.batch_id);
+  // Itens do pedido: um por lote, na ordem em que aparecem no evento (pedidos antigos têm um lote só).
+  const rows = await all<{ batch_id: string; name: string; n: number; unit: number | null }>(
+    `SELECT t.batch_id, b.name, COUNT(*)::int n, MAX(t.list_price) unit
+       FROM tickets t JOIN batches b ON b.id = t.batch_id WHERE t.order_id = ? GROUP BY t.batch_id, b.name, b.position ORDER BY b.position, b.name`, o.id);
+  const items = rows.length
+    ? rows.map((r) => ({ batchId: r.batch_id, batchName: r.name, quantity: r.n, unitPrice: r.unit ?? o.unit_price }))
+    : [{ batchId: o.batch_id, batchName: (await one<{ name: string }>("SELECT name FROM batches WHERE id = ?", o.batch_id))?.name ?? "",
+         quantity: o.quantity, unitPrice: o.unit_price }];
   return {
     id: o.id, status: o.status, eventId: o.event_id, eventTitle: ev?.title ?? "", eventSlug: ev?.slug ?? "",
-    eventStartsAt: ev?.starts_at ?? "", batchId: o.batch_id, batchName: b?.name ?? "", quantity: o.quantity,
+    eventStartsAt: ev?.starts_at ?? "", batchId: o.batch_id,
+    batchName: items.length > 1 ? items.map((i) => `${i.quantity}× ${i.batchName}`).join(" + ") : items[0]!.batchName,
+    quantity: o.quantity, items,
     // subtotal = valor dos ingressos antes do desconto; discount = desconto do cupom (o total já vem com ele).
     unitPrice: o.unit_price, subtotal: o.subtotal + (o.discount ?? 0), discount: o.discount ?? 0, fee: o.fee, total: o.total,
     couponCode: o.coupon_id ? (await one<{ code: string }>("SELECT code FROM coupons WHERE id = ?", o.coupon_id))?.code ?? null : null,
@@ -45,12 +61,25 @@ export async function toOrder(o: OrderRow) {
 }
 
 export interface Holder { name: string; cpf: string }
+export interface CartItem { batchId: string; holders: Holder[] }
 
-/** Cria o pedido reservando o estoque. Regras de CPF, estoque e janela de vendas são validadas aqui. */
-export async function createOrder(userId: string, input: { eventId: string; batchId: string; holders: Holder[]; accessCode?: string; couponCode?: string }) {
+/**
+ * Cria o pedido reservando o estoque. Aceita um lote só (batchId + holders) ou o carrinho (items: vários lotes).
+ * Regras de CPF, estoque e janela de vendas são validadas aqui.
+ */
+export async function createOrder(userId: string, input: {
+  eventId: string; batchId?: string | undefined; holders?: Holder[] | undefined; items?: CartItem[] | undefined;
+  accessCode?: string | undefined; couponCode?: string | undefined;
+}) {
   await expireStaleOrders();
-  const holders = input.holders.map((h) => ({ name: h.name.trim(), cpf: onlyDigits(h.cpf) }));
-  if (holders.length < 1 || holders.length > config.maxTicketsPerOrder)
+  // Junta os itens por lote (o mesmo lote duas vezes vira um item só).
+  const raw: CartItem[] = input.items?.length ? input.items : input.batchId ? [{ batchId: input.batchId, holders: input.holders ?? [] }] : [];
+  const byBatch = new Map<string, Holder[]>();
+  for (const it of raw) byBatch.set(it.batchId, [...(byBatch.get(it.batchId) ?? []), ...it.holders]);
+  const items = [...byBatch].map(([batchId, hs]) => ({ batchId, holders: hs.map((h) => ({ name: h.name.trim(), cpf: onlyDigits(h.cpf) })) }))
+    .filter((it) => it.holders.length > 0);
+  const holders = items.flatMap((it) => it.holders);
+  if (!items.length || holders.length < 1 || holders.length > config.maxTicketsPerOrder)
     throw badRequest("INVALID_QUANTITY", `Escolha entre 1 e ${config.maxTicketsPerOrder} ingressos.`);
   for (const h of holders) {
     if (h.name.length < 3) throw badRequest("INVALID_HOLDER", "Informe o nome completo de cada titular.");
@@ -67,15 +96,20 @@ export async function createOrder(userId: string, input: { eventId: string; batc
     if (ev.starts_at < now()) throw badRequest("EVENT_STARTED", "As vendas deste evento já foram encerradas.");
     if (ev.access_code && normalizeCode(input.accessCode ?? "") !== normalizeCode(ev.access_code))
       throw new HttpError(403, "ACCESS_CODE", "Palavra-senha incorreta. Peça a senha para o organizador do evento.");
-    const b = await one<BatchRow>("SELECT * FROM batches WHERE id = ? AND event_id = ? FOR UPDATE", input.batchId, ev.id);
-    if (!b) throw notFound("Lote não encontrado.");
-    const siblings = await all<BatchRow>("SELECT * FROM batches WHERE event_id = ?", ev.id);
-    const st = batchStatuses(siblings).get(b.id);
-    if (st === "soldout") throw conflict("SOLD_OUT", "Este lote esgotou.");
-    if (st === "upcoming") throw conflict("BATCH_UPCOMING", "Este lote abre quando o lote anterior esgotar.");
-    if (st !== "active") throw conflict("BATCH_UNAVAILABLE", "Este lote não está à venda no momento.");
-    if (b.total - b.sold - b.reserved < holders.length)
-      throw conflict("NOT_ENOUGH_STOCK", `Restam apenas ${b.total - b.sold - b.reserved} ingressos neste lote.`);
+    const siblings = await all<BatchRow>("SELECT * FROM batches WHERE event_id = ? ORDER BY id FOR UPDATE", ev.id);
+    const statuses = batchStatuses(siblings);
+    const lines: { b: BatchRow; holders: Holder[] }[] = [];
+    for (const it of items) {
+      const b = siblings.find((x) => x.id === it.batchId);
+      if (!b) throw notFound("Lote não encontrado.");
+      const st = statuses.get(b.id);
+      if (st === "soldout") throw conflict("SOLD_OUT", `O lote ${b.name} esgotou.`);
+      if (st === "upcoming") throw conflict("BATCH_UPCOMING", `O lote ${b.name} abre quando o lote anterior esgotar.`);
+      if (st !== "active") throw conflict("BATCH_UNAVAILABLE", `O lote ${b.name} não está à venda no momento.`);
+      if (b.total - b.sold - b.reserved < it.holders.length)
+        throw conflict("NOT_ENOUGH_STOCK", `Restam apenas ${b.total - b.sold - b.reserved} ingressos no lote ${b.name}.`);
+      lines.push({ b, holders: it.holders });
+    }
 
     // Limite de ingressos por CPF no evento (conta ingressos ativos + reservas pendentes).
     const perCpf = new Map<string, number>();
@@ -84,32 +118,44 @@ export async function createOrder(userId: string, input: { eventId: string; batc
       const { c } = (await one<{ c: number }>(
         "SELECT COUNT(*) c FROM tickets WHERE event_id = ? AND holder_cpf = ? AND status IN ('pending','valid','used')", ev.id, cpf,
       ))!;
-      if (c + n > ev.max_per_cpf)
+      if (Number(c) + n > ev.max_per_cpf)
         throw conflict("CPF_LIMIT", `O CPF ${cpf.slice(0, 3)}.***.***-${cpf.slice(9)} atingiu o limite de ${ev.max_per_cpf} ingressos neste evento.`);
     }
 
     // Cupom: o desconto sai do valor do ingresso (o organizador recebe menos); a taxa é calculada sobre o valor já com desconto.
+    // No carrinho, vale para todos os ingressos do pedido (o limite de usos conta cada ingresso).
     const coupon = input.couponCode?.trim() ? await findUsableCoupon(ev.id, input.couponCode, holders.length, true) : null;
-    const discount = coupon ? discountFor(coupon, b.price, holders.length) : 0;
+    const priced = lines.map((l) => {
+      const d = coupon ? discountFor(coupon, l.b.price, l.holders.length) : 0;
+      // Divide o desconto entre os ingressos do lote (o resto de centavos fica no primeiro).
+      const each = Math.floor(d / l.holders.length);
+      return { ...l, discount: d, ticketPrices: l.holders.map((_, i) => l.b.price - each - (i === 0 ? d - each * l.holders.length : 0)) };
+    });
+    const discount = priced.reduce((s, l) => s + l.discount, 0);
 
     const id = randomUUID();
-    const subtotal = b.price * holders.length - discount;
+    const gross = priced.reduce((s, l) => s + l.b.price * l.holders.length, 0);
+    const subtotal = gross - discount;
     const fee = platformFee(subtotal);
     const t = now();
     const expires = new Date(Date.now() + config.reservationMinutes * 60_000).toISOString();
-    await run("UPDATE batches SET reserved = reserved + ? WHERE id = ?", holders.length, b.id);
+    const first = priced[0]!.b;
+    for (const l of priced) await run("UPDATE batches SET reserved = reserved + ? WHERE id = ?", l.holders.length, l.b.id);
     await run(
       `INSERT INTO orders (id, user_id, event_id, batch_id, quantity, unit_price, subtotal, fee, total, status, payment_provider, expires_at, created_at, coupon_id, discount)
        VALUES (?,?,?,?,?,?,?,?,?, 'pending', ?, ?, ?, ?, ?)`,
-      id, userId, ev.id, b.id, holders.length, b.price, subtotal, fee, subtotal + fee, payments.name, expires, t, coupon?.id ?? null, discount,
+      id, userId, ev.id, first.id, holders.length, priced.length === 1 ? first.price : Math.round(gross / holders.length),
+      subtotal, fee, subtotal + fee, payments.name, expires, t, coupon?.id ?? null, discount,
     );
-    for (const h of holders)
-      await run(
-        `INSERT INTO tickets (id, order_id, event_id, batch_id, owner_id, holder_name, holder_cpf, status, created_at)
-         VALUES (?,?,?,?,?,?,?, 'pending', ?)`,
-        randomUUID(), id, ev.id, b.id, userId, h.name, h.cpf, t,
-      );
-    return { id, total: subtotal + fee, fee, title: `${ev.title} — ${b.name}`, expires, organizerId: ev.organizer_id };
+    for (const l of priced)
+      for (const [i, h] of l.holders.entries())
+        await run(
+          `INSERT INTO tickets (id, order_id, event_id, batch_id, owner_id, holder_name, holder_cpf, status, created_at, price, list_price)
+           VALUES (?,?,?,?,?,?,?, 'pending', ?, ?, ?)`,
+          randomUUID(), id, ev.id, l.b.id, userId, h.name, h.cpf, t, l.ticketPrices[i]!, l.b.price,
+        );
+    const title = priced.length === 1 ? `${ev.title} — ${first.name}` : `${ev.title} — ${holders.length} ingressos`;
+    return { id, total: subtotal + fee, fee, title, expires, organizerId: ev.organizer_id };
   });
 
   // Ingresso gratuito: aprova direto.
@@ -161,16 +207,19 @@ export function approveOrder(orderId: string, paymentId: string | null = null) {
       return { ...o, status: "refund_required" as const };
     }
     const t = now();
+    const lines = await orderBatches(o.id);
     if (o.status === "pending") {
-      await run("UPDATE batches SET reserved = reserved - ?, sold = sold + ? WHERE id = ?", o.quantity, o.quantity, o.batch_id);
+      for (const l of lines) await run("UPDATE batches SET reserved = reserved - ?, sold = sold + ? WHERE id = ?", l.n, l.n, l.batch_id);
     } else {
-      // Pagamento chegou depois que a reserva expirou: tenta reservar de novo.
-      const b = (await one<BatchRow>("SELECT * FROM batches WHERE id = ? FOR UPDATE", o.batch_id))!;
-      if (b.total - b.sold - b.reserved < o.quantity) {
-        await run("UPDATE orders SET status = 'refund_required' WHERE id = ?", o.id);
-        return { ...o, status: "refund_required" as const };
+      // Pagamento chegou depois que a reserva expirou: tenta reservar de novo (todos os lotes do pedido ou nenhum).
+      for (const l of lines) {
+        const b = (await one<BatchRow>("SELECT * FROM batches WHERE id = ? FOR UPDATE", l.batch_id))!;
+        if (b.total - b.sold - b.reserved < l.n) {
+          await run("UPDATE orders SET status = 'refund_required' WHERE id = ?", o.id);
+          return { ...o, status: "refund_required" as const };
+        }
       }
-      await run("UPDATE batches SET sold = sold + ? WHERE id = ?", o.quantity, o.batch_id);
+      for (const l of lines) await run("UPDATE batches SET sold = sold + ? WHERE id = ?", l.n, l.batch_id);
     }
     await run("UPDATE orders SET status = 'paid', paid_at = ?, paid_payment_id = ? WHERE id = ?", t, paymentId, o.id);
     await run("UPDATE tickets SET status = 'valid' WHERE order_id = ?", o.id);
@@ -183,7 +232,7 @@ export async function releaseOrder(orderId: string, status: "expired" | "cancell
   await tx(async () => {
     const o = await one<OrderRow>("SELECT * FROM orders WHERE id = ? AND status = 'pending' FOR UPDATE", orderId);
     if (!o) return;
-    await run("UPDATE batches SET reserved = reserved - ? WHERE id = ?", o.quantity, o.batch_id);
+    for (const l of await orderBatches(o.id, ["pending"])) await run("UPDATE batches SET reserved = reserved - ? WHERE id = ?", l.n, l.batch_id);
     await run("UPDATE orders SET status = ? WHERE id = ?", status, o.id);
     await run("UPDATE tickets SET status = 'cancelled' WHERE order_id = ?", o.id);
   });
@@ -239,9 +288,11 @@ export async function markRefunded(orderId: string) {
   await tx(async () => {
     const o = await one<OrderRow>("SELECT * FROM orders WHERE id = ? FOR UPDATE", orderId);
     if (!o || o.status !== "paid") return;
+    // Devolve ao lote só os ingressos que ainda contavam como vendidos (cortesia já revogada não conta de novo).
+    const lines = await orderBatches(o.id, ["valid", "used"]);
     await run("UPDATE orders SET status = 'refunded' WHERE id = ?", o.id);
     await run("UPDATE tickets SET status = 'cancelled' WHERE order_id = ?", o.id);
-    await run("UPDATE batches SET sold = sold - ? WHERE id = ?", o.quantity, o.batch_id);
+    for (const l of lines) await run("UPDATE batches SET sold = sold - ? WHERE id = ?", l.n, l.batch_id);
   });
 }
 
@@ -412,6 +463,9 @@ export async function notifyPaid(orderId: string) {
       WHERE o.id = ?`, orderId);
   if (!d) return;
   const holders = (await all<{ holder_name: string }>("SELECT holder_name FROM tickets WHERE order_id = ? ORDER BY created_at", orderId)).map((t) => t.holder_name);
+  const lines = await all<{ name: string; n: number }>(
+    "SELECT b.name, COUNT(*)::int n FROM tickets t JOIN batches b ON b.id = t.batch_id WHERE t.order_id = ? GROUP BY b.name, b.position ORDER BY b.position", orderId);
+  if (lines.length > 1) d.batch = lines.map((l) => `${l.n}× ${l.name}`).join(" + ");
   await sendEmail(purchaseEmail({
     to: d.email, name: d.name, orderId: d.id, eventTitle: d.title, startsAt: d.starts_at, venue: d.venue, city: d.city,
     batchName: d.batch, total: d.total, holders,

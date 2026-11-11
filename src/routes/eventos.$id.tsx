@@ -1,6 +1,6 @@
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Calendar, MapPin, Minus, Plus, Info, Repeat, Undo2, KeyRound, Tag, X } from "lucide-react";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { AvailabilityBadge } from "@/components/availability-badge";
@@ -45,17 +45,35 @@ export const Route = createFileRoute("/eventos/$id")({
   component: EventPage,
 });
 
+const MAX_PER_ORDER = 10;
+
 function EventPage() {
   const { id } = Route.useParams();
   const { data: ev } = useSuspenseQuery(eventQuery(id));
   const buyable = ev.batches.filter((b) => b.status === "active" && b.sold < b.total);
-  const [batchId, setBatchId] = useState(buyable[0]?.id);
-  const [qty, setQty] = useState(1);
-  const batch = ev.batches.find((b) => b.id === batchId);
-  const remaining = batch ? batch.total - batch.sold : 0;
-  // Cada ingresso tem um titular (CPF); limite por CPF é validado no backend.
-  const maxQty = Math.min(10, remaining);
-  const subtotal = (batch?.price ?? 0) * qty;
+  // Carrinho: quantos ingressos de cada lote. Com um lote só, já começa com 1.
+  // Fica guardado no navegador: quem escolhe, entra na conta e volta encontra o carrinho como deixou.
+  const cartKey = `bt-cart:${ev.id}`;
+  const [cart, setCart] = useState<Record<string, number>>(() => (buyable.length === 1 ? { [buyable[0]!.id]: 1 } : {}));
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(cartKey) ?? "null") as Record<string, number> | null;
+      if (saved) setCart(Object.fromEntries(buyable.filter((b) => saved[b.id]).map((b) => [b.id, Math.min(saved[b.id]!, b.total - b.sold)])));
+    } catch { /* sem acesso ao armazenamento: segue com o carrinho vazio */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartKey]);
+
+  const lines = buyable.filter((b) => (cart[b.id] ?? 0) > 0).map((b) => ({ b, n: cart[b.id]! }));
+  const qty = lines.reduce((s, l) => s + l.n, 0);
+  const setLineQty = (b: (typeof buyable)[number], n: number) => setCart((c) => {
+    const others = Object.entries(c).reduce((s, [id, v]) => (id === b.id ? s : s + v), 0);
+    // Cada ingresso tem um titular (CPF); até 10 por compra. Limite por CPF é validado no backend.
+    const next = { ...c, [b.id]: Math.max(0, Math.min(n, b.total - b.sold, MAX_PER_ORDER - others)) };
+    // Só grava quando a pessoa mexe no carrinho (assim abrir a página nunca apaga o que estava guardado).
+    try { sessionStorage.setItem(cartKey, JSON.stringify(next)); } catch { /* ignora */ }
+    return next;
+  });
+  const subtotal = lines.reduce((s, l) => s + l.b.price * l.n, 0);
   // Palavra-senha: a compra só libera depois de conferida (o servidor confere de novo na compra).
   const [unlocked, setUnlocked] = useState(!ev.requiresAccessCode);
   const [code, setCode] = useState("");
@@ -77,12 +95,15 @@ function EventPage() {
   const applyCoupon = async () => {
     if (!couponInput.trim()) return;
     setApplying(true); setCouponError(null);
-    try { setCoupon(await previewCoupon(ev.id, couponInput, qty)); setCouponOpen(false); }
+    try { setCoupon(await previewCoupon(ev.id, couponInput, Math.max(1, qty))); setCouponOpen(false); }
     catch (e) { setCouponError(e instanceof Error ? e.message : "Cupom inválido."); }
     finally { setApplying(false); }
   };
-  const discount = !coupon ? 0
-    : Math.min(subtotal, coupon.kind === "percent" ? Math.round((subtotal * coupon.value) / 100) : coupon.value * qty);
+  // Mesmo cálculo do servidor: o cupom vale para cada lote do carrinho.
+  const discount = !coupon ? 0 : lines.reduce((s, { b, n }) => {
+    const gross = b.price * n;
+    return s + Math.min(gross, coupon.kind === "percent" ? Math.round((gross * Math.min(coupon.value, 100)) / 100) : coupon.value * n);
+  }, 0);
   const fee = platformFee(subtotal - discount);
   const { user } = useSession();
   const navigate = useNavigate();
@@ -98,15 +119,20 @@ function EventPage() {
     setOrderError(null);
     setStep("holders");
   };
+  const holderLabels = lines.flatMap(({ b, n }) => Array.from({ length: n }, () => b.name));
   const placeOrder = async (holders: { name: string; cpf: string }[]) => {
-    if (!batch) return;
+    if (!qty) return;
     setSubmitting(true); setOrderError(null);
+    // Os titulares vêm na mesma ordem dos itens do carrinho.
+    let at = 0;
+    const items = lines.map(({ b, n }) => ({ batchId: b.id, holders: holders.slice(at, (at += n)) }));
     try {
       const order = await createOrder({
-        eventId: ev.id, batchId: batch.id, holders,
+        eventId: ev.id, items,
         ...(ev.requiresAccessCode ? { accessCode: code } : {}),
         ...(coupon ? { couponCode: coupon.code } : {}),
       });
+      try { sessionStorage.removeItem(cartKey); } catch { /* ignora */ }
       navigate({ to: "/checkout/$orderId", params: { orderId: order.id } });
     } catch (e) {
       setOrderError(e instanceof Error ? e.message : "Não foi possível reservar.");
@@ -153,32 +179,37 @@ function EventPage() {
           <div className="mt-4 space-y-2">
             {/* Só aparecem os lotes à venda agora: próximos lotes, esgotados e pausados ficam escondidos. */}
             {buyable.map((b) => {
+              const n = cart[b.id] ?? 0;
               const left = b.total - b.sold;
-              const label = `${left} disponíveis`;
               return (
-                <button key={b.id} disabled={step === "holders"} onClick={() => { setBatchId(b.id); setQty(1); }}
-                  className={cn("flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left transition-colors",
-                    batchId === b.id ? "border-primary bg-primary/5" : "hover:border-muted-foreground/40")}>
-                  <div><p className="text-sm font-medium">{b.name}</p>
-                    <p className="text-xs text-muted-foreground">{label}</p></div>
-                  <span className="text-sm font-medium">{brl(b.price)}</span>
-                </button>
+                <div key={b.id} className={cn("flex items-center gap-3 rounded-lg border px-4 py-3 transition-colors",
+                  n > 0 ? "border-primary bg-primary/5" : "")}>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">{b.name}</p>
+                    <p className="text-xs text-muted-foreground"><span className="font-medium text-foreground">{brl(b.price)}</span> · {left} disponíveis</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Button size="icon" variant="outline" className="size-8" disabled={step === "holders" || n === 0}
+                      onClick={() => setLineQty(b, n - 1)} aria-label={`Tirar um ingresso ${b.name}`}><Minus /></Button>
+                    <span className="w-5 text-center tabular-nums" aria-live="polite">{n}</span>
+                    <Button size="icon" variant="outline" className="size-8" disabled={step === "holders" || n >= left || qty >= MAX_PER_ORDER}
+                      onClick={() => setLineQty(b, n + 1)} aria-label={`Adicionar um ingresso ${b.name}`}><Plus /></Button>
+                  </div>
+                </div>
               );
             })}
           </div>
-          {batch && buyable.length > 0 ? (
+          {buyable.length > 0 ? (
             <>
-              <div className="mt-5 flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Quantidade</span>
-                <div className="flex items-center gap-3">
-                  <Button size="icon" variant="outline" className="size-8" disabled={step === "holders"} onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label="Diminuir"><Minus /></Button>
-                  <span className="w-4 text-center tabular-nums">{qty}</span>
-                  <Button size="icon" variant="outline" className="size-8" disabled={step === "holders"} onClick={() => setQty((q) => Math.min(maxQty, q + 1))} aria-label="Aumentar"><Plus /></Button>
-                </div>
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground">Cada ingresso exige um titular com CPF próprio (máx. {ev.maxTicketsPerCpf ?? MAX_TICKETS_PER_CPF} por CPF).</p>
+              <p className="mt-3 text-xs text-muted-foreground">
+                Dá para juntar lotes diferentes na mesma compra (até {MAX_PER_ORDER} ingressos). Cada ingresso exige um titular com CPF próprio
+                (máx. {ev.maxTicketsPerCpf ?? MAX_TICKETS_PER_CPF} por CPF).
+              </p>
               <dl className="mt-5 space-y-1.5 border-t pt-4 text-sm">
-                <Row k="Subtotal" v={brl(subtotal)} />
+                {lines.length > 1 && lines.map(({ b, n }) => (
+                  <div key={b.id} className="flex justify-between gap-3 text-muted-foreground"><dt className="min-w-0">{n}× {b.name}</dt><dd className="shrink-0">{brl(b.price * n)}</dd></div>
+                ))}
+                <Row k={`Subtotal${qty ? ` (${qty} ${qty === 1 ? "ingresso" : "ingressos"})` : ""}`} v={brl(subtotal)} />
                 {coupon && (
                   <div className="flex items-center justify-between text-primary">
                     <dt className="flex items-center gap-1.5"><Tag className="size-3.5" />Cupom {coupon.code}
@@ -218,9 +249,9 @@ function EventPage() {
                   {codeError && <p className="mt-1.5 text-xs text-destructive">{codeError}</p>}
                 </div>
               ) : step === "select" ? (
-                <Button className="mt-5 w-full" onClick={goToHolders}>{user ? "Continuar" : "Entrar para comprar"}</Button>
+                <Button className="mt-5 w-full" disabled={!qty} onClick={goToHolders}>{!qty ? "Escolha seus ingressos" : user ? "Continuar" : "Entrar para comprar"}</Button>
               ) : (
-                <HoldersForm key={`${batch.id}-${qty}`} qty={qty} defaultName={user?.name} loading={submitting} error={orderError}
+                <HoldersForm key={holderLabels.join("|")} labels={holderLabels} defaultName={user?.name} loading={submitting} error={orderError}
                   onBack={() => setStep("select")} onSubmit={placeOrder} />
               )}
             </>

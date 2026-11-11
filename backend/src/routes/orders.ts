@@ -9,10 +9,13 @@ import { parse, rateLimit, requireAuth, user } from "../lib/http.js";
 export const ordersRouter = Router();
 ordersRouter.use(requireAuth);
 
+const holderSchema = z.object({ name: z.string().max(120), cpf: z.string().max(20) });
 const createSchema = z.object({
   eventId: z.string().min(1),
-  batchId: z.string().min(1),
-  holders: z.array(z.object({ name: z.string(), cpf: z.string() })).min(1),
+  // Um lote só (como antes) ou o carrinho com vários lotes.
+  batchId: z.string().min(1).optional(),
+  holders: z.array(holderSchema).min(1).max(50).optional(),
+  items: z.array(z.object({ batchId: z.string().min(1), holders: z.array(holderSchema).min(1).max(50) })).min(1).max(20).optional(),
   accessCode: z.string().max(60).optional(),
   couponCode: z.string().max(40).optional(),
 });

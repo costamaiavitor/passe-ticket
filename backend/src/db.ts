@@ -251,6 +251,10 @@ CREATE TABLE IF NOT EXISTS mp_oauth_states (
 -- Pedido pago direto na conta do organizador: quem é o vendedor e quanto ficou de taxa para o BooTickets.
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS seller_id TEXT REFERENCES users(id);
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS application_fee INTEGER NOT NULL DEFAULT 0;
+-- Carrinho: um pedido pode ter ingressos de lotes diferentes. Cada ingresso guarda o que foi pago por ele
+-- (já com a parte do desconto). Ingressos antigos ficam sem preço e usam o valor do pedido.
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS price INTEGER;
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS list_price INTEGER;
 
 -- Um CPF por conta (transferências e cortesias são entregues pelo CPF). Só cria a trava se ainda não houver
 -- CPFs repetidos no banco, para a atualização nunca derrubar o site; o cadastro já recusa CPF repetido.

@@ -4,8 +4,11 @@ import { http, USE_MOCKS } from "./http";
 
 const mocks = () => import("@/mocks/store");
 
-export async function createOrder(input: { eventId: string; batchId: string; holders: Holder[]; accessCode?: string; couponCode?: string }): Promise<Order> {
-  if (USE_MOCKS) return (await mocks()).mockCreateOrder(input);
+/** Cria o pedido com um ou mais lotes (carrinho). */
+export async function createOrder(input: {
+  eventId: string; items: { batchId: string; holders: Holder[] }[]; accessCode?: string; couponCode?: string;
+}): Promise<Order> {
+  if (USE_MOCKS) return (await mocks()).mockCreateOrder({ eventId: input.eventId, batchId: input.items[0]!.batchId, holders: input.items.flatMap((i) => i.holders) });
   return http<Order>("/orders", { method: "POST", body: JSON.stringify(input) });
 }
 

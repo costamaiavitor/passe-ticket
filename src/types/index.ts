@@ -73,6 +73,8 @@ export interface Order {
   batchName: string;
   quantity: number;
   unitPrice: number;
+  /** Carrinho: um item por lote (pedidos de um lote só têm um item). */
+  items?: { batchId: string; batchName: string; quantity: number; unitPrice: number }[];
   subtotal: number;
   /** Desconto do cupom (o total já vem com ele). */
   discount?: number;

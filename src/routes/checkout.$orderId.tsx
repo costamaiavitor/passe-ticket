@@ -54,10 +54,13 @@ function Checkout() {
     <div>
       <p className="text-sm text-muted-foreground">Pedido #{order.id.slice(0, 8)}</p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">{order.eventTitle}</h1>
-      <p className="mt-1 text-sm text-muted-foreground">{fmtDate(order.eventStartsAt)} · {fmtTime(order.eventStartsAt)} · {order.quantity}× {order.batchName}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{fmtDate(order.eventStartsAt)} · {fmtTime(order.eventStartsAt)} · {order.quantity} {order.quantity === 1 ? "ingresso" : "ingressos"}</p>
 
       <dl className="mt-6 space-y-1.5 rounded-xl border bg-card p-5 text-sm">
-        <div className="flex justify-between text-muted-foreground"><dt>Subtotal</dt><dd>{brl(order.subtotal)}</dd></div>
+        {(order.items?.length ? order.items : [{ batchId: order.batchId, batchName: order.batchName, quantity: order.quantity, unitPrice: order.unitPrice }]).map((i) => (
+          <div key={i.batchId} className="flex justify-between gap-3"><dt className="min-w-0">{i.quantity}× {i.batchName}</dt><dd className="shrink-0">{brl(i.quantity * i.unitPrice)}</dd></div>
+        ))}
+        <div className="flex justify-between border-t pt-2 text-muted-foreground"><dt>Subtotal</dt><dd>{brl(order.subtotal)}</dd></div>
         {!!order.discount && <div className="flex justify-between text-primary"><dt>Cupom {order.couponCode}</dt><dd>− {brl(order.discount)}</dd></div>}
         <div className="flex justify-between text-muted-foreground"><dt>Taxa da plataforma</dt><dd>{brl(order.fee)}</dd></div>
         <div className="flex justify-between pt-1 font-medium"><dt>Total</dt><dd>{brl(order.total)}</dd></div>

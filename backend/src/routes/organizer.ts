@@ -115,7 +115,8 @@ organizerRouter.get("/events/:id", async (req, res) => {
   const e = (await one<EventRow>("SELECT * FROM events WHERE id = ?", id))!;
   // Receita pelo valor que cada pessoa realmente pagou (o preço do lote pode ter mudado depois).
   const lots = await all<BatchRow & { revenue: number }>(
-    `SELECT b.*, COALESCE((SELECT SUM(o.subtotal) FROM orders o WHERE o.batch_id = b.id AND o.status = 'paid'), 0) revenue
+    `SELECT b.*, COALESCE((SELECT SUM(COALESCE(t.price, o.subtotal / GREATEST(o.quantity, 1))) FROM tickets t JOIN orders o ON o.id = t.order_id
+                 WHERE t.batch_id = b.id AND o.status = 'paid'), 0) revenue
      FROM batches b WHERE b.event_id = ? ORDER BY b.position, b.price`, id);
   res.json({
     ...(await organizerView(e)),
@@ -262,7 +263,7 @@ organizerRouter.delete("/batches/:id", async (req, res) => {
   if (!b) throw notFound("Lote não encontrado.");
   await assertEventOwner(user(req), b.event_id);
   await assertEditable(b.event_id);
-  if (await one("SELECT 1 FROM orders WHERE batch_id = ? LIMIT 1", b.id))
+  if (await one("SELECT 1 FROM tickets WHERE batch_id = ? LIMIT 1", b.id))
     throw conflict("BATCH_HAS_ORDERS", `O lote "${b.name}" já tem compras. Em vez de excluir, pause as vendas dele.`);
   const { n } = (await one<{ n: number }>("SELECT COUNT(*) n FROM batches WHERE event_id = ?", b.event_id))!;
   if (n <= 1) throw conflict("LAST_BATCH", "O evento precisa ter pelo menos um tipo de ingresso.");
@@ -281,11 +282,11 @@ organizerRouter.get("/events/:id/tickets", async (req, res) => {
   const rows = await all<{
     id: string; holder_name: string; holder_cpf: string; status: string; checked_in_at: string | null; batch: string;
     owner_email: string; buyer_name: string; buyer_email: string; buyer_id: string; owner_id: string;
-    order_id: string; unit_price: number; paid_at: string | null; transfers: number; kind: string; discount: number; quantity: number;
+    order_id: string; unit_price: number; paid_at: string | null; transfers: number; kind: string; discount: number; quantity: number; price: number | null;
   }>(
     `SELECT t.id, t.holder_name, t.holder_cpf, t.status, t.checked_in_at, t.transfers, t.owner_id, b.name batch,
             uo.email owner_email, ub.name buyer_name, ub.email buyer_email, ub.id buyer_id,
-            o.id order_id, o.unit_price, o.paid_at, o.kind, o.discount, o.quantity
+            o.id order_id, o.unit_price, o.paid_at, o.kind, o.discount, o.quantity, t.price
      FROM tickets t JOIN batches b ON b.id = t.batch_id JOIN orders o ON o.id = t.order_id
        JOIN users uo ON uo.id = t.owner_id JOIN users ub ON ub.id = o.user_id
      WHERE t.event_id = ? AND t.status IN ('valid','used') ORDER BY o.paid_at DESC, t.holder_name`, id,
@@ -293,7 +294,7 @@ organizerRouter.get("/events/:id/tickets", async (req, res) => {
   res.json(rows.map((t) => ({
     id: t.id, holderName: t.holder_name, holderCpf: maskCpf(t.holder_cpf), status: t.status, checkedInAt: t.checked_in_at,
     // Preço pago por ingresso (já com o desconto do cupom, se houve).
-    batchName: t.batch, price: Math.round(t.unit_price - (t.discount ?? 0) / Math.max(1, t.quantity)), paidAt: t.paid_at, orderId: t.order_id,
+    batchName: t.batch, price: t.price ?? Math.round(t.unit_price - (t.discount ?? 0) / Math.max(1, t.quantity)), paidAt: t.paid_at, orderId: t.order_id,
     courtesy: t.kind === "courtesy",
     buyerName: t.buyer_name, buyerEmail: t.buyer_email, ownerEmail: t.owner_email,
     transferred: t.transfers > 0 || t.owner_id !== t.buyer_id,
