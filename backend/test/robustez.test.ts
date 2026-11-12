@@ -246,6 +246,32 @@ describe("Robustez do BooTickets", () => {
     assert.equal((await api(`/events/${ev.id}`)).status, 404);
   });
 
+  it("admin apaga de vez evento cancelado só quando não houve pagamento e o Pix já venceu", async () => {
+    const ev = await event("Festa Teste Pix Vencido");
+    const o = await buy(T["ana"]!, ev, [["Ana Souza", CPFS[3]!]]);
+    // Pix gerado e ainda no prazo: remover só cancela, e o admin ainda não consegue apagar.
+    assert.equal((await api(`/organizer/events/${ev.id}`, { method: "DELETE", token: T["org"] })).body.deleted, false);
+    assert.equal((await api(`/admin/events/${ev.id}`, { method: "DELETE", token: T["org"] })).status, 403);
+    // O Pix venceu sem pagamento: agora pode apagar de vez.
+    await run("UPDATE orders SET expires_at = ? WHERE id = ?", new Date(Date.now() - 60_000).toISOString(), o.body.id);
+    assert.equal((await api(`/admin/events/${ev.id}`, { method: "DELETE", token: T["adm"] })).status, 200);
+    assert.equal((await api(`/events/${ev.id}`)).status, 404);
+    assert.ok(!((await api("/admin/events", { token: T["adm"] })).body as any[]).some((e) => e.id === ev.id));
+  });
+
+  it("admin não apaga evento cancelado que teve venda paga (histórico do dinheiro fica)", async () => {
+    const ev = await event("Festa Com Venda Cancelada");
+    const o = await buy(T["ana"]!, ev, [["Ana Souza", CPFS[4]!]]);
+    await api(`/orders/${o.body.id}/simulate-payment`, { method: "POST", token: T["ana"] });
+    await api(`/organizer/events/${ev.id}`, { method: "DELETE", token: T["org"] });
+    const r = await api(`/admin/events/${ev.id}`, { method: "DELETE", token: T["adm"] });
+    assert.equal(r.status, 409);
+    assert.equal(r.body.code, "HAS_PAYMENTS");
+    // evento ativo não pode ser apagado por aqui
+    const vivo = await event("Festa Viva");
+    assert.equal((await api(`/admin/events/${vivo.id}`, { method: "DELETE", token: T["adm"] })).status, 409);
+  });
+
   it("organizador não cancela evento com vendas por fora do 'Remover' (sem estorno)", async () => {
     const ev = await event("Festa Anti-Golpe");
     const o = await buy(T["ana"]!, ev, [["Ana Souza", CPFS[3]!]]);

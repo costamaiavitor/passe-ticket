@@ -1,12 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Check, Copy, ExternalLink, MapPin, X } from "lucide-react";
+import { Check, Copy, ExternalLink, MapPin, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { RequireAuth } from "@/components/require-auth";
 import { Button } from "@/components/ui/button";
-import { allEventsQuery, approveEvent, markRefundedOutside, payoutsQuery, registerPayout, rejectEvent, reviewEventsQuery } from "@/services/admin";
+import { allEventsQuery, approveEvent, purgeEvent, markRefundedOutside, payoutsQuery, registerPayout, rejectEvent, reviewEventsQuery } from "@/services/admin";
 import { brl, fmtDate, fmtTime } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import type { PayoutRow, ReviewEvent } from "@/types";
@@ -47,6 +47,12 @@ const EV_STATUS: Record<string, string> = { published: "Publicado", review: "Em 
 function AllEvents() {
   const { data, isLoading, error } = useQuery(allEventsQuery());
   const [q, setQ] = useState("");
+  const qc = useQueryClient();
+  const purge = useMutation({
+    mutationFn: purgeEvent,
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ["admin-events"] }); void qc.invalidateQueries({ queryKey: ["events"] }); toast.success("Evento apagado do site."); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Não foi possível apagar."),
+  });
   if (isLoading) return <p className="text-sm text-muted-foreground">Carregando…</p>;
   if (error) return <p className="text-sm text-destructive">{error.message}</p>;
   const term = q.trim().toLowerCase();
@@ -70,6 +76,11 @@ function AllEvents() {
               <Button asChild size="sm" variant="secondary"><Link to="/organizador/evento/$id" params={{ id: e.id }}>Painel</Link></Button>
               {e.status !== "cancelled" && <Button asChild size="sm" variant="outline"><Link to="/organizador/editar/$id" params={{ id: e.id }}>Editar</Link></Button>}
               <Button asChild size="sm" variant="ghost"><Link to="/eventos/$id" params={{ id: e.slug }}><ExternalLink /></Link></Button>
+              {e.status === "cancelled" && (
+                <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" disabled={purge.isPending}
+                  aria-label={`Apagar ${e.title} de vez`} title="Apagar de vez"
+                  onClick={() => { if (window.confirm(`Apagar "${e.title}" de vez? Não dá para desfazer.`)) purge.mutate(e.id); }}><Trash2 /></Button>
+              )}
             </div>
           </div>
         ))}

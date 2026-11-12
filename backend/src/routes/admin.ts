@@ -3,7 +3,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { all, now, one, run, tx } from "../db.js";
 import { toEventDetail, type EventRow } from "../domain/events.js";
-import { markRefunded } from "../domain/orders.js";
+import { markRefunded, purgeCancelledEvent } from "../domain/orders.js";
 import { eventReviewedEmail, payoutEmail, sendEmail } from "../lib/email.js";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
 import { parse, requireRole, user } from "../lib/http.js";
@@ -45,6 +45,13 @@ adminRouter.get("/events", async (_req, res) => {
     id: r.id, slug: r.slug, title: r.title, status: r.status, startsAt: r.starts_at, city: r.city, coverUrl: r.cover_url,
     visibility: r.visibility, organizer: { name: r.organizer_name, email: r.organizer_email }, sold: Number(r.sold), revenue: Number(r.revenue),
   })));
+});
+
+/** Apaga de vez um evento cancelado que não teve pagamento (some do site e do painel). */
+adminRouter.delete("/events/:id", async (req, res) => {
+  await purgeCancelledEvent(String(req.params.id));
+  console.warn(`Admin ${user(req).id} apagou de vez o evento cancelado ${String(req.params.id)}.`);
+  res.json({ ok: true });
 });
 
 adminRouter.get("/events/review", async (_req, res) => {

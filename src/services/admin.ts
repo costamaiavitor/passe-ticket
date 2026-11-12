@@ -19,6 +19,9 @@ export interface AdminEvent {
   id: string; slug: string; title: string; status: string; startsAt: string; city: string; coverUrl: string; visibility: string;
   organizer: { name: string; email: string }; sold: number; revenue: number;
 }
+/** Apaga de vez um evento cancelado sem pagamento. */
+export const purgeEvent = (id: string) => http<{ ok: true }>(`/admin/events/${encodeURIComponent(id)}`, { method: "DELETE" });
+
 export const allEventsQuery = () => queryOptions({ queryKey: ["admin-events"], queryFn: () => http<AdminEvent[]>("/admin/events") });
 
 export const payoutsQuery = () => queryOptions({ queryKey: ["admin-payouts"], queryFn: () => http<PayoutRow[]>("/admin/payouts") });

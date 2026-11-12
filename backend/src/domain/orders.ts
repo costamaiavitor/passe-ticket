@@ -462,6 +462,31 @@ export async function removeEvent(eventId: string) {
   return { deleted: false, refunded, refundFailed, errors };
 }
 
+/**
+ * Apaga de vez um evento cancelado (admin). Só quando não sobrou nada de dinheiro em jogo:
+ * nenhuma compra paga, estornada ou esperando estorno, nenhum cartão em análise ou aprovado
+ * e nenhum Pix ainda dentro do prazo de pagamento.
+ */
+export async function purgeCancelledEvent(eventId: string) {
+  const ev = await one<{ status: string }>("SELECT status FROM events WHERE id = ?", eventId);
+  if (!ev) throw notFound("Evento não encontrado.");
+  if (ev.status !== "cancelled") throw conflict("NOT_CANCELLED", "Só dá para apagar de vez um evento cancelado.");
+  const money = await one(
+    `SELECT 1 FROM orders o WHERE o.event_id = ? AND (o.status IN ('paid','refund_required','refunded') OR o.paid_payment_id IS NOT NULL
+       OR (o.status = 'pending' AND o.expires_at > ?)
+       OR EXISTS (SELECT 1 FROM order_payments p WHERE p.order_id = o.id AND p.status IN ('approved','pending','refunded'))) LIMIT 1`,
+    eventId, now());
+  const payout = await one("SELECT 1 FROM organizer_payouts WHERE event_id = ? LIMIT 1", eventId);
+  if (money || payout) throw conflict("HAS_PAYMENTS", "Este evento teve pagamento (ou ainda tem um em aberto). Ele fica cancelado para guardar o histórico.");
+  await tx(async () => {
+    await run("DELETE FROM checkins WHERE event_id = ?", eventId);
+    await run("DELETE FROM tickets WHERE event_id = ?", eventId);
+    await run("DELETE FROM order_payments WHERE order_id IN (SELECT id FROM orders WHERE event_id = ?)", eventId);
+    await run("DELETE FROM orders WHERE event_id = ?", eventId);
+    await run("DELETE FROM events WHERE id = ?", eventId); // lotes, cupons e equipe saem junto (ON DELETE CASCADE)
+  });
+}
+
 /** Manda o e-mail de "compra confirmada" com o resumo e o link para os QR Codes. */
 export async function notifyPaid(orderId: string) {
   const d = await one<{
