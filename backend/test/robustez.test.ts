@@ -259,14 +259,19 @@ describe("Robustez do BooTickets", () => {
     assert.ok(!((await api("/admin/events", { token: T["adm"] })).body as any[]).some((e) => e.id === ev.id));
   });
 
-  it("admin não apaga evento cancelado que teve venda paga (histórico do dinheiro fica)", async () => {
+  it("admin só apaga evento cancelado com venda depois que o dinheiro foi devolvido", async () => {
     const ev = await event("Festa Com Venda Cancelada");
     const o = await buy(T["ana"]!, ev, [["Ana Souza", CPFS[4]!]]);
     await api(`/orders/${o.body.id}/simulate-payment`, { method: "POST", token: T["ana"] });
-    await api(`/organizer/events/${ev.id}`, { method: "DELETE", token: T["org"] });
+    await api(`/organizer/events/${ev.id}`, { method: "DELETE", token: T["org"] }); // cancela e estorna
+    // Estorno ainda não feito (ex.: falhou): não apaga.
+    await run("UPDATE orders SET status = 'refund_required' WHERE id = ?", o.body.id);
     const r = await api(`/admin/events/${ev.id}`, { method: "DELETE", token: T["adm"] });
     assert.equal(r.status, 409);
     assert.equal(r.body.code, "HAS_PAYMENTS");
+    // Dinheiro devolvido: agora apaga.
+    await run("UPDATE orders SET status = 'refunded' WHERE id = ?", o.body.id);
+    assert.equal((await api(`/admin/events/${ev.id}`, { method: "DELETE", token: T["adm"] })).status, 200);
     // evento ativo não pode ser apagado por aqui
     const vivo = await event("Festa Viva");
     assert.equal((await api(`/admin/events/${vivo.id}`, { method: "DELETE", token: T["adm"] })).status, 409);

@@ -463,19 +463,21 @@ export async function removeEvent(eventId: string) {
 }
 
 /**
- * Apaga de vez um evento cancelado (admin). Só quando não sobrou nada de dinheiro em jogo:
- * nenhuma compra paga, estornada ou esperando estorno, nenhum cartão em análise ou aprovado
- * e nenhum Pix ainda dentro do prazo de pagamento.
+ * Apaga de vez um evento cancelado (admin). Só quando não há mais dinheiro em jogo: nenhuma compra paga
+ * ou esperando estorno, nenhum cartão aprovado que não foi devolvido, nenhum cartão em análise recente e
+ * nenhum Pix ainda no prazo. Compras já estornadas não impedem (o dinheiro voltou; o registro fica no Mercado Pago).
  */
 export async function purgeCancelledEvent(eventId: string) {
   const ev = await one<{ status: string }>("SELECT status FROM events WHERE id = ?", eventId);
   if (!ev) throw notFound("Evento não encontrado.");
   if (ev.status !== "cancelled") throw conflict("NOT_CANCELLED", "Só dá para apagar de vez um evento cancelado.");
+  const twoDaysAgo = new Date(Date.now() - 2 * 86400_000).toISOString();
   const money = await one(
-    `SELECT 1 FROM orders o WHERE o.event_id = ? AND (o.status IN ('paid','refund_required','refunded') OR o.paid_payment_id IS NOT NULL
+    `SELECT 1 FROM orders o WHERE o.event_id = ? AND (o.status IN ('paid','refund_required')
        OR (o.status = 'pending' AND o.expires_at > ?)
-       OR EXISTS (SELECT 1 FROM order_payments p WHERE p.order_id = o.id AND p.status IN ('approved','pending','refunded'))) LIMIT 1`,
-    eventId, now());
+       OR EXISTS (SELECT 1 FROM order_payments p WHERE p.order_id = o.id
+         AND ((p.status = 'approved' AND o.status <> 'refunded') OR (p.status = 'pending' AND p.created_at > ?)))) LIMIT 1`,
+    eventId, now(), twoDaysAgo);
   const payout = await one("SELECT 1 FROM organizer_payouts WHERE event_id = ? LIMIT 1", eventId);
   if (money || payout) throw conflict("HAS_PAYMENTS", "Este evento teve pagamento (ou ainda tem um em aberto). Ele fica cancelado para guardar o histórico.");
   await tx(async () => {
