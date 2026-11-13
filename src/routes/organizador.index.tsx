@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
-import { BarChart3, CalendarPlus, ExternalLink, MapPin, Pencil, QrCode, Trash2, Users } from "lucide-react";
+import { BarChart3, CalendarPlus, ExternalLink, MapPin, Pencil, QrCode, Trash2, UserPlus, Users } from "lucide-react";
 import { toast } from "sonner";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { RequireAuth } from "@/components/require-auth";
@@ -10,8 +10,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import {
   AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { addStaff, becomeOrganizer, mpConnectionQuery, myEventsQuery, payoutInfoQuery, removeEvent, removeStaff, savePayoutInfo, staffQuery } from "@/services/organizer";
-import { hasRole } from "@/services/session";
+import { addOrganizer, addStaff, becomeOrganizer, organizersQuery, removeOrganizer, mpConnectionQuery, myEventsQuery, payoutInfoQuery, removeEvent, removeStaff, savePayoutInfo, staffQuery } from "@/services/organizer";
+import { hasRole, useSession } from "@/services/session";
 import { brl, fmtDate, fmtTime } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import { PrivateBadges } from "@/components/event-promos";
@@ -146,7 +146,9 @@ const STATUS: Record<OrganizerEvent["status"], { label: string; cls: string }> =
 
 function OrganizerEventCard({ ev }: { ev: OrganizerEvent }) {
   const [staffOpen, setStaffOpen] = useState(false);
+  const [orgsOpen, setOrgsOpen] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
+  const isOwner = ev.myRole !== "co";
   const capacity = ev.batches.reduce((s, b) => s + b.total, 0);
   const pct = capacity ? Math.min(100, Math.round((ev.stats.ticketsSold / capacity) * 100)) : 0;
   const st = STATUS[ev.status];
@@ -159,6 +161,7 @@ function OrganizerEventCard({ ev }: { ev: OrganizerEvent }) {
       </div>
       <div className="p-5">
         <h2 className="font-medium leading-snug"><Link to="/organizador/evento/$id" params={{ id: ev.id }} className="hover:underline">{ev.title}</Link></h2>
+        {!isOwner && <p className="mt-1 text-xs text-primary">Você organiza junto · evento de {ev.organizer.name}</p>}
         <p className="mt-1 text-sm text-muted-foreground">{fmtDate(ev.startsAt)} · {fmtTime(ev.startsAt)}</p>
         <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground"><MapPin className="size-3.5" />{ev.venue}, {ev.city}</p>
         {(ev.visibility === "unlisted" || !!ev.accessCode) && (
@@ -208,12 +211,13 @@ function OrganizerEventCard({ ev }: { ev: OrganizerEvent }) {
           )}
         </div>
         <div className="mt-2 grid grid-cols-2 gap-2">
-          <Button variant="outline" size="sm" onClick={() => setStaffOpen(true)}><Users />Equipe</Button>
-          <Button asChild variant="outline" size="sm"><Link to="/eventos/$id" params={{ id: ev.slug }}><ExternalLink />Ver página</Link></Button>
+          <Button variant="outline" size="sm" onClick={() => setStaffOpen(true)}><Users />Portaria</Button>
+          <Button variant="outline" size="sm" onClick={() => setOrgsOpen(true)}><UserPlus />Organizadores</Button>
         </div>
-        <div className="mt-2 grid grid-cols-2 gap-2">
+        <div className="mt-2 grid grid-cols-3 gap-2">
+          <Button asChild variant="ghost" size="sm"><Link to="/eventos/$id" params={{ id: ev.slug }}><ExternalLink />Página</Link></Button>
           <Button asChild variant="ghost" size="sm"><Link to="/portaria"><QrCode />Leitor</Link></Button>
-          {(ev.status !== "cancelled" || ev.stats.ticketsSold > 0) && (
+          {isOwner && (ev.status !== "cancelled" || ev.stats.ticketsSold > 0) && (
             <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setRemoveOpen(true)}>
               <Trash2 />{ev.status === "cancelled" ? "Estornar compras" : "Remover"}
             </Button>
@@ -221,6 +225,7 @@ function OrganizerEventCard({ ev }: { ev: OrganizerEvent }) {
         </div>
       </div>
       <StaffDialog eventId={ev.id} title={ev.title} open={staffOpen} onOpenChange={setStaffOpen} />
+      <OrganizersDialog eventId={ev.id} title={ev.title} isOwner={isOwner} open={orgsOpen} onOpenChange={setOrgsOpen} />
       <RemoveDialog ev={ev} open={removeOpen} onOpenChange={setRemoveOpen} />
     </article>
   );
@@ -269,6 +274,71 @@ const Stat = ({ label, value }: { label: string; value: string }) => (
     <dt className="text-[11px] text-muted-foreground">{label}</dt>
   </div>
 );
+
+function OrganizersDialog({ eventId, title, isOwner, open, onOpenChange }: {
+  eventId: string; title: string; isOwner: boolean; open: boolean; onOpenChange: (o: boolean) => void;
+}) {
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery({ ...organizersQuery(eventId), enabled: open });
+  const { user } = useSession();
+  const [email, setEmail] = useState("");
+  const refresh = () => qc.invalidateQueries({ queryKey: ["event-organizers", eventId] });
+  const add = useMutation({
+    mutationFn: (e: string) => addOrganizer(eventId, e),
+    onSuccess: () => { setEmail(""); void refresh(); toast.success("Organizador adicionado. Avisamos a pessoa por e-mail."); },
+  });
+  const remove = useMutation({
+    mutationFn: (userId: string) => removeOrganizer(eventId, userId),
+    onSuccess: (_r, userId) => {
+      void refresh();
+      if (userId === user?.id) { onOpenChange(false); void qc.invalidateQueries({ queryKey: ["organizer-events"] }); toast.success("Você saiu da organização do evento."); }
+    },
+  });
+  const submit = (e: FormEvent) => { e.preventDefault(); if (email.trim()) add.mutate(email.trim()); };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Organizadores</DialogTitle>
+          <DialogDescription>
+            {title}: quem estiver aqui vê as vendas e pode editar o evento, criar cupons e cortesias e montar a portaria.
+            O dinheiro das vendas continua indo para o dono do evento.
+          </DialogDescription>
+        </DialogHeader>
+        {isOwner && (
+          <>
+            <form onSubmit={submit} className="flex gap-2">
+              <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e-mail da pessoa"
+                className="h-10 min-w-0 flex-1 rounded-md border bg-surface px-3 text-sm outline-none focus:border-primary/50" />
+              <Button type="submit" disabled={add.isPending}>{add.isPending ? "…" : "Convidar"}</Button>
+            </form>
+            {add.error && <p className="text-sm text-destructive">{add.error.message}</p>}
+            <p className="text-xs text-muted-foreground">A pessoa precisa ter conta no BooTickets. O evento aparece em “Meus eventos” dela.</p>
+          </>
+        )}
+        <ul className="divide-y rounded-lg border">
+          {isLoading && <li className="p-3 text-sm text-muted-foreground">Carregando…</li>}
+          {data && (
+            <li className="flex items-center justify-between gap-3 p-3">
+              <div className="min-w-0"><p className="truncate text-sm font-medium">{data.owner.name}</p><p className="truncate text-xs text-muted-foreground">{data.owner.email}</p></div>
+              <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-xs text-primary">Dono</span>
+            </li>
+          )}
+          {data?.organizers.map((o) => (
+            <li key={o.id} className="flex items-center justify-between gap-3 p-3">
+              <div className="min-w-0"><p className="truncate text-sm font-medium">{o.name}</p><p className="truncate text-xs text-muted-foreground">{o.email}</p></div>
+              {(isOwner || o.id === user?.id) && (
+                <Button variant="ghost" size="sm" className="shrink-0 text-destructive hover:text-destructive" disabled={remove.isPending}
+                  onClick={() => remove.mutate(o.id)}>{o.id === user?.id ? "Sair" : <><Trash2 />Tirar</>}</Button>
+              )}
+            </li>
+          ))}
+        </ul>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function StaffDialog({ eventId, title, open, onOpenChange }: { eventId: string; title: string; open: boolean; onOpenChange: (o: boolean) => void }) {
   const qc = useQueryClient();

@@ -101,6 +101,16 @@ CREATE TABLE IF NOT EXISTS tickets (
 CREATE INDEX IF NOT EXISTS tickets_owner ON tickets(owner_id);
 CREATE INDEX IF NOT EXISTS tickets_event_cpf ON tickets(event_id, holder_cpf);
 
+-- Co-organizadores: outras contas que organizam o evento junto com o dono (o dinheiro continua indo para o dono).
+CREATE TABLE IF NOT EXISTS event_organizers (
+  event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  added_by TEXT,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (event_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS event_organizers_user ON event_organizers(user_id);
+
 CREATE TABLE IF NOT EXISTS event_staff (
   event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

@@ -50,10 +50,16 @@ export const user = (req: Request): AuthCtx => {
 };
 
 /** Organizador dono do evento ou admin. */
-export async function assertEventOwner(auth: AuthCtx, eventId: string) {
+/**
+ * Pode mexer no evento: o dono, um co-organizador ou o admin.
+ * ownerOnly: só o dono (ou admin) — para remover o evento e escolher os co-organizadores.
+ */
+export async function assertEventOwner(auth: AuthCtx, eventId: string, opts: { ownerOnly?: boolean } = {}) {
   const ev = await one<{ organizer_id: string }>("SELECT organizer_id FROM events WHERE id = ?", eventId);
   if (!ev) throw new HttpError(404, "NOT_FOUND", "Evento não encontrado.");
-  if (ev.organizer_id !== auth.id && !auth.roles.includes("admin")) throw forbidden();
+  if (ev.organizer_id === auth.id || auth.roles.includes("admin")) return;
+  if (!opts.ownerOnly && await one("SELECT 1 FROM event_organizers WHERE event_id = ? AND user_id = ?", eventId, auth.id)) return;
+  throw forbidden();
 }
 
 /** Pode operar a portaria: equipe do evento, organizador dono ou admin. */
@@ -61,8 +67,9 @@ export async function canScan(auth: AuthCtx, eventId: string): Promise<boolean> 
   if (auth.roles.includes("admin")) return true;
   return !!await one(
     `SELECT 1 FROM events e WHERE e.id = ? AND (e.organizer_id = ? OR EXISTS
-       (SELECT 1 FROM event_staff s WHERE s.event_id = e.id AND s.user_id = ?))`,
-    eventId, auth.id, auth.id,
+       (SELECT 1 FROM event_staff s WHERE s.event_id = e.id AND s.user_id = ?) OR EXISTS
+       (SELECT 1 FROM event_organizers c WHERE c.event_id = e.id AND c.user_id = ?))`,
+    eventId, auth.id, auth.id, auth.id,
   );
 }
 

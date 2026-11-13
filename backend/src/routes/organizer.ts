@@ -7,7 +7,7 @@ import { courtesyEventId, createCoupon, issueCourtesy, listCourtesies, revokeCou
 import { isValidCpf, onlyDigits } from "../lib/cpf.js";
 import { removeEvent } from "../domain/orders.js";
 import { config } from "../config.js";
-import { eventEditedEmail, eventForReviewEmail, sendEmail } from "../lib/email.js";
+import { coOrganizerEmail, eventEditedEmail, eventForReviewEmail, sendEmail } from "../lib/email.js";
 import { maskCpf } from "../lib/cpf.js";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
 import { assertEventOwner, parse, requireRole, user } from "../lib/http.js";
@@ -77,12 +77,14 @@ async function insertBatch(eventId: string, b: z.infer<typeof batchSchema>, posi
 
 organizerRouter.get("/events", async (req, res) => {
   // "Meus eventos" mostra só os eventos da própria conta, inclusive para admin (todos os eventos ficam no Admin).
-  const rows = await all<EventRow>("SELECT * FROM events WHERE organizer_id = ? ORDER BY starts_at DESC", user(req).id);
-  res.json(await Promise.all(rows.map(organizerView)));
+  const me = user(req).id;
+  const rows = await all<EventRow>(
+    `SELECT * FROM events WHERE organizer_id = ? OR id IN (SELECT event_id FROM event_organizers WHERE user_id = ?) ORDER BY starts_at DESC`, me, me);
+  res.json(await Promise.all(rows.map((e) => organizerView(e, me))));
 });
 
 /** Evento visto pelo organizador: dados públicos + números de vendas e repasses. */
-async function organizerView(e: EventRow) {
+async function organizerView(e: EventRow, viewerId?: string) {
   const s = (await one<{ sold: number; revenue: number; direct: number; checked: number; paid_out: number; buyers: number; pending: number; courtesies: number }>(
     `SELECT
        (SELECT COUNT(*) FROM tickets WHERE event_id = ? AND status IN ('valid','used')) sold,
@@ -100,6 +102,8 @@ async function organizerView(e: EventRow) {
     ...(await toEventDetail(e)),
     reviewNote: e.review_note ?? "",
     accessCode: e.access_code ?? "",
+    // Quem está vendo é o dono ou co-organizador (o dono é quem pode remover o evento e escolher organizadores).
+    myRole: !viewerId || viewerId === e.organizer_id ? "owner" : "co",
     // Vendas pela conta Mercado Pago conectada (direct) já caíram com o organizador; o repasse manual é só do resto.
     stats: {
       ticketsSold: s.sold, revenue: s.revenue, checkedIn: s.checked, paidOut: s.paid_out, receivedDirect: Number(s.direct),
@@ -119,7 +123,7 @@ organizerRouter.get("/events/:id", async (req, res) => {
                  WHERE t.batch_id = b.id AND o.status = 'paid'), 0) revenue
      FROM batches b WHERE b.event_id = ? ORDER BY b.position, b.price`, id);
   res.json({
-    ...(await organizerView(e)),
+    ...(await organizerView(e, user(req).id)),
     salesByBatch: lots.map((b) => ({
       id: b.id, name: b.name, price: b.price, total: b.total, sold: b.sold, reserved: b.reserved, revenue: Number(b.revenue),
       status: b.status, ticketType: b.ticket_type, salesStart: b.sales_start, salesEnd: b.sales_end,
@@ -367,7 +371,7 @@ organizerRouter.delete("/courtesies/:ticketId", async (req, res) => {
 /** Remove o evento: apaga se não houver vendas; com vendas, cancela e estorna os compradores. */
 organizerRouter.delete("/events/:id", async (req, res) => {
   const id = String(req.params.id);
-  await assertEventOwner(user(req), id);
+  await assertEventOwner(user(req), id, { ownerOnly: true });
   res.json(await removeEvent(id));
 });
 
@@ -382,6 +386,42 @@ organizerRouter.put("/payout-info", async (req, res) => {
   const d = parse(z.object({ pixKey: z.string().trim().min(3).max(140), holder: z.string().trim().min(3).max(140) }), req.body);
   await run("UPDATE users SET payout_pix_key = ?, payout_holder = ? WHERE id = ?", d.pixKey, d.holder, user(req).id);
   res.json({ pixKey: d.pixKey, holder: d.holder });
+});
+
+// ---- Co-organizadores ----
+organizerRouter.get("/events/:id/organizers", async (req, res) => {
+  await assertEventOwner(user(req), req.params.id);
+  const owner = await one<{ id: string; name: string; email: string }>(
+    "SELECT u.id, u.name, u.email FROM events e JOIN users u ON u.id = e.organizer_id WHERE e.id = ?", req.params.id);
+  const co = await all<{ id: string; name: string; email: string }>(
+    "SELECT u.id, u.name, u.email FROM event_organizers c JOIN users u ON u.id = c.user_id WHERE c.event_id = ? ORDER BY c.created_at", req.params.id);
+  res.json({ owner, organizers: co });
+});
+
+organizerRouter.post("/events/:id/organizers", async (req, res) => {
+  const me = user(req);
+  await assertEventOwner(me, req.params.id, { ownerOnly: true });
+  const { email } = parse(z.object({ email: z.string().trim().toLowerCase().email() }), req.body);
+  const u = await one<{ id: string; name: string; email: string; roles: string }>("SELECT id, name, email, roles FROM users WHERE email = ?", email);
+  if (!u) throw notFound("Não existe conta com esse e-mail. Peça para a pessoa criar a conta no BooTickets e tente de novo.");
+  const ev = (await one<{ title: string; organizer_id: string }>("SELECT title, organizer_id FROM events WHERE id = ?", req.params.id))!;
+  if (u.id === ev.organizer_id) throw badRequest("ALREADY_OWNER", "Essa conta já é a dona do evento.");
+  await tx(async () => {
+    await run("INSERT INTO event_organizers (event_id, user_id, added_by, created_at) VALUES (?,?,?,?) ON CONFLICT DO NOTHING", req.params.id, u.id, me.id, now());
+    const roles = new Set(JSON.parse(u.roles) as string[]);
+    if (!roles.has("organizer")) { roles.add("organizer"); await run("UPDATE users SET roles = ? WHERE id = ?", JSON.stringify([...roles]), u.id); }
+  });
+  const inviter = (await one<{ name: string }>("SELECT name FROM users WHERE id = ?", me.id))?.name ?? "O organizador";
+  await sendEmail(coOrganizerEmail(u.email, u.name, inviter, ev.title));
+  res.status(201).json({ ok: true });
+});
+
+organizerRouter.delete("/events/:id/organizers/:userId", async (req, res) => {
+  const me = user(req);
+  // O dono tira qualquer um; um co-organizador pode sair do evento sozinho.
+  if (me.id !== req.params.userId) await assertEventOwner(me, req.params.id, { ownerOnly: true });
+  await run("DELETE FROM event_organizers WHERE event_id = ? AND user_id = ?", req.params.id, req.params.userId);
+  res.status(204).end();
 });
 
 // ---- Equipe da portaria ----

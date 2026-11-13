@@ -144,6 +144,17 @@ export function payoutEmail(to: string, name: string, eventTitle: string, amount
 }
 
 /** Cortesia: se a pessoa já tem conta com o CPF, o ingresso já está lá; senão, ela cria a conta e aceita. */
+export function coOrganizerEmail(to: string, name: string, inviter: string, eventTitle: string): Email {
+  const link = `${config.publicUrl}/organizador`;
+  return {
+    to,
+    subject: `Você agora organiza: ${eventTitle}`,
+    html: layout("Você virou organizador!", `<p>Olá, ${esc(name)}! ${esc(inviter)} te adicionou como organizador de <strong>${esc(eventTitle)}</strong>.</p><p>O evento já aparece em Meus eventos: dá para ver as vendas, editar, criar cupons e cortesias e montar a equipe da portaria.</p>`,
+      { label: "Abrir Meus eventos", url: link }),
+    text: `${inviter} te adicionou como organizador de ${eventTitle}. Veja em ${link}`,
+  };
+}
+
 export function courtesyEmail(to: string, name: string, eventTitle: string, ready: boolean): Email {
   const link = `${config.publicUrl}/ingressos`;
   const how = ready

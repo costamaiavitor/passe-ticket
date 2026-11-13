@@ -16,9 +16,10 @@ checkinRouter.get("/events", async (req, res) => {
   const rows = await all<{ id: string; title: string; starts_at: string; venue: string }>(
     `SELECT e.id, e.title, e.starts_at, e.venue FROM events e
      WHERE e.status = 'published' AND e.starts_at >= ?
-       AND (?::boolean OR e.organizer_id = ? OR EXISTS (SELECT 1 FROM event_staff s WHERE s.event_id = e.id AND s.user_id = ?))
+       AND (?::boolean OR e.organizer_id = ? OR EXISTS (SELECT 1 FROM event_staff s WHERE s.event_id = e.id AND s.user_id = ?)
+            OR EXISTS (SELECT 1 FROM event_organizers c WHERE c.event_id = e.id AND c.user_id = ?))
      ORDER BY e.starts_at`,
-    since, isAdmin, a.id, a.id,
+    since, isAdmin, a.id, a.id, a.id,
   );
   res.json(rows.map((e) => ({ id: e.id, title: e.title, startsAt: e.starts_at, venue: e.venue })));
 });

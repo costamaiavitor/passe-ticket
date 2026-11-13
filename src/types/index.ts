@@ -147,6 +147,8 @@ export interface OrganizerEvent extends EventDetail {
   reviewNote?: string;
   /** Palavra-senha para comprar ('' = sem senha). Só o organizador vê. */
   accessCode?: string;
+  /** owner = dono do evento; co = co-organizador (não remove o evento nem escolhe organizadores). */
+  myRole?: "owner" | "co";
   /** revenue = valor dos ingressos vendidos (o que o organizador recebe); paidOut = já repassado. */
   stats: {
     ticketsSold: number; revenue: number; checkedIn: number; paidOut: number; toReceive: number;
@@ -185,6 +187,7 @@ export interface PayoutRow {
 }
 
 export interface StaffMember { id: string; name: string; email: string }
+export interface EventOrganizers { owner: StaffMember; organizers: StaffMember[] }
 
 /** Cupom de desconto do evento. value = % (1–100) ou centavos por ingresso. */
 export interface Coupon {

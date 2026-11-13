@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { all } from "../db.js";
+import { all, one } from "../db.js";
 import { config } from "../config.js";
 import { findEvent, normalizeCode, toEventDetail, toEventSummaries, type EventRow } from "../domain/events.js";
 import { expireStaleOrdersThrottled } from "../domain/orders.js";
@@ -72,7 +72,8 @@ eventsRouter.get("/:id", optionalAuth, async (req, res) => {
   await expireStaleOrdersThrottled();
   const e = await findEvent(String(req.params.id));
   const isPublic = e && (e.status === "published" || e.status === "cancelled");
-  const canPreview = e && req.auth && (req.auth.id === e.organizer_id || req.auth.roles.includes("admin"));
+  const canPreview = e && req.auth && (req.auth.id === e.organizer_id || req.auth.roles.includes("admin")
+    || !!(await one("SELECT 1 FROM event_organizers WHERE event_id = ? AND user_id = ?", e.id, req.auth.id)));
   if (!e || (!isPublic && !canPreview)) throw notFound("Evento não encontrado");
   res.json(await toEventDetail(e));
 });

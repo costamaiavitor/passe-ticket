@@ -1,6 +1,6 @@
 // Área do organizador: criar eventos, acompanhar vendas e montar a equipe da portaria.
 import { queryOptions } from "@tanstack/react-query";
-import type { Attendee, AuthUser, Coupon, Courtesy, EventCategory, EventPanel, OrganizerEvent, StaffMember } from "@/types";
+import type { Attendee, AuthUser, Coupon, Courtesy, EventCategory, EventPanel, OrganizerEvent, StaffMember, EventOrganizers } from "@/types";
 import { API_BASE, http, setAccessToken, USE_MOCKS } from "./http";
 import { setSession } from "./session";
 
@@ -127,6 +127,15 @@ export const eventPanelQuery = (id: string) =>
   queryOptions({ queryKey: ["event-panel", id], queryFn: () => http<EventPanel>(`/organizer/events/${encodeURIComponent(id)}`), refetchInterval: 15_000 });
 export const attendeesQuery = (id: string) =>
   queryOptions({ queryKey: ["attendees", id], queryFn: () => http<Attendee[]>(`/organizer/events/${encodeURIComponent(id)}/tickets`), refetchInterval: 15_000 });
+
+// ---- Co-organizadores ----
+const orgsPath = (eventId: string) => `/organizer/events/${encodeURIComponent(eventId)}/organizers`;
+export const organizersQuery = (eventId: string) =>
+  queryOptions({ queryKey: ["event-organizers", eventId], queryFn: () => http<EventOrganizers>(orgsPath(eventId)) });
+export const addOrganizer = (eventId: string, email: string) =>
+  http<{ ok: true }>(orgsPath(eventId), { method: "POST", body: JSON.stringify({ email }) });
+export const removeOrganizer = (eventId: string, userId: string) =>
+  http<null>(`${orgsPath(eventId)}/${encodeURIComponent(userId)}`, { method: "DELETE" });
 
 // ---- Equipe da portaria ----
 const staffPath = (eventId: string) => `/organizer/events/${encodeURIComponent(eventId)}/staff`;
