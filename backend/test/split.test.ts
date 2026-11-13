@@ -61,7 +61,7 @@ async function connect(org: string, code = `ok-${org}`) {
   const r = await api("/organizer/mercadopago/connect", { method: "POST", token: T[org] });
   assert.equal(r.status, 200, JSON.stringify(r.body));
   const url = new URL(r.body.url);
-  assert.equal(url.host, "auth.mercadopago.com");
+  assert.equal(url.host, "auth.mercadopago.com.br");
   assert.equal(url.searchParams.get("code_challenge_method"), "S256");
   const state = url.searchParams.get("state")!;
   return { state, cb: await api(`/mp/oauth/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`) };

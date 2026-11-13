@@ -46,7 +46,7 @@ export async function startConnect(userId: string) {
     client_id: config.mpClientId || "mock", response_type: "code", platform_id: "mp", state,
     redirect_uri: redirectUri(), code_challenge: challenge, code_challenge_method: "S256",
   });
-  return `https://auth.mercadopago.com/authorization?${q}`;
+  return `https://auth.mercadopago.com.br/authorization?${q}`;
 }
 
 /** Volta do Mercado Pago: confere o state, troca o código pelos tokens e guarda a conta do organizador. */
