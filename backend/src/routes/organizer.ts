@@ -371,7 +371,12 @@ organizerRouter.delete("/courtesies/:ticketId", async (req, res) => {
 /** Remove o evento: apaga se não houver vendas; com vendas, cancela e estorna os compradores. */
 organizerRouter.delete("/events/:id", async (req, res) => {
   const id = String(req.params.id);
-  await assertEventOwner(user(req), id, { ownerOnly: true });
+  const me = user(req);
+  await assertEventOwner(me, id, { ownerOnly: true });
+  // Evento que já teve repasse: o dinheiro das vendas já foi entregue ao organizador. Se ele pudesse remover o
+  // evento sozinho, os compradores seriam estornados pela conta do BooTickets (prejuízo em dobro). Só o admin cancela.
+  if (!me.roles.includes("admin") && await one("SELECT 1 FROM organizer_payouts WHERE event_id = ? LIMIT 1", id))
+    throw conflict("PAYOUT_DONE", "Este evento já teve repasse das vendas. Para cancelar e devolver o dinheiro aos compradores, fale com o suporte do BooTickets.");
   res.json(await removeEvent(id));
 });
 

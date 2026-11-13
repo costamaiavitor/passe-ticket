@@ -464,6 +464,30 @@ describe("BooTickets API", () => {
     assert.equal(payouts.find((p) => p.eventId === ev.id)?.balance ?? 0, 0);
   });
 
+  it("evento que já teve repasse: o organizador não remove sozinho (senão o estorno sairia do BooTickets); o admin pode", async () => {
+    const future = new Date(Date.now() + 15 * 86400_000).toISOString();
+    const ev = await createApproved({
+      title: "Festa Já Repassada", category: "festas", startsAt: future, venue: "Galpão", city: "Fortaleza", maxTicketsPerCpf: 5,
+      batches: [{ name: "Pista", price: 2000, total: 5, salesStart: new Date(Date.now() - 1000).toISOString(), salesEnd: future }],
+    }, tokens.org);
+    const o = await api("/orders", { token: tokens.other, body: { eventId: ev.id, batchId: ev.batches[0].id, holders: [{ name: "Ciclano Silva", cpf: CPF_B }] } });
+    await api(`/orders/${o.body.id}/simulate-payment`, { method: "POST", token: tokens.other });
+    assert.equal((await api("/admin/payouts", { token: adminToken, body: { eventId: ev.id, amount: 2000, note: "Pix" } })).status, 201);
+
+    const blocked = await api(`/organizer/events/${ev.id}`, { method: "DELETE", token: tokens.org });
+    assert.equal(blocked.status, 409, JSON.stringify(blocked.body));
+    assert.equal(blocked.body.code, "PAYOUT_DONE");
+    // Nada mudou: a compra continua paga e o evento no ar.
+    assert.equal((await api(`/orders/${o.body.id}`, { token: tokens.other })).body.status, "paid");
+    assert.equal((await api(`/events/${ev.id}`)).body.status, "published");
+
+    // O admin decide: cancela e estorna.
+    const adm = await api(`/organizer/events/${ev.id}`, { method: "DELETE", token: adminToken });
+    assert.equal(adm.status, 200, JSON.stringify(adm.body));
+    assert.equal(adm.body.refunded, 1);
+    assert.equal((await api(`/orders/${o.body.id}`, { token: tokens.other })).body.status, "refunded");
+  });
+
   it("painel do evento: resumo, vendas por lote e lista de compradores só para o dono", async () => {
     const future = new Date(Date.now() + 16 * 86400_000).toISOString();
     const ev = await createApproved({
