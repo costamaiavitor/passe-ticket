@@ -200,15 +200,20 @@ const mercadopago: PaymentProvider = {
 
 /** Valida o cabeçalho x-signature do webhook do Mercado Pago. */
 export function verifyMercadoPagoSignature(headers: Record<string, string | string[] | undefined>, dataId: string): boolean {
-  if (!config.mpWebhookSecret) return !config.isProd; // sem segredo só aceitamos fora de produção
+  // Pode ter mais de um segredo separado por vírgula (um por aplicação do Mercado Pago: a da conta do BooTickets
+  // e a usada na conexão dos organizadores). Vale a assinatura de qualquer um deles.
+  const secrets = config.mpWebhookSecret.split(",").map((s) => s.trim()).filter(Boolean);
+  if (!secrets.length) return !config.isProd; // sem segredo só aceitamos fora de produção
   const sig = String(headers["x-signature"] ?? "");
   const requestId = String(headers["x-request-id"] ?? "");
   const parts = Object.fromEntries(sig.split(",").map((kv) => kv.trim().split("=") as [string, string]));
   if (!parts["ts"] || !parts["v1"]) return false;
   const manifest = `id:${dataId.toLowerCase()};request-id:${requestId};ts:${parts["ts"]};`;
-  const expected = Buffer.from(createHmac("sha256", config.mpWebhookSecret).update(manifest).digest("hex"));
   const got = Buffer.from(parts["v1"]);
-  return got.length === expected.length && timingSafeEqual(got, expected);
+  return secrets.some((secret) => {
+    const expected = Buffer.from(createHmac("sha256", secret).update(manifest).digest("hex"));
+    return got.length === expected.length && timingSafeEqual(got, expected);
+  });
 }
 
 export const payments: PaymentProvider = config.paymentProvider === "mercadopago" ? mercadopago : mock;

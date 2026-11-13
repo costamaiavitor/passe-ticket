@@ -3,7 +3,7 @@ process.env["NODE_ENV"] = "test";
 process.env["PAYMENT_PROVIDER"] = "mock";
 process.env["ADMIN_EMAILS"] = "chefe@t.dev,adm@t.dev";
 process.env["GOOGLE_CLIENT_ID"] = "test-client.apps.googleusercontent.com";
-process.env["MP_WEBHOOK_SECRET"] = "segredo-de-teste-do-webhook";
+process.env["MP_WEBHOOK_SECRET"] = "segredo-de-teste-do-webhook, segredo-do-app-novo";
 
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
@@ -365,6 +365,11 @@ describe("Robustez do BooTickets", () => {
     assert.equal(verifyMercadoPagoSignature({ "x-signature": `ts=${ts},v1=${v1.replace(/.$/, "0")}`, "x-request-id": reqId }, dataId), false);
     assert.equal(verifyMercadoPagoSignature({ "x-signature": `ts=${ts},v1=abc`, "x-request-id": reqId }, dataId), false);
     assert.equal(verifyMercadoPagoSignature({}, dataId), false);
+    // segundo segredo (outra aplicação do Mercado Pago) também vale; um segredo qualquer não
+    const v2 = createHmac("sha256", "segredo-do-app-novo").update(`id:${dataId};request-id:${reqId};ts:${ts};`).digest("hex");
+    assert.equal(verifyMercadoPagoSignature({ "x-signature": `ts=${ts},v1=${v2}`, "x-request-id": reqId }, dataId), true);
+    const v3 = createHmac("sha256", "outro-segredo").update(`id:${dataId};request-id:${reqId};ts:${ts};`).digest("hex");
+    assert.equal(verifyMercadoPagoSignature({ "x-signature": `ts=${ts},v1=${v3}`, "x-request-id": reqId }, dataId), false);
   });
 
   it("QR Code: adulterado, de outro evento ou já usado nunca libera entrada", async () => {
