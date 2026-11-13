@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { RequireAuth } from "@/components/require-auth";
 import { Button } from "@/components/ui/button";
-import { allEventsQuery, approveEvent, purgeEvent, markRefundedOutside, payoutsQuery, registerPayout, rejectEvent, reviewEventsQuery } from "@/services/admin";
+import { allEventsQuery, approveEvent, mpAccountsQuery, purgeEvent, markRefundedOutside, payoutsQuery, registerPayout, rejectEvent, reviewEventsQuery } from "@/services/admin";
 import { brl, fmtDate, fmtTime } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import type { PayoutRow, ReviewEvent } from "@/types";
@@ -25,20 +25,65 @@ export const Route = createFileRoute("/admin")({
 });
 
 function Admin() {
-  const [tab, setTab] = useState<"review" | "events" | "payouts">("review");
+  const [tab, setTab] = useState<"review" | "events" | "payouts" | "mp">("review");
   const { data: review } = useQuery(reviewEventsQuery());
   return (
     <>
       <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Admin</h1>
-      <div className="mt-5 inline-grid grid-cols-3 gap-1 rounded-lg bg-surface p-1">
-        {([["review", `Aprovar eventos${review?.length ? ` (${review.length})` : ""}`], ["events", "Todos os eventos"], ["payouts", "Repasses"]] as const).map(([k, label]) => (
+      <div className="mt-5 inline-grid grid-cols-2 gap-1 rounded-lg bg-surface p-1 sm:grid-cols-4">
+        {([["review", `Aprovar eventos${review?.length ? ` (${review.length})` : ""}`], ["events", "Todos os eventos"], ["payouts", "Repasses"], ["mp", "Mercado Pago"]] as const).map(([k, label]) => (
           <button key={k} type="button" onClick={() => setTab(k)}
             className={cn("rounded-md px-4 py-2 text-sm font-medium transition-colors",
               tab === k ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>{label}</button>
         ))}
       </div>
-      <div className="mt-6">{tab === "review" ? <ReviewList /> : tab === "events" ? <AllEvents /> : <Payouts />}</div>
+      <div className="mt-6">{tab === "review" ? <ReviewList /> : tab === "events" ? <AllEvents /> : tab === "mp" ? <MpAccounts /> : <Payouts />}</div>
     </>
+  );
+}
+
+// ---------------- Contas Mercado Pago dos organizadores ----------------
+const MP_STATUS: Record<string, { label: string; cls: string }> = {
+  connected: { label: "Conectado", cls: "bg-success/15 text-success" },
+  problem: { label: "Precisa reconectar", cls: "bg-warning/15 text-warning" },
+  disconnected: { label: "Desconectou", cls: "bg-destructive/15 text-destructive" },
+  never: { label: "Não conectou", cls: "bg-elevated text-muted-foreground" },
+};
+
+function MpAccounts() {
+  const { data, isLoading, error } = useQuery(mpAccountsQuery());
+  if (isLoading) return <p className="text-sm text-muted-foreground">Carregando…</p>;
+  if (error) return <p className="text-sm text-destructive">{error.message}</p>;
+  const list = data ?? [];
+  const connected = list.filter((r) => r.status === "connected").length;
+  return (
+    <div>
+      <p className="text-sm text-muted-foreground">
+        <span className="font-medium text-foreground">{connected} de {list.length}</span> organizador(es) recebendo direto no Mercado Pago (split).
+        Os outros recebem pela conta do BooTickets, com repasse manual. Você recebe um e-mail quando alguém conecta, desconecta ou tem erro ao conectar.
+      </p>
+      {!list.length && <p className="mt-4 rounded-xl border p-8 text-center text-sm text-muted-foreground">Nenhum organizador ainda.</p>}
+      <div className="mt-4 divide-y rounded-xl border bg-card">
+        {list.map((r) => {
+          const st = MP_STATUS[r.status]!;
+          return (
+            <div key={r.id} className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="truncate font-medium">{r.name}</p>
+                <p className="truncate text-xs text-muted-foreground">{r.email} · {r.events} evento(s)</p>
+              </div>
+              <div className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
+                <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-medium", st.cls)}>{st.label}</span>
+                <span className="text-xs text-muted-foreground">
+                  {r.status === "disconnected" && r.disconnectedAt ? `em ${fmtDate(r.disconnectedAt)} ${fmtTime(r.disconnectedAt)}`
+                    : r.connectedAt ? `desde ${fmtDate(r.connectedAt)} ${fmtTime(r.connectedAt)}` : ""}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

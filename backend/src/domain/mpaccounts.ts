@@ -3,7 +3,8 @@
 // Docs: https://www.mercadopago.com.br/developers/pt/docs/split-payments/split-1-1/integration-configuration/integrate-marketplace
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { config } from "../config.js";
-import { now, one, run } from "../db.js";
+import { all, now, one, run } from "../db.js";
+import { mpConnectionAdminEmail, sendEmail } from "../lib/email.js";
 import { badRequest, HttpError } from "../lib/errors.js";
 import { payments, type OAuthTokens, type PayAuth } from "../payments.js";
 
@@ -55,9 +56,27 @@ export async function finishConnect(state: string, code: string) {
   // O state só vale uma vez.
   await run("DELETE FROM mp_oauth_states WHERE state = ?", state);
   if (!s || s.expires_at < now()) throw badRequest("OAUTH_STATE", "O link de conexão expirou. Tente conectar de novo.");
-  const t = await payments.oauthToken({ grant_type: "authorization_code", code, redirect_uri: redirectUri(), code_verifier: s.verifier });
+  let t: OAuthTokens;
+  try {
+    t = await payments.oauthToken({ grant_type: "authorization_code", code, redirect_uri: redirectUri(), code_verifier: s.verifier });
+  } catch (e) {
+    await notifyAdmins(s.user_id, "failed", e instanceof Error ? e.message : String(e));
+    throw e;
+  }
   await saveTokens(s.user_id, t);
+  await notifyAdmins(s.user_id, "connected");
   return s.user_id;
+}
+
+/** Avisa os admins (ADMIN_EMAILS) por e-mail. Falha no e-mail nunca atrapalha a conexão. */
+async function notifyAdmins(userId: string, kind: "connected" | "disconnected" | "failed", detail?: string) {
+  try {
+    const u = await one<{ name: string; email: string }>("SELECT name, email FROM users WHERE id = ?", userId);
+    if (!u) return;
+    for (const to of config.adminEmails) await sendEmail(mpConnectionAdminEmail(to, { name: u.name, email: u.email, kind, ...(detail ? { detail } : {}) }));
+  } catch (e) {
+    console.error("Não consegui avisar os admins sobre o Mercado Pago:", e);
+  }
 }
 
 async function saveTokens(userId: string, t: OAuthTokens) {
@@ -75,7 +94,25 @@ async function saveTokens(userId: string, t: OAuthTokens) {
 /** Desconecta: as próximas vendas voltam a cair na conta do BooTickets (com repasse manual). As antigas continuam
  *  usando a conta do organizador para estornos — por isso o token não é apagado. */
 export async function disconnect(userId: string) {
+  const was = await one("SELECT 1 FROM mp_accounts WHERE user_id = ? AND disconnected_at IS NULL", userId);
   await run("UPDATE mp_accounts SET disconnected_at = ? WHERE user_id = ? AND disconnected_at IS NULL", now(), userId);
+  if (was) await notifyAdmins(userId, "disconnected");
+}
+
+/** Para o Admin: cada organizador e a situação da conta Mercado Pago dele. */
+export async function listConnections() {
+  const rows = await all<{ id: string; name: string; email: string; mp_user_id: string | null; connected_at: string | null;
+    disconnected_at: string | null; last_error: string | null; events: number }>(
+    `SELECT u.id, u.name, u.email, a.mp_user_id, a.connected_at, a.disconnected_at, a.last_error,
+            (SELECT COUNT(*) FROM events e WHERE e.organizer_id = u.id AND e.status <> 'cancelled')::int events
+       FROM users u LEFT JOIN mp_accounts a ON a.user_id = u.id
+      WHERE a.user_id IS NOT NULL OR u.roles LIKE '%organizer%'
+      ORDER BY (a.user_id IS NOT NULL AND a.disconnected_at IS NULL) DESC, a.connected_at DESC NULLS LAST, u.name`);
+  return rows.map((r) => ({
+    id: r.id, name: r.name, email: r.email, events: Number(r.events),
+    status: !r.mp_user_id ? "never" : r.disconnected_at ? "disconnected" : r.last_error ? "problem" : "connected",
+    mpUserId: r.mp_user_id, connectedAt: r.connected_at, disconnectedAt: r.disconnected_at,
+  }));
 }
 
 export async function connectionInfo(userId: string) {

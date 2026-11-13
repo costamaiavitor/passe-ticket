@@ -22,6 +22,14 @@ export interface AdminEvent {
 /** Apaga de vez um evento cancelado sem pagamento. */
 export const purgeEvent = (id: string) => http<{ ok: true }>(`/admin/events/${encodeURIComponent(id)}`, { method: "DELETE" });
 
+/** Situação da conta Mercado Pago de cada organizador (split só vale para quem está conectado). */
+export interface MpAccountRow {
+  id: string; name: string; email: string; events: number;
+  status: "connected" | "disconnected" | "problem" | "never";
+  mpUserId: string | null; connectedAt: string | null; disconnectedAt: string | null;
+}
+export const mpAccountsQuery = () => queryOptions({ queryKey: ["admin-mp"], queryFn: () => http<MpAccountRow[]>("/admin/mp-accounts"), refetchInterval: 30_000 });
+
 export const allEventsQuery = () => queryOptions({ queryKey: ["admin-events"], queryFn: () => http<AdminEvent[]>("/admin/events") });
 
 export const payoutsQuery = () => queryOptions({ queryKey: ["admin-payouts"], queryFn: () => http<PayoutRow[]>("/admin/payouts") });

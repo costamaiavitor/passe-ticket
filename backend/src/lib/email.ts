@@ -144,6 +144,24 @@ export function payoutEmail(to: string, name: string, eventTitle: string, amount
 }
 
 /** Cortesia: se a pessoa já tem conta com o CPF, o ingresso já está lá; senão, ela cria a conta e aceita. */
+/** Aviso para os admins: alguém conectou, desconectou ou não conseguiu conectar a conta Mercado Pago. */
+export function mpConnectionAdminEmail(to: string, d: { name: string; email: string; kind: "connected" | "disconnected" | "failed"; detail?: string }): Email {
+  const link = `${config.publicUrl}/admin`;
+  const what = d.kind === "connected" ? "conectou a conta Mercado Pago" : d.kind === "disconnected" ? "desconectou a conta Mercado Pago" : "tentou conectar o Mercado Pago, mas deu erro";
+  const after = d.kind === "connected"
+    ? "As próximas vendas dos eventos dessa pessoa caem direto na conta dela, e a sua comissão vem separada."
+    : d.kind === "disconnected"
+      ? "As próximas vendas voltam a cair na conta do BooTickets e entram no repasse manual."
+      : `Motivo: ${d.detail ?? "desconhecido"}. As vendas continuam caindo na conta do BooTickets.`;
+  const title = d.kind === "connected" ? "Mercado Pago conectado" : d.kind === "disconnected" ? "Mercado Pago desconectado" : "Falha ao conectar o Mercado Pago";
+  return {
+    to,
+    subject: `${title}: ${d.name}`,
+    html: layout(title, `<p><strong>${esc(d.name)}</strong> (${esc(d.email)}) ${what}.</p><p>${esc(after)}</p>`, { label: "Abrir o Admin", url: link }),
+    text: `${d.name} (${d.email}) ${what}. ${after} ${link}`,
+  };
+}
+
 export function coOrganizerEmail(to: string, name: string, inviter: string, eventTitle: string): Email {
   const link = `${config.publicUrl}/organizador`;
   return {
