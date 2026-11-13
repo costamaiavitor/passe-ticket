@@ -115,7 +115,7 @@ export async function createOrder(userId: string, input: {
         if (!turnover) throw conflict("BATCH_UPCOMING", `O lote ${b.name} abre quando o lote anterior esgotar.`);
       } else if (st !== "active") throw conflict("BATCH_UNAVAILABLE", `O lote ${b.name} não está à venda no momento.`);
       if (left(b) < it.holders.length)
-        throw conflict("NOT_ENOUGH_STOCK", `Restam apenas ${left(b)} ingressos no lote ${b.name}.`);
+        throw conflict("NOT_ENOUGH_STOCK", `Não há ingressos suficientes no lote ${b.name} para essa quantidade. Tente uma quantidade menor.`);
       lines.push({ b, holders: it.holders });
     }
 

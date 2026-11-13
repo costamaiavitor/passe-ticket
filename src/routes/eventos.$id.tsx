@@ -214,7 +214,7 @@ function EventPage() {
                   <div className="flex items-center gap-3">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium">{b.name}</p>
-                      <p className="text-xs text-muted-foreground"><span className="font-medium text-foreground">{brl(b.price)}</span> · {left} disponíveis</p>
+                      <p className="text-sm font-medium text-foreground">{brl(b.price)}</p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <Button size="icon" variant="outline" className="size-8" disabled={step === "holders" || n === 0}
