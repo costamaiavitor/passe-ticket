@@ -69,6 +69,7 @@ const mockOwner = (id: string, auth?: PayAuth) => {
 const mock: PaymentProvider = {
   name: "mock",
   async create({ orderId, split }) {
+    if (split && mockSplitErrors.has(split.accessToken)) throw new Error(`Mercado Pago 400: ${mockSplitErrors.get(split.accessToken)}`);
     const id = `mock_${randomUUID()}`;
     mockAccounts.set(id, split?.accessToken ?? "passe");
     if (split) mockFees.set(id, split.applicationFeeCents);
@@ -101,6 +102,8 @@ const mock: PaymentProvider = {
 export const mockStatuses = new Map<string, PaymentStatus>();
 /** Só para testes: conta (token) onde cada pagamento simulado foi criado, e a taxa do BooTickets (split). */
 export const mockAccounts = new Map<string, string>();
+/** Testes: token da conta do organizador → erro que o Mercado Pago devolve ao criar o pagamento dividido. */
+export const mockSplitErrors = new Map<string, string>();
 export const mockFees = new Map<string, number>();
 
 // ---- Mercado Pago (Pix) — https://www.mercadopago.com.br/developers/pt/reference/payments/_payments/post

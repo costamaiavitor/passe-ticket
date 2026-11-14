@@ -263,6 +263,8 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS seller_id TEXT REFERENCES users(id);
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS application_fee INTEGER NOT NULL DEFAULT 0;
 -- Carrinho: um pedido pode ter ingressos de lotes diferentes. Cada ingresso guarda o que foi pago por ele
 -- (já com a parte do desconto). Ingressos antigos ficam sem preço e usam o valor do pedido.
+-- Por que a venda NAO foi dividida (split): 'not_connected' = dono do evento sem Mercado Pago conectado; senao, o erro do Mercado Pago.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS split_note TEXT;
 ALTER TABLE tickets ADD COLUMN IF NOT EXISTS price INTEGER;
 ALTER TABLE tickets ADD COLUMN IF NOT EXISTS list_price INTEGER;
 

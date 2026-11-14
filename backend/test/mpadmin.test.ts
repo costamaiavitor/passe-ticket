@@ -11,6 +11,7 @@ const { createApp } = await import("../src/app.js");
 const { run, one, now } = await import("../src/db.js");
 const { hashPassword } = await import("../src/lib/crypto.js");
 const { sentEmails } = await import("../src/lib/email.js");
+const { mockSplitErrors } = await import("../src/payments.js");
 
 let base = "";
 const server = createApp().listen(0);
@@ -107,5 +108,44 @@ describe("Admin: contas Mercado Pago", () => {
     // desconectar de novo não manda outro aviso
     await api("/organizer/mercadopago", { method: "DELETE", token: T["orgA"] });
     assert.equal(mails("Mercado Pago desconectado: Pessoa orgA").length, 1);
+  });
+
+  it("venda de organizador conectado que o Mercado Pago recusa: cai no BooTickets, fica anotada e o admin é avisado uma vez", async () => {
+    assert.match((await connect("orgB")).cb.location, /mp=ok/);
+    const ev = await event("orgB", "Festa do Split Recusado");
+    mockSplitErrors.set("seller-orgB", "application_fee não permitido para esta conta");
+    const o1 = await buy("ana", ev);
+    assert.equal(o1.status, 201, "a venda não para");
+    const row = (await orderRow(o1.body.id))!;
+    assert.equal(row.seller_id, null);
+    const note = (await one<{ split_note: string }>("SELECT split_note FROM orders WHERE id = ?", o1.body.id))!.split_note;
+    assert.match(note, /application_fee não permitido/);
+    assert.equal(mails("Venda não dividida (split falhou): Pessoa orgB").length, 1);
+    // segunda venda com o mesmo erro: não manda outro e-mail
+    await run("UPDATE orders SET status = 'cancelled' WHERE id = ?", o1.body.id);
+    await run("UPDATE tickets SET status = 'cancelled' WHERE order_id = ?", o1.body.id);
+    await buy("ana", ev);
+    assert.equal(mails("Venda não dividida (split falhou): Pessoa orgB").length, 1);
+    // Admin mostra o problema e o motivo; o organizador também é avisado no cartão dele
+    let b = ((await api("/admin/mp-accounts", { token: T["adm"] })).body as any[]).find((r) => r.email === "orgb@t.dev");
+    assert.equal(b.status, "problem");
+    assert.match(b.lastError, /application_fee não permitido/);
+    assert.match((await api("/organizer/mercadopago", { token: T["orgB"] })).body.problem, /recusou a última venda/);
+    // o Mercado Pago volta a aceitar: a próxima venda é dividida e o alerta some sozinho
+    mockSplitErrors.clear();
+    const ev2 = await event("orgB", "Festa do Split de Volta");
+    const o3 = await buy("ana", ev2);
+    assert.equal((await orderRow(o3.body.id))!.seller_id, "orgB");
+    b = ((await api("/admin/mp-accounts", { token: T["adm"] })).body as any[]).find((r) => r.email === "orgb@t.dev");
+    assert.equal(b.status, "connected");
+    assert.equal((await api("/organizer/mercadopago", { token: T["orgB"] })).body.problem, null);
+  });
+
+  it("organizador que não conectou: a venda fica anotada como 'não conectou' e não gera alerta", async () => {
+    await user("orgC", '["buyer","organizer"]');
+    const ev = await event("orgC", "Festa Sem Mercado Pago");
+    const o = await buy("ana", ev);
+    assert.equal((await one<{ split_note: string }>("SELECT split_note FROM orders WHERE id = ?", o.body.id))!.split_note, "not_connected");
+    assert.equal(mails("Venda não dividida (split falhou): Pessoa orgC").length, 0);
   });
 });

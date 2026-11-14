@@ -27,6 +27,10 @@ export interface MpAccountRow {
   id: string; name: string; email: string; events: number;
   status: "connected" | "disconnected" | "problem" | "never";
   mpUserId: string | null; connectedAt: string | null; disconnectedAt: string | null;
+  /** Vendas pagas direto na conta do organizador x pela conta do BooTickets (depois de conectar). */
+  salesDirect: number; salesPlatform: number;
+  /** Último erro do Mercado Pago (renovação do acesso ou venda que não pôde ser dividida). */
+  lastError: string | null;
 }
 export const mpAccountsQuery = () => queryOptions({ queryKey: ["admin-mp"], queryFn: () => http<MpAccountRow[]>("/admin/mp-accounts"), refetchInterval: 30_000 });
 

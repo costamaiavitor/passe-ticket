@@ -4,7 +4,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { config } from "../config.js";
 import { all, now, one, run } from "../db.js";
-import { mpConnectionAdminEmail, sendEmail } from "../lib/email.js";
+import { mpConnectionAdminEmail, sendEmail, splitFailedAdminEmail } from "../lib/email.js";
 import { badRequest, HttpError } from "../lib/errors.js";
 import { payments, type OAuthTokens, type PayAuth } from "../payments.js";
 
@@ -99,12 +99,39 @@ export async function disconnect(userId: string) {
   if (was) await notifyAdmins(userId, "disconnected");
 }
 
+const SPLIT_ERR = "Venda não dividida: ";
+
+/** Uma venda de organizador conectado caiu na conta do BooTickets: guarda o motivo e avisa os admins (uma vez por motivo). */
+export async function reportSplitFailure(userId: string, reason: string, orderTitle: string) {
+  try {
+    const msg = (SPLIT_ERR + reason).slice(0, 300);
+    const a = await one<{ last_error: string | null }>("SELECT last_error FROM mp_accounts WHERE user_id = ?", userId);
+    if (!a || a.last_error === msg) return; // já avisado sobre este mesmo erro
+    await run("UPDATE mp_accounts SET last_error = ? WHERE user_id = ?", msg, userId);
+    const u = await one<{ name: string; email: string }>("SELECT name, email FROM users WHERE id = ?", userId);
+    if (u) for (const to of config.adminEmails) await sendEmail(splitFailedAdminEmail(to, { name: u.name, email: u.email, reason, orderTitle }));
+  } catch (e) {
+    console.error("Não consegui registrar a falha de split:", e);
+  }
+}
+
+/** Venda dividida com sucesso: limpa um erro de split anterior (o problema passou). */
+export async function reportSplitOk(userId: string) {
+  await run("UPDATE mp_accounts SET last_error = NULL WHERE user_id = ? AND last_error LIKE ?", userId, SPLIT_ERR + "%").catch(() => undefined);
+}
+
 /** Para o Admin: cada organizador e a situação da conta Mercado Pago dele. */
 export async function listConnections() {
   const rows = await all<{ id: string; name: string; email: string; mp_user_id: string | null; connected_at: string | null;
-    disconnected_at: string | null; last_error: string | null; events: number }>(
+    disconnected_at: string | null; last_error: string | null; events: number; direct: number; platform: number; last_note: string | null }>(
     `SELECT u.id, u.name, u.email, a.mp_user_id, a.connected_at, a.disconnected_at, a.last_error,
-            (SELECT COUNT(*) FROM events e WHERE e.organizer_id = u.id AND e.status <> 'cancelled')::int events
+            (SELECT COUNT(*) FROM events e WHERE e.organizer_id = u.id AND e.status <> 'cancelled')::int events,
+            (SELECT COUNT(*) FROM orders o JOIN events e ON e.id = o.event_id WHERE e.organizer_id = u.id AND o.status = 'paid' AND o.kind = 'sale'
+               AND o.total > 0 AND o.seller_id IS NOT NULL)::int direct,
+            (SELECT COUNT(*) FROM orders o JOIN events e ON e.id = o.event_id WHERE e.organizer_id = u.id AND o.status = 'paid' AND o.kind = 'sale'
+               AND o.total > 0 AND o.seller_id IS NULL AND (a.connected_at IS NULL OR o.created_at >= a.connected_at))::int platform,
+            (SELECT o.split_note FROM orders o JOIN events e ON e.id = o.event_id WHERE e.organizer_id = u.id AND o.split_note IS NOT NULL
+               AND o.split_note <> 'not_connected' AND o.split_note <> '' ORDER BY o.created_at DESC LIMIT 1) last_note
        FROM users u LEFT JOIN mp_accounts a ON a.user_id = u.id
       WHERE a.user_id IS NOT NULL OR u.roles LIKE '%organizer%'
       ORDER BY (a.user_id IS NOT NULL AND a.disconnected_at IS NULL) DESC, a.connected_at DESC NULLS LAST, u.name`);
@@ -112,6 +139,9 @@ export async function listConnections() {
     id: r.id, name: r.name, email: r.email, events: Number(r.events),
     status: !r.mp_user_id ? "never" : r.disconnected_at ? "disconnected" : r.last_error ? "problem" : "connected",
     mpUserId: r.mp_user_id, connectedAt: r.connected_at, disconnectedAt: r.disconnected_at,
+    // Vendas pagas: direto na conta do organizador x pela conta do BooTickets (depois de conectar, se conectou).
+    salesDirect: Number(r.direct), salesPlatform: Number(r.platform),
+    lastError: r.last_error ?? r.last_note ?? null,
   }));
 }
 
@@ -123,7 +153,11 @@ export async function connectionInfo(userId: string) {
     mpUserId: a && !a.disconnected_at ? a.mp_user_id : null,
     connectedAt: a && !a.disconnected_at ? a.connected_at : null,
     // Ex.: o organizador revogou o acesso pelo app do Mercado Pago e a renovação falhou.
-    problem: a && !a.disconnected_at && a.last_error ? "Não conseguimos renovar o acesso à sua conta Mercado Pago. Conecte de novo." : null,
+    problem: a && !a.disconnected_at && a.last_error
+      ? a.last_error.startsWith(SPLIT_ERR)
+        ? "O Mercado Pago recusou a última venda na sua conta, e ela caiu na conta do BooTickets (você recebe por repasse). Desconecte e conecte de novo; se continuar, fale com o BooTickets."
+        : "Não conseguimos renovar o acesso à sua conta Mercado Pago. Conecte de novo."
+      : null,
   };
 }
 

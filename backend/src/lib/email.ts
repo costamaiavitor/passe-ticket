@@ -162,6 +162,18 @@ export function mpConnectionAdminEmail(to: string, d: { name: string; email: str
   };
 }
 
+/** Aviso para os admins: a venda de um organizador conectado não pôde ser dividida e caiu na conta do BooTickets. */
+export function splitFailedAdminEmail(to: string, d: { name: string; email: string; reason: string; orderTitle: string }): Email {
+  const link = `${config.publicUrl}/admin`;
+  return {
+    to,
+    subject: `Venda não dividida (split falhou): ${d.name}`,
+    html: layout("Uma venda não foi dividida", `<p>A venda <strong>${esc(d.orderTitle)}</strong>, de <strong>${esc(d.name)}</strong> (${esc(d.email)}), era para cair direto na conta Mercado Pago do organizador, mas o Mercado Pago recusou. Para a venda não parar, o pagamento foi gerado na conta do BooTickets e entra no repasse manual.</p><p><strong>Motivo:</strong> ${esc(d.reason)}</p><p>Você só recebe este aviso de novo se o motivo mudar. Quando uma venda voltar a ser dividida, o alerta some sozinho do Admin.</p>`,
+      { label: "Abrir o Admin", url: link }),
+    text: `Venda não dividida: ${d.orderTitle}, de ${d.name} (${d.email}). Motivo: ${d.reason}. ${link}`,
+  };
+}
+
 export function coOrganizerEmail(to: string, name: string, inviter: string, eventTitle: string): Email {
   const link = `${config.publicUrl}/organizador`;
   return {

@@ -45,7 +45,7 @@ function Admin() {
 // ---------------- Contas Mercado Pago dos organizadores ----------------
 const MP_STATUS: Record<string, { label: string; cls: string }> = {
   connected: { label: "Conectado", cls: "bg-success/15 text-success" },
-  problem: { label: "Precisa reconectar", cls: "bg-warning/15 text-warning" },
+  problem: { label: "Com problema", cls: "bg-warning/15 text-warning" },
   disconnected: { label: "Desconectou", cls: "bg-destructive/15 text-destructive" },
   never: { label: "Não conectou", cls: "bg-elevated text-muted-foreground" },
 };
@@ -71,6 +71,12 @@ function MpAccounts() {
               <div className="min-w-0">
                 <p className="truncate font-medium">{r.name}</p>
                 <p className="truncate text-xs text-muted-foreground">{r.email} · {r.events} evento(s)</p>
+                <p className="text-xs text-muted-foreground">
+                  Vendas pagas: <span className="text-foreground">{r.salesDirect}</span> direto na conta dele ·{" "}
+                  <span className={cn(r.status !== "never" && r.salesPlatform > 0 ? "font-medium text-warning" : "text-foreground")}>{r.salesPlatform}</span> pela conta do BooTickets
+                  {r.status !== "never" ? " (depois de conectar)" : ""}
+                </p>
+                {r.lastError && r.status !== "never" && <p className="mt-1 break-words text-xs text-warning">Motivo: {r.lastError}</p>}
               </div>
               <div className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
                 <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-medium", st.cls)}>{st.label}</span>

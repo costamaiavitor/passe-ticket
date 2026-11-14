@@ -7,7 +7,7 @@ import { payments, type CardPaymentInput, type PaymentInfo } from "../payments.j
 import { eventCancelledEmail, purchaseEmail, sendEmail } from "../lib/email.js";
 import { batchStatus, batchStatuses, categoryOf, normalizeCode, type BatchRow, type EventRow } from "./events.js";
 import { discountFor, findUsableCoupon } from "./promos.js";
-import { authForOrder, sellerAuth } from "./mpaccounts.js";
+import { authForOrder, reportSplitFailure, reportSplitOk, sellerAuth } from "./mpaccounts.js";
 
 export interface OrderRow {
   id: string; user_id: string; event_id: string; batch_id: string; quantity: number; unit_price: number;
@@ -173,7 +173,13 @@ export async function createOrder(userId: string, input: {
   }
 
   // Split 1:1: organizador com Mercado Pago conectado recebe direto; a taxa do BooTickets sai automaticamente.
-  const seller = await sellerAuth(order.organizerId).catch(() => null);
+  // Toda venda que NÃO é dividida fica com o motivo anotado (split_note) e, se for erro, os admins são avisados na hora.
+  let splitNote: string | null = null;
+  const seller = await sellerAuth(order.organizerId).catch((e) => { splitNote = `Conta do organizador indisponível: ${e instanceof Error ? e.message : String(e)}`; return null; });
+  if (!seller && !splitNote)
+    splitNote = (await one("SELECT 1 FROM mp_accounts WHERE user_id = ? AND disconnected_at IS NULL", order.organizerId))
+      ? "O acesso à conta Mercado Pago do organizador venceu ou foi revogado. Ele precisa conectar de novo."
+      : "not_connected";
   const base = { orderId: order.id, amountCents: order.total, description: order.title, payerEmail: buyer.email, expiresAt: order.expires };
   try {
     let p;
@@ -186,11 +192,14 @@ export async function createOrder(userId: string, input: {
         // Conta do organizador com problema (ex.: acesso revogado): a venda não para — cai na conta do BooTickets
         // e entra no repasse manual.
         console.error(`Split indisponível para o organizador ${order.organizerId}; cobrando na conta do BooTickets:`, e);
+        splitNote = e instanceof Error ? e.message : String(e);
       }
     }
     p ??= await payments.create(base);
-    await run("UPDATE orders SET payment_id = ?, payment_data = ?, seller_id = ?, application_fee = ? WHERE id = ?",
-      p.id, JSON.stringify(p.info), sellerId, sellerId ? order.fee : 0, order.id);
+    await run("UPDATE orders SET payment_id = ?, payment_data = ?, seller_id = ?, application_fee = ?, split_note = ? WHERE id = ?",
+      p.id, JSON.stringify(p.info), sellerId, sellerId ? order.fee : 0, sellerId ? null : (splitNote ?? "").slice(0, 500), order.id);
+    if (sellerId) await reportSplitOk(sellerId);
+    else if (splitNote && splitNote !== "not_connected") await reportSplitFailure(order.organizerId, splitNote, order.title);
   } catch (e) {
     await releaseOrder(order.id, "cancelled");
     if (e instanceof HttpError) throw e;
