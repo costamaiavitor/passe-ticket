@@ -2,6 +2,7 @@
 import { Router } from "express";
 import { config } from "../config.js";
 import { connectionInfo, disconnect, finishConnect, startConnect } from "../domain/mpaccounts.js";
+import { HttpError } from "../lib/errors.js";
 import { rateLimit, requireRole, user } from "../lib/http.js";
 
 /** Volta do Mercado Pago depois que o organizador autoriza. Rota pública: quem é o organizador vem do "state". */
@@ -16,7 +17,7 @@ mpCallbackRouter.get("/oauth/callback", rateLimit({ windowMs: 60_000, max: confi
     back("ok");
   } catch (e) {
     console.error("Falha ao conectar conta Mercado Pago:", e);
-    back("erro");
+    back(e instanceof HttpError && e.code === "MP_SAME_ACCOUNT" ? "mesma" : "erro");
   }
 });
 

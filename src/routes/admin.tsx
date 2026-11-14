@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { RequireAuth } from "@/components/require-auth";
 import { Button } from "@/components/ui/button";
-import { allEventsQuery, approveEvent, mpAccountsQuery, purgeEvent, markRefundedOutside, payoutsQuery, registerPayout, rejectEvent, reviewEventsQuery } from "@/services/admin";
+import { allEventsQuery, approveEvent, mpAccountsQuery, testMpAccount, purgeEvent, markRefundedOutside, payoutsQuery, registerPayout, rejectEvent, reviewEventsQuery } from "@/services/admin";
 import { brl, fmtDate, fmtTime } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import type { PayoutRow, ReviewEvent } from "@/types";
@@ -52,6 +52,14 @@ const MP_STATUS: Record<string, { label: string; cls: string }> = {
 
 function MpAccounts() {
   const { data, isLoading, error } = useQuery(mpAccountsQuery());
+  const qc = useQueryClient();
+  // Resultado do último teste de cada conta (fica na tela até recarregar).
+  const [results, setResults] = useState<Record<string, { ok: boolean; message: string }>>({});
+  const test = useMutation({
+    mutationFn: testMpAccount,
+    onSuccess: (r, userId) => { setResults((m) => ({ ...m, [userId]: r })); void qc.invalidateQueries({ queryKey: ["admin-mp"] }); },
+    onError: (e, userId) => setResults((m) => ({ ...m, [userId]: { ok: false, message: e instanceof Error ? e.message : "Não foi possível testar." } })),
+  });
   if (isLoading) return <p className="text-sm text-muted-foreground">Carregando…</p>;
   if (error) return <p className="text-sm text-destructive">{error.message}</p>;
   const list = data ?? [];
@@ -76,7 +84,16 @@ function MpAccounts() {
                   <span className={cn(r.status !== "never" && r.salesPlatform > 0 ? "font-medium text-warning" : "text-foreground")}>{r.salesPlatform}</span> pela conta do BooTickets
                   {r.status !== "never" ? " (depois de conectar)" : ""}
                 </p>
+                {r.mpUserId && r.status !== "never" && <p className="text-xs text-muted-foreground">Conta Mercado Pago nº {r.mpUserId}</p>}
+                {r.samePlatform && <p className="mt-1 text-xs font-medium text-destructive">Esta é a conta Mercado Pago do próprio BooTickets, não a do organizador. Nenhuma venda dele é dividida: ele precisa desconectar e conectar de novo, entrando no Mercado Pago com a conta dele.</p>}
+                {r.sharedAccount && !r.samePlatform && <p className="mt-1 text-xs text-warning">Outro organizador conectou esta mesma conta Mercado Pago. Confira se é isso mesmo.</p>}
                 {r.lastError && r.status !== "never" && <p className="mt-1 break-words text-xs text-warning">Motivo: {r.lastError}</p>}
+                {results[r.id] && <p className={cn("mt-1 break-words text-xs font-medium", results[r.id]!.ok ? "text-primary" : "text-destructive")}>Teste: {results[r.id]!.message}</p>}
+                {(r.status === "connected" || r.status === "problem") && (
+                  <Button size="sm" variant="outline" className="mt-2" disabled={test.isPending} onClick={() => test.mutate(r.id)}>
+                    {test.isPending && test.variables === r.id ? "Testando…" : "Testar se o dinheiro cai na conta dele"}
+                  </Button>
+                )}
               </div>
               <div className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
                 <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-medium", st.cls)}>{st.label}</span>

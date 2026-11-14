@@ -48,7 +48,10 @@ export type OAuthGrant =
 
 export interface PaymentProvider {
   name: string;
-  create(input: { orderId: string; amountCents: number; description: string; payerEmail: string; expiresAt: string; split?: Split | undefined }): Promise<CreatedPayment>;
+  /** notify: false = não pede aviso (webhook) deste pagamento; usado no teste de conexão, que não é um pedido de verdade. */
+  create(input: { orderId: string; amountCents: number; description: string; payerEmail: string; expiresAt: string; split?: Split | undefined; notify?: boolean }): Promise<CreatedPayment>;
+  /** De quem é a conta Mercado Pago deste token (sem token = a conta do BooTickets). */
+  account(auth?: PayAuth): Promise<{ id: string }>;
   createCard(input: CardPaymentInput & { split?: Split | undefined }): Promise<CardPaymentResult>;
   /** Consulta o status real no provedor (nunca confie só no corpo do webhook). */
   status(paymentId: string, auth?: PayAuth): Promise<PaymentStatus>;
@@ -90,6 +93,7 @@ const mock: PaymentProvider = {
   },
   async cancel(id, auth) { mockOwner(id, auth); mockStatuses.set(id, "cancelled"); },
   async refund(id, auth) { mockOwner(id, auth); mockStatuses.set(id, "refunded"); },
+  async account(auth) { return { id: auth ? auth.accessToken.replace(/^seller-/, "mp-") : "mp-passe" }; },
   // Código "ok-<n>" vira a conta simulada "seller-<n>"; qualquer outro código é recusado.
   async oauthToken(body) {
     const n = body.grant_type === "authorization_code" ? /^ok-(\w+)$/.exec(body.code)?.[1] : /^refresh-(\w+)$/.exec(body.refresh_token)?.[1];
@@ -115,9 +119,16 @@ async function mpFetch<T>(path: string, init: RequestInit = {}, auth?: PayAuth):
     // Pagamento de organizador conectado: usa o token dele (o dinheiro cai na conta dele).
     headers: { Authorization: `Bearer ${auth?.accessToken ?? config.mpAccessToken}`, "Content-Type": "application/json", ...init.headers },
   });
-  const body = (await res.json().catch(() => ({}))) as T & { message?: string };
-  if (!res.ok) throw new Error(`Mercado Pago ${res.status}: ${body.message ?? "erro"}`);
+  const body = (await res.json().catch(() => ({}))) as T & { message?: string; cause?: unknown };
+  if (!res.ok) throw new Error(`Mercado Pago ${res.status}: ${body.message ?? "erro"}${mpCause(body.cause)}`);
   return body;
+}
+
+/** O motivo detalhado que o Mercado Pago manda junto do erro (código + descrição). Sem ele não dá para saber por que recusou. */
+function mpCause(cause: unknown) {
+  const list = (Array.isArray(cause) ? cause : cause ? [cause] : []) as { code?: unknown; description?: unknown }[];
+  const txt = list.map((c) => [c?.code, c?.description].filter((x) => x !== undefined && x !== null && x !== "").join(" ")).filter(Boolean).join("; ");
+  return txt ? ` (${txt.slice(0, 300)})` : "";
 }
 
 interface MpPayment {
@@ -129,7 +140,11 @@ interface MpPayment {
 
 const mercadopago: PaymentProvider = {
   name: "mercadopago",
-  async create({ orderId, amountCents, description, payerEmail, expiresAt, split }) {
+  async account(auth) {
+    const u = await mpFetch<{ id: number | string }>("/users/me", {}, auth);
+    return { id: String(u.id) };
+  },
+  async create({ orderId, amountCents, description, payerEmail, expiresAt, split, notify }) {
     const p = await mpFetch<MpPayment>("/v1/payments", {
       method: "POST",
       headers: { "X-Idempotency-Key": orderId },
@@ -143,7 +158,7 @@ const mercadopago: PaymentProvider = {
         // Split 1:1: a taxa do BooTickets vai para a conta do BooTickets; o restante fica com o organizador.
         ...(split ? { application_fee: split.applicationFeeCents / 100 } : {}),
         // O Mercado Pago só aceita aviso em endereço público com https; sem ele, o checkout confirma pelo polling.
-        ...(config.publicUrl.startsWith("https://") ? { notification_url: `${config.publicUrl}/api/v1/webhooks/mercadopago` } : {}),
+        ...(notify !== false && config.publicUrl.startsWith("https://") ? { notification_url: `${config.publicUrl}/api/v1/webhooks/mercadopago` } : {}),
       }),
     }, split);
     const td = p.point_of_interaction?.transaction_data ?? {};

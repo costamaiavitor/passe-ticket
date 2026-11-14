@@ -130,7 +130,7 @@ describe("Admin: contas Mercado Pago", () => {
     let b = ((await api("/admin/mp-accounts", { token: T["adm"] })).body as any[]).find((r) => r.email === "orgb@t.dev");
     assert.equal(b.status, "problem");
     assert.match(b.lastError, /application_fee não permitido/);
-    assert.match((await api("/organizer/mercadopago", { token: T["orgB"] })).body.problem, /recusou a última venda/);
+    assert.match((await api("/organizer/mercadopago", { token: T["orgB"] })).body.problem, /ainda não estão caindo na sua conta/);
     // o Mercado Pago volta a aceitar: a próxima venda é dividida e o alerta some sozinho
     mockSplitErrors.clear();
     const ev2 = await event("orgB", "Festa do Split de Volta");
@@ -147,5 +147,56 @@ describe("Admin: contas Mercado Pago", () => {
     const o = await buy("ana", ev);
     assert.equal((await one<{ split_note: string }>("SELECT split_note FROM orders WHERE id = ?", o.body.id))!.split_note, "not_connected");
     assert.equal(mails("Venda não dividida (split falhou): Pessoa orgC").length, 0);
+  });
+
+  it("teste da conexão: o admin vê na hora se o dinheiro cai na conta do organizador, e o motivo quando não cai", async () => {
+    await user("orgD", '["buyer","organizer"]');
+    // quem não conectou não tem o que testar
+    assert.equal((await api("/admin/mp-accounts/orgD/test", { method: "POST", token: T["adm"] })).body.ok, false);
+    // conta sem chave Pix: conecta, mas o teste feito logo depois de conectar já acusa o problema
+    mockSplitErrors.set("seller-orgD", "bad_request (13253 Collector user without key enabled for QR render)");
+    assert.match((await connect("orgD")).cb.location, /mp=ok/);
+    let d = ((await api("/admin/mp-accounts", { token: T["adm"] })).body as any[]).find((r) => r.email === "orgd@t.dev");
+    assert.equal(d.status, "problem");
+    assert.match(d.lastError, /chave Pix/);
+    assert.equal(d.mpUserId, "mp-orgD");
+    assert.equal(d.samePlatform, false);
+    assert.equal(mails("Venda não dividida (split falhou): Pessoa orgD").length, 1);
+    // o organizador lê o motivo em português simples, sem o detalhe técnico
+    const problem = (await api("/organizer/mercadopago", { token: T["orgD"] })).body.problem as string;
+    assert.match(problem, /chave Pix/);
+    assert.doesNotMatch(problem, /13253/);
+    // o botão do admin repete o teste e mostra o mesmo motivo; só admin pode testar
+    const t1 = await api("/admin/mp-accounts/orgD/test", { method: "POST", token: T["adm"] });
+    assert.equal(t1.body.ok, false);
+    assert.match(t1.body.message, /chave Pix/);
+    assert.equal((await api("/admin/mp-accounts/orgD/test", { method: "POST", token: T["orgD"] })).status, 403);
+    // o organizador cria a chave Pix: o teste passa e o alerta some
+    mockSplitErrors.clear();
+    const t2 = await api("/admin/mp-accounts/orgD/test", { method: "POST", token: T["adm"] });
+    assert.equal(t2.body.ok, true, JSON.stringify(t2.body));
+    d = ((await api("/admin/mp-accounts", { token: T["adm"] })).body as any[]).find((r) => r.email === "orgd@t.dev");
+    assert.equal(d.status, "connected");
+    assert.equal((await api("/organizer/mercadopago", { token: T["orgD"] })).body.problem, null);
+  });
+
+  it("não deixa conectar a conta Mercado Pago do próprio BooTickets no lugar da conta do organizador", async () => {
+    await user("orgE", '["buyer","organizer"]');
+    // "ok-passe" = a pessoa autorizou logada na conta do BooTickets
+    const r = await connect("orgE", "ok-passe");
+    assert.match(r.cb.location, /mp=mesma/);
+    assert.equal((await api("/organizer/mercadopago", { token: T["orgE"] })).body.connected, false);
+    assert.equal(mails("Falha ao conectar o Mercado Pago: Pessoa orgE").length, 1);
+    // conexão antiga que já estava assim (feita antes desta trava): o Admin acusa e o teste explica
+    const { encrypt } = await import("../src/domain/mpaccounts.js");
+    await run(
+      `INSERT INTO mp_accounts (user_id, mp_user_id, access_token, refresh_token, public_key, live_mode, expires_at, connected_at)
+       VALUES ('orgE', 'mp-passe', ?, ?, '', 1, ?, ?)`,
+      encrypt("seller-passe"), encrypt("refresh-passe"), new Date(Date.now() + 100 * 86400_000).toISOString(), now());
+    const e = ((await api("/admin/mp-accounts", { token: T["adm"] })).body as any[]).find((x) => x.email === "orge@t.dev");
+    assert.equal(e.samePlatform, true);
+    const t = await api("/admin/mp-accounts/orgE/test", { method: "POST", token: T["adm"] });
+    assert.equal(t.body.ok, false);
+    assert.match(t.body.message, /conta Mercado Pago do próprio BooTickets/);
   });
 });

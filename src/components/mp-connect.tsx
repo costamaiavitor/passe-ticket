@@ -16,6 +16,7 @@ export function MercadoPagoCard() {
     const p = new URLSearchParams(window.location.search).get("mp");
     if (!p) return;
     if (p === "ok") toast.success("Conta Mercado Pago conectada! As próximas vendas caem direto nela.");
+    else if (p === "mesma") toast.error("Você entrou no Mercado Pago com a conta do BooTickets, não com a sua. Saia dessa conta no Mercado Pago (ou use o seu celular) e conecte de novo.", { duration: 15000 });
     else if (p === "negado") toast.error("A conexão foi cancelada no Mercado Pago. Tente de novo quando quiser.");
     else toast.error("Não foi possível conectar sua conta Mercado Pago. Tente de novo.");
     window.history.replaceState(null, "", window.location.pathname);
@@ -36,7 +37,7 @@ export function MercadoPagoCard() {
           <div className="flex gap-3">
             <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-primary" />
             <div>
-              <p className="text-sm font-medium">Recebendo direto no Mercado Pago</p>
+              <p className="text-sm font-medium">{data.problem ? "Conta conectada, mas as vendas ainda não caem nela" : "Recebendo direto no Mercado Pago"}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 Cada venda cai na sua conta na hora do pagamento. A taxa de serviço (10%, paga pelo comprador) vai para o BooTickets e a tarifa do Mercado Pago é descontada da sua parte.
               </p>

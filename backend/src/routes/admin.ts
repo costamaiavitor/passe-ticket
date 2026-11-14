@@ -4,7 +4,7 @@ import { z } from "zod";
 import { all, now, one, run, tx } from "../db.js";
 import { toEventDetail, type EventRow } from "../domain/events.js";
 import { markRefunded, purgeCancelledEvent } from "../domain/orders.js";
-import { listConnections } from "../domain/mpaccounts.js";
+import { listConnections, testSplit } from "../domain/mpaccounts.js";
 import { eventReviewedEmail, payoutEmail, sendEmail } from "../lib/email.js";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
 import { parse, requireRole, user } from "../lib/http.js";
@@ -57,6 +57,8 @@ adminRouter.delete("/events/:id", async (req, res) => {
 
 /** Quem conectou (ou desconectou) a conta Mercado Pago — o split só vale para quem está conectado. */
 adminRouter.get("/mp-accounts", async (_req, res) => { res.json(await listConnections()); });
+// Testa de verdade a conta de um organizador (Pix de R$ 1,00 cancelado na hora) e diz o motivo se o Mercado Pago recusar.
+adminRouter.post("/mp-accounts/:userId/test", async (req, res) => { res.json(await testSplit(req.params.userId)); });
 
 adminRouter.get("/events/review", async (_req, res) => {
   const rows = await all<ReviewRow>(

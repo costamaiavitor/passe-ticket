@@ -31,7 +31,12 @@ export interface MpAccountRow {
   salesDirect: number; salesPlatform: number;
   /** Último erro do Mercado Pago (renovação do acesso ou venda que não pôde ser dividida). */
   lastError: string | null;
+  /** A conta conectada é a do próprio BooTickets (nenhuma venda é dividida) / é a mesma de outro organizador. */
+  samePlatform: boolean; sharedAccount: boolean;
 }
+/** Testa a conta de verdade: Pix de R$ 1,00 gerado na conta do organizador e cancelado na hora. */
+export const testMpAccount = (userId: string) =>
+  http<{ ok: boolean; mpUserId: string | null; message: string }>(`/admin/mp-accounts/${encodeURIComponent(userId)}/test`, { method: "POST" });
 export const mpAccountsQuery = () => queryOptions({ queryKey: ["admin-mp"], queryFn: () => http<MpAccountRow[]>("/admin/mp-accounts"), refetchInterval: 30_000 });
 
 export const allEventsQuery = () => queryOptions({ queryKey: ["admin-events"], queryFn: () => http<AdminEvent[]>("/admin/events") });
