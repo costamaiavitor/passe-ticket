@@ -1,10 +1,10 @@
-export const PLATFORM_FEE_RATE = 0.1;
+export const PLATFORM_FEE_RATE = 0.11;
 export const MAX_TICKETS_PER_CPF = 2;
 
 export const brl = (cents: number) =>
   (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-/** Taxa (centavos) somada ao valor do comprador. Valor definitivo vem do backend. */
+/** Taxa do BooTickets (centavos), descontada da parte do organizador; o comprador paga só o ingresso. Valor definitivo vem do backend. */
 export const platformFee = (subtotalCents: number, rate = PLATFORM_FEE_RATE) => Math.round(subtotalCents * rate);
 
 export const fmtDate = (iso: string) =>

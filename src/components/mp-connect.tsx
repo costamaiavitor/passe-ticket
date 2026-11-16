@@ -39,7 +39,7 @@ export function MercadoPagoCard() {
             <div>
               <p className="text-sm font-medium">{data.problem ? "Conta conectada, mas as vendas ainda não caem nela" : "Recebendo direto no Mercado Pago"}</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Cada venda cai na sua conta na hora do pagamento. A taxa de serviço (10%, paga pelo comprador) vai para o BooTickets e a tarifa do Mercado Pago é descontada da sua parte.
+                Cada venda cai na sua conta na hora do pagamento. A taxa do BooTickets (11% do ingresso) sai automaticamente e já cobre a tarifa do Mercado Pago: você fica com 89% do valor. O comprador não paga taxa.
               </p>
               {data.problem && <p className="mt-2 flex items-center gap-1.5 text-xs text-warning"><AlertTriangle className="size-3.5" />{data.problem}</p>}
             </div>

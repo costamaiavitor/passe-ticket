@@ -62,7 +62,10 @@ function Checkout() {
         ))}
         <div className="flex justify-between border-t pt-2 text-muted-foreground"><dt>Subtotal</dt><dd>{brl(order.subtotal)}</dd></div>
         {!!order.discount && <div className="flex justify-between text-primary"><dt>Cupom {order.couponCode}</dt><dd>− {brl(order.discount)}</dd></div>}
-        <div className="flex justify-between text-muted-foreground"><dt>Taxa da plataforma</dt><dd>{brl(order.fee)}</dd></div>
+        {/* Pedidos antigos tinham a taxa somada ao total; nos novos o comprador não paga taxa. */}
+        {order.total > order.subtotal - (order.discount ?? 0)
+          ? <div className="flex justify-between text-muted-foreground"><dt>Taxa da plataforma</dt><dd>{brl(order.fee)}</dd></div>
+          : <div className="flex justify-between text-muted-foreground"><dt>Taxa de serviço</dt><dd>Grátis</dd></div>}
         <div className="flex justify-between pt-1 font-medium"><dt>Total</dt><dd>{brl(order.total)}</dd></div>
       </dl>
 

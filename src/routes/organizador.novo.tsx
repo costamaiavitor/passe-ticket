@@ -201,7 +201,7 @@ function CreateEvent() {
                   </div>
                   <p className="mt-2 text-xs text-muted-foreground">
                     {b.price > 0
-                      ? <>Cliente paga <span className="text-foreground">{brl(b.price + platformFee(b.price))}</span> (ingresso + 10% de taxa). Você recebe {brl(b.price)}.</>
+                      ? <>Cliente paga <span className="text-foreground">{brl(b.price)}</span>, sem taxa. Você recebe {brl(b.price - platformFee(b.price))} (o BooTickets fica com 11% e paga a tarifa do Mercado Pago).</>
                       : "Ingresso gratuito: o cliente só garante a vaga, sem pagar."}
                   </p>
                 </div>

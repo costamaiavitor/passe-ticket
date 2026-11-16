@@ -120,7 +120,7 @@ function PayoutInfoCard() {
   return (
     <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="mt-5 rounded-xl border border-primary/40 bg-card p-4">
       <p className="font-medium">Onde você quer receber as vendas?</p>
-      <p className="mt-1 text-xs text-muted-foreground">O BooTickets repassa o valor dos ingressos vendidos por Pix. A taxa de serviço de 10% é paga pelo comprador.</p>
+      <p className="mt-1 text-xs text-muted-foreground">O BooTickets repassa por Pix o valor dos ingressos vendidos, menos a taxa de 11% (que já inclui a tarifa do Mercado Pago). O comprador não paga taxa.</p>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         <input required minLength={3} value={pixKey} onChange={(e) => setPixKey(e.target.value)} placeholder="Chave Pix (CPF, CNPJ, e-mail, celular…)"
           className="h-10 rounded-md border bg-surface px-3 text-sm outline-none focus:border-primary/50" />

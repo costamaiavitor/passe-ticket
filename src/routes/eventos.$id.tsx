@@ -10,7 +10,7 @@ import { createOrder } from "@/services/orders";
 import { useSession } from "@/services/session";
 import { checkAccessCode, eventQuery, previewCoupon } from "@/services/events";
 import { ApiError } from "@/services/http";
-import { brl, fmtDate, fmtTime, MAX_TICKETS_PER_CPF, platformFee } from "@/utils/format";
+import { brl, fmtDate, fmtTime, MAX_TICKETS_PER_CPF } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import { shareMeta, shareText } from "@/lib/seo";
 
@@ -130,7 +130,6 @@ function EventPage() {
     const gross = b.price * n;
     return s + Math.min(gross, coupon.kind === "percent" ? Math.round((gross * Math.min(coupon.value, 100)) / 100) : coupon.value * n);
   }, 0);
-  const fee = platformFee(subtotal - discount);
   const { user } = useSession();
   const navigate = useNavigate();
   const [step, setStep] = useState<"select" | "holders">("select");
@@ -252,8 +251,8 @@ function EventPage() {
                     <dd>− {brl(discount)}</dd>
                   </div>
                 )}
-                <Row k="Taxa da plataforma (10%)" v={brl(fee)} />
-                <Row k="Total" v={brl(subtotal - discount + fee)} strong />
+                <Row k="Taxa de serviço" v="Grátis" />
+                <Row k="Total" v={brl(subtotal - discount)} strong />
               </dl>
               {!coupon && step === "select" && unlocked && (
                 couponOpen ? (

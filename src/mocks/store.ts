@@ -33,10 +33,10 @@ export function mockCreateOrder(input: { eventId: string; batchId: string; holde
   const b = ev?.batches.find((x) => x.id === input.batchId);
   if (!ev || !b) throw new ApiError(404, "NOT_FOUND", "Lote não encontrado.");
   const subtotal = b.price * input.holders.length;
-  const fee = Math.round(subtotal * 0.1);
+  const fee = Math.round(subtotal * 0.11);
   const o: Order = {
     id: uid(), status: "pending", eventId: ev.id, eventTitle: ev.title, eventSlug: ev.slug, eventStartsAt: ev.startsAt,
-    batchId: b.id, batchName: b.name, quantity: input.holders.length, unitPrice: b.price, subtotal, fee, total: subtotal + fee,
+    batchId: b.id, batchName: b.name, quantity: input.holders.length, unitPrice: b.price, subtotal, fee, total: subtotal,
     payment: { method: "pix", pixCode: "00020126PIXSIMULADO-MODO-DEMO" }, paymentProvider: "mock",
     expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(), paidAt: null, createdAt: new Date().toISOString(),
   };

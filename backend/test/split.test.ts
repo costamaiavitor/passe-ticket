@@ -103,20 +103,35 @@ describe("Split 1:1 Mercado Pago", () => {
     const row = (await orderRow(o.body.id))!;
     assert.equal(row.seller_id, "orgA");
     assert.equal(mockAccounts.get(row.payment_id), "seller-orgA", "Pix na conta do organizador");
-    assert.equal(mockFees.get(row.payment_id), 1000, "taxa de R$ 10 para o BooTickets");
-    assert.equal(row.application_fee, 1000);
-    assert.equal(o.body.total, 11000);
+    // R$ 100: taxa de R$ 11; a tarifa do Pix (0,99% = R$ 0,99) o Mercado Pago tira da parte do organizador,
+    // então o BooTickets fica com R$ 10,01 e o organizador com R$ 100 - 10,01 - 0,99 = R$ 89.
+    assert.equal(mockFees.get(row.payment_id), 1001, "taxa do BooTickets menos a tarifa do Pix");
+    assert.equal(row.application_fee, 1001);
+    assert.equal(o.body.total, 10000, "comprador não paga taxa");
     // pagamento aprovado (consulta feita com o token do organizador)
     mockStatuses.set(row.payment_id, "approved");
     assert.equal((await api(`/orders/${o.body.id}`, { token: T["ana"] })).body.status, "paid");
     const stats = (await api(`/organizer/events/${ev.id}`, { token: T["orgA"] })).body.stats;
     assert.equal(stats.revenue, 10000);
-    assert.equal(stats.receivedDirect, 10000);
+    assert.equal(stats.receivedDirect, 8900);
     assert.equal(stats.toReceive, 0, "já recebeu pelo Mercado Pago");
     const pay = ((await api("/admin/payouts", { token: T["adm"] })).body as any[]).find((p) => p.eventId === ev.id);
     assert.equal(pay.balance, 0);
-    assert.equal(pay.direct, 10000);
+    assert.equal(pay.direct, 8900);
     assert.equal((await api("/admin/payouts", { token: T["adm"], body: { eventId: ev.id, amount: 100 } })).status, 400, "não repassa de novo");
+  });
+
+  it("pedidos feitos antes da mudança (taxa somada ao total) mantêm a conta antiga", async () => {
+    const { splitFee, feeIncluded } = await import("../src/domain/orders.js");
+    const antigo = { subtotal: 10000, fee: 1000, total: 11000 };
+    assert.equal(feeIncluded(antigo), false);
+    assert.equal(splitFee(antigo, "pix"), 1000);
+    assert.equal(splitFee(antigo, "card"), 1000);
+    const novo = { subtotal: 10000, fee: 1100, total: 10000 };
+    assert.equal(feeIncluded(novo), true);
+    assert.equal(splitFee(novo, "pix"), 1001);
+    assert.equal(splitFee(novo, "card"), 602);
+    assert.equal(splitFee({ subtotal: 0, fee: 0, total: 0 }, "card"), 0);
   });
 
   it("organizador sem conta conectada continua no modelo antigo (cai no BooTickets, repasse manual)", async () => {
@@ -127,7 +142,7 @@ describe("Split 1:1 Mercado Pago", () => {
     assert.equal(mockAccounts.get(row.payment_id), "passe");
     mockStatuses.set(row.payment_id, "approved");
     await api(`/orders/${o.body.id}`, { token: T["ana"] });
-    assert.equal((await api(`/organizer/events/${ev.id}`, { token: T["orgB"] })).body.stats.toReceive, 5000);
+    assert.equal((await api(`/organizer/events/${ev.id}`, { token: T["orgB"] })).body.stats.toReceive, 4450, "R$ 50 menos 11%: o BooTickets paga a tarifa do Mercado Pago");
   });
 
   it("três organizadores vendendo ao mesmo tempo: cada pagamento vai para a conta certa", async () => {
@@ -140,7 +155,8 @@ describe("Split 1:1 Mercado Pago", () => {
       const row = (await orderRow(o.body.id))!;
       assert.equal(row.seller_id, owners[i]);
       assert.equal(mockAccounts.get(row.payment_id), `seller-${owners[i]}`);
-      assert.equal(mockFees.get(row.payment_id), row.fee);
+      assert.equal(mockFees.get(row.payment_id), row.application_fee);
+      assert.equal(row.application_fee, row.fee - Math.round(row.subtotal * 0.0099));
     }
   });
 
@@ -152,7 +168,9 @@ describe("Split 1:1 Mercado Pago", () => {
     assert.equal(card.body.status, "paid");
     const cardId = (await one<{ id: string }>("SELECT id FROM order_payments WHERE order_id = ?", o.body.id))!.id;
     assert.equal(mockAccounts.get(cardId), "seller-orgC");
-    assert.equal(mockFees.get(cardId), 800);
+    // cartão: taxa de R$ 8,80 menos a tarifa do cartão (4,98% de R$ 80 = R$ 3,98)
+    assert.equal(mockFees.get(cardId), 482);
+    assert.equal((await orderRow(o.body.id))!.application_fee, 482);
     // o Pix que ficou aberto é cancelado na conta do organizador
     assert.equal(mockStatuses.get((await orderRow(o.body.id))!.payment_id), "cancelled");
     const r = await api(`/organizer/events/${ev.id}`, { method: "DELETE", token: T["orgC"] });

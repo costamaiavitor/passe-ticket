@@ -101,7 +101,7 @@ describe("BooTickets API", () => {
   let ticketQr = "";
   let ticketId = "";
 
-  it("compra: reserva estoque, aplica taxa de 10% e respeita limite por CPF", async () => {
+  it("compra: reserva estoque, comprador não paga taxa (11% sai do organizador) e respeita limite por CPF", async () => {
     const tooMany = await api("/orders", { token: tokens.buyer, body: { eventId, batchId, holders: [
       { name: "Fulano de Tal", cpf: CPF_C }, { name: "Fulano de Tal", cpf: CPF_C }, { name: "Fulano de Tal", cpf: CPF_C }] } });
     assert.equal(tooMany.status, 409);
@@ -112,8 +112,8 @@ describe("BooTickets API", () => {
     assert.equal(r.status, 201, JSON.stringify(r.body));
     assert.equal(r.body.status, "pending");
     assert.equal(r.body.subtotal, 10000);
-    assert.equal(r.body.fee, 1000);
-    assert.equal(r.body.total, 11000);
+    assert.equal(r.body.fee, 1100);
+    assert.equal(r.body.total, 10000);
     assert.ok(r.body.payment.pixCode);
 
     // Antes de pagar não há ingresso/QR
@@ -414,14 +414,14 @@ describe("BooTickets API", () => {
     const payouts = (await api("/admin/payouts", { token: adminToken })).body as Array<{ eventId: string; revenue: number; balance: number }>;
     const row = payouts.find((p) => p.eventId === ev.id)!;
     assert.equal(row.revenue, 4000);
-    assert.equal(row.balance, 4000);
+    assert.equal(row.balance, 3560, "R$ 40 menos 11% do BooTickets");
     assert.equal((await api("/admin/payouts", { token: tokens.org, body: { eventId: ev.id, amount: 1000 } })).status, 403);
     assert.equal((await api("/admin/payouts", { token: adminToken, body: { eventId: ev.id, amount: 5000 } })).status, 400);
     assert.equal((await api("/admin/payouts", { token: adminToken, body: { eventId: ev.id, amount: 3000, note: "Pix" } })).status, 201);
     const mine = (await api("/organizer/events", { token: tokens.org })).body as Array<{ id: string; stats: { paidOut: number; toReceive: number } }>;
     const stats = mine.find((e) => e.id === ev.id)!.stats;
     assert.equal(stats.paidOut, 3000);
-    assert.equal(stats.toReceive, 1000);
+    assert.equal(stats.toReceive, 560);
 
     // Dados para receber o repasse
     assert.equal((await api("/organizer/payout-info", { method: "PUT", token: tokens.org, body: { pixKey: "org@t.dev", holder: "Produtor Teste" } })).status, 200);

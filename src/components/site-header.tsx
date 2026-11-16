@@ -84,7 +84,7 @@ export function SiteFooter() {
         <nav className="flex flex-wrap gap-x-5 gap-y-1">
           <Link to="/termos" className="hover:text-foreground">Termos de Uso</Link>
           <Link to="/privacidade" className="hover:text-foreground">Privacidade</Link>
-          <span>Taxa de serviço transparente</span>
+          <span>Sem taxa para quem compra</span>
         </nav>
       </div>
     </footer>

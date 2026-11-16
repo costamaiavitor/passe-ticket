@@ -26,6 +26,20 @@ interface OrderPaymentRow { id: string; order_id: string; method: string; status
 
 export const platformFee = (subtotal: number) => Math.round(subtotal * config.feeRate);
 
+/** Pedido no modelo novo: a taxa está dentro do preço (comprador paga só o ingresso). Nos antigos ela era somada ao total. */
+export const feeIncluded = (o: { total: number; subtotal: number }) => o.total === o.subtotal;
+
+/**
+ * Quanto vai para a conta do BooTickets numa venda dividida (application_fee).
+ * O Mercado Pago desconta a tarifa dele da parte do vendedor (o organizador). Como quem paga a tarifa é o BooTickets,
+ * ela sai da nossa taxa: o organizador fica com o preço menos a taxa (89%), e o BooTickets com a taxa menos a tarifa.
+ */
+export function splitFee(o: { total: number; subtotal: number; fee: number }, method: "pix" | "card") {
+  if (!feeIncluded(o)) return o.fee; // pedido antigo: taxa paga pelo comprador, por fora
+  const mp = Math.round(o.total * (method === "card" ? config.mpCardFeeRate : config.mpPixFeeRate));
+  return Math.max(0, o.fee - mp);
+}
+
 /** Quantos ingressos de cada lote o pedido tem (o carrinho pode misturar lotes). */
 export async function orderBatches(orderId: string, statuses?: string[]) {
   const where = statuses ? ` AND status IN (${statuses.map(() => "?").join(",")})` : "";
@@ -153,7 +167,7 @@ export async function createOrder(userId: string, input: {
       `INSERT INTO orders (id, user_id, event_id, batch_id, quantity, unit_price, subtotal, fee, total, status, payment_provider, expires_at, created_at, coupon_id, discount)
        VALUES (?,?,?,?,?,?,?,?,?, 'pending', ?, ?, ?, ?, ?)`,
       id, userId, ev.id, first.id, holders.length, priced.length === 1 ? first.price : Math.round(gross / holders.length),
-      subtotal, fee, subtotal + fee, payments.name, expires, t, coupon?.id ?? null, discount,
+      subtotal, fee, subtotal, payments.name, expires, t, coupon?.id ?? null, discount,
     );
     for (const l of priced)
       for (const [i, h] of l.holders.entries())
@@ -163,7 +177,8 @@ export async function createOrder(userId: string, input: {
           randomUUID(), id, ev.id, l.b.id, userId, h.name, h.cpf, t, l.ticketPrices[i]!, l.b.price,
         );
     const title = priced.length === 1 ? `${ev.title} — ${first.name}` : `${ev.title} — ${holders.length} ingressos`;
-    return { id, total: subtotal + fee, fee, title, expires, organizerId: ev.organizer_id };
+    // O comprador paga só o valor do ingresso; a taxa do BooTickets (fee) sai da parte do organizador.
+    return { id, total: subtotal, subtotal, fee, title, expires, organizerId: ev.organizer_id };
   });
 
   // Ingresso gratuito: aprova direto.
@@ -186,7 +201,7 @@ export async function createOrder(userId: string, input: {
     let sellerId: string | null = null;
     if (seller) {
       try {
-        p = await payments.create({ ...base, split: { ...seller, applicationFeeCents: order.fee } });
+        p = await payments.create({ ...base, split: { ...seller, applicationFeeCents: splitFee(order, "pix") } });
         sellerId = order.organizerId;
       } catch (e) {
         // Conta do organizador com problema (ex.: acesso revogado): a venda não para — cai na conta do BooTickets
@@ -197,7 +212,7 @@ export async function createOrder(userId: string, input: {
     }
     p ??= await payments.create(base);
     await run("UPDATE orders SET payment_id = ?, payment_data = ?, seller_id = ?, application_fee = ?, split_note = ? WHERE id = ?",
-      p.id, JSON.stringify(p.info), sellerId, sellerId ? order.fee : 0, sellerId ? null : (splitNote ?? "").slice(0, 600), order.id);
+      p.id, JSON.stringify(p.info), sellerId, sellerId ? splitFee(order, "pix") : 0, sellerId ? null : (splitNote ?? "").slice(0, 600), order.id);
     if (sellerId) await reportSplitOk(sellerId);
     else if (splitNote && splitNote !== "not_connected") await reportSplitFailure(order.organizerId, splitNote, order.title);
   } catch (e) {
@@ -395,7 +410,7 @@ export async function payWithCard(userId: string, orderId: string, input: CardIn
   let r;
   try {
     r = await payments.createCard({
-      split: auth ? { ...auth, applicationFeeCents: o.application_fee ?? 0 } : undefined,
+      split: auth ? { ...auth, applicationFeeCents: splitFee(o, "card") } : undefined,
       token: input.token, paymentMethodId: input.paymentMethodId, issuerId: input.issuerId,
       installments: input.installments, identification: input.identification,
       orderId: o.id, amountCents: o.total, description: `Ingresso — ${ev?.title ?? "BooTickets"}`,
@@ -409,6 +424,8 @@ export async function payWithCard(userId: string, orderId: string, input: CardIn
     "INSERT INTO order_payments (id, order_id, provider, method, status, status_detail, installments, created_at) VALUES (?,?,?,?,?,?,?,?)",
     r.id, o.id, payments.name, "card", r.status, r.statusDetail, input.installments, now(),
   );
+  // Cartão tem tarifa maior que o Pix: guarda a taxa que de fato foi para o BooTickets nesta venda.
+  if (auth && r.status !== "rejected") await run("UPDATE orders SET application_fee = ? WHERE id = ?", splitFee(o, "card"), o.id);
   if (r.status === "rejected")
     throw new HttpError(402, "CARD_REJECTED", CARD_REJECTIONS[r.statusDetail] ?? "O cartão foi recusado. Tente outro cartão ou pague com Pix.");
   if (r.status === "approved") await confirmPayment(o.id, r.id);

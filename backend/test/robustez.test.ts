@@ -181,7 +181,7 @@ describe("Robustez do BooTickets", () => {
     const ev = await event("Festa Repasse Duplo", { price: 1000 });
     const o = await buy(T["bia"]!, ev, [["Bia Lima", CPFS[4]!]]);
     await api(`/orders/${o.body.id}/simulate-payment`, { method: "POST", token: T["bia"] });
-    const rs = await Promise.all([1, 2, 3].map(() => api("/admin/payouts", { token: T["adm"], body: { eventId: ev.id, amount: 1000 } })));
+    const rs = await Promise.all([1, 2, 3].map(() => api("/admin/payouts", { token: T["adm"], body: { eventId: ev.id, amount: 890 } })));
     assert.equal(rs.filter((r) => r.status === 201).length, 1);
   });
 
