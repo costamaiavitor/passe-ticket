@@ -40,7 +40,12 @@ export const config = {
   accessTokenTtlSec: 15 * 60,
   refreshTokenTtlSec: 30 * 24 * 3600,
   adminEmails: (env["ADMIN_EMAILS"] ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean),
-  feeRate: Number(env["PLATFORM_FEE_RATE"] ?? 0.1),
+  // Taxa do BooTickets, paga pelo comprador por fora (ingresso de R$ 100 = R$ 111). Dela sai a tarifa do Mercado Pago.
+  feeRate: Number(env["PLATFORM_FEE_RATE"] ?? 0.11),
+  // Tarifa do Mercado Pago (estimada) que o BooTickets assume nas vendas que caem direto na conta do organizador.
+  // Cartão usa a tarifa mais alta (recebimento na hora): se a conta dele tiver tarifa menor, ele fica com um pouco mais.
+  mpPixFeeRate: Number(env["MP_PIX_FEE_RATE"] ?? 0.0099),
+  mpCardFeeRate: Number(env["MP_CARD_FEE_RATE"] ?? 0.0498),
   reservationMinutes: Number(env["ORDER_RESERVATION_MINUTES"] ?? 15),
   maxTicketsPerOrder: Number(env["MAX_TICKETS_PER_ORDER"] ?? 10),
   defaultMaxPerCpf: 2,

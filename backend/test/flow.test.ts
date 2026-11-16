@@ -101,7 +101,7 @@ describe("BooTickets API", () => {
   let ticketQr = "";
   let ticketId = "";
 
-  it("compra: reserva estoque, aplica taxa de 10% e respeita limite por CPF", async () => {
+  it("compra: reserva estoque, aplica taxa de 11% e respeita limite por CPF", async () => {
     const tooMany = await api("/orders", { token: tokens.buyer, body: { eventId, batchId, holders: [
       { name: "Fulano de Tal", cpf: CPF_C }, { name: "Fulano de Tal", cpf: CPF_C }, { name: "Fulano de Tal", cpf: CPF_C }] } });
     assert.equal(tooMany.status, 409);
@@ -112,8 +112,8 @@ describe("BooTickets API", () => {
     assert.equal(r.status, 201, JSON.stringify(r.body));
     assert.equal(r.body.status, "pending");
     assert.equal(r.body.subtotal, 10000);
-    assert.equal(r.body.fee, 1000);
-    assert.equal(r.body.total, 11000);
+    assert.equal(r.body.fee, 1100);
+    assert.equal(r.body.total, 11100);
     assert.ok(r.body.payment.pixCode);
 
     // Antes de pagar não há ingresso/QR

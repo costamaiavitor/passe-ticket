@@ -246,7 +246,7 @@ function EditEvent({ ev }: { ev: EventPanel }) {
                   </div>
                   <p className="mt-2 text-xs text-muted-foreground">
                     {l.price > 0
-                      ? <>Cliente paga <span className="text-foreground">{brl(l.price + platformFee(l.price))}</span> (ingresso + 10% de taxa). Você recebe {brl(l.price)}.</>
+                      ? <>Cliente paga <span className="text-foreground">{brl(l.price + platformFee(l.price))}</span> (ingresso + 11% de taxa). Você recebe {brl(l.price)}.</>
                       : "Ingresso gratuito: o cliente só garante a vaga, sem pagar."}
                   </p>
                 </div>
@@ -297,7 +297,7 @@ function EditEvent({ ev }: { ev: EventPanel }) {
           <h2 className="text-lg font-semibold tracking-tight">Cupons e cortesias</h2>
           <p className="mt-0.5 text-sm text-muted-foreground">Estes são salvos na hora, sem precisar do botão “Salvar alterações”.</p>
         </div>
-        <Section n={6} title="Cupons de desconto" hint="O desconto sai do valor do ingresso. A taxa de 10% é calculada já com o desconto.">
+        <Section n={6} title="Cupons de desconto" hint="O desconto sai do valor do ingresso. A taxa de 11% é calculada já com o desconto.">
           <CouponsManager eventId={ev.id} />
         </Section>
         <Section n={7} title="Ingressos de cortesia" hint="A cortesia ocupa uma vaga do tipo de ingresso escolhido.">

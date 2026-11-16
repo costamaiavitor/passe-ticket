@@ -1,4 +1,4 @@
-export const PLATFORM_FEE_RATE = 0.1;
+export const PLATFORM_FEE_RATE = 0.11;
 export const MAX_TICKETS_PER_CPF = 2;
 
 export const brl = (cents: number) =>

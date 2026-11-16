@@ -82,8 +82,8 @@ describe("Carrinho", () => {
     assert.equal(r.status, 201, JSON.stringify(r.body));
     assert.equal(r.body.quantity, 3);
     assert.equal(r.body.subtotal, 5000 + 2 * 4000);
-    assert.equal(r.body.fee, 1300);
-    assert.equal(r.body.total, 14300);
+    assert.equal(r.body.fee, 1430);
+    assert.equal(r.body.total, 14430);
     assert.deepEqual(r.body.items.map((i: any) => [i.batchName, i.quantity, i.unitPrice]),
       [["Masculino — 1º lote", 1, 5000], ["Feminino — 1º lote", 2, 4000]]);
 
@@ -113,7 +113,7 @@ describe("Carrinho", () => {
     assert.equal(r.status, 201, JSON.stringify(r.body));
     assert.equal(r.body.discount, 900);
     assert.equal(r.body.subtotal, 9000);
-    assert.equal(r.body.total, 8100 + 810);
+    assert.equal(r.body.total, 8100 + 891);
   });
 
   it("se um lote do carrinho não tem vaga, nada é reservado", async () => {

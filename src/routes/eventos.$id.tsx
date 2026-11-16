@@ -252,7 +252,7 @@ function EventPage() {
                     <dd>− {brl(discount)}</dd>
                   </div>
                 )}
-                <Row k="Taxa da plataforma (10%)" v={brl(fee)} />
+                <Row k="Taxa da plataforma (11%)" v={brl(fee)} />
                 <Row k="Total" v={brl(subtotal - discount + fee)} strong />
               </dl>
               {!coupon && step === "select" && unlocked && (

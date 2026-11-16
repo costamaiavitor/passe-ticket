@@ -138,13 +138,13 @@ describe("Privado, senha, cupons e cortesias", () => {
     // prévia
     const prev = await api(`/events/${ev.id}/coupon`, { body: { code: " Verao50 ", quantity: 1 } });
     assert.deepEqual(prev.body, { code: "VERAO50", kind: "percent", value: 50 });
-    // compra com 2 ingressos: R$ 200 → desconto R$ 100 → subtotal R$ 100 + taxa R$ 10
+    // compra com 2 ingressos: R$ 200 → desconto R$ 100 → subtotal R$ 100 + taxa R$ 11
     const o = await buy(T["ana"]!, ev, C["ana"]!, { couponCode: "verao50" }, 2);
     assert.equal(o.status, 201, JSON.stringify(o.body));
     assert.equal(o.body.subtotal, 20000);
     assert.equal(o.body.discount, 10000);
-    assert.equal(o.body.fee, 1000);
-    assert.equal(o.body.total, 11000);
+    assert.equal(o.body.fee, 1100);
+    assert.equal(o.body.total, 11100);
     assert.equal(o.body.couponCode, "VERAO50");
     // limite de 2 ingressos já usado
     assert.equal((await buy(T["bia"]!, ev, C["bia"]!, { couponCode: "VERAO50" })).status, 409);
@@ -161,7 +161,7 @@ describe("Privado, senha, cupons e cortesias", () => {
     const cp = (await api(`/organizer/events/${ev.id}/coupons`, { token: T["org"], body: { code: "MENOS30", kind: "fixed", value: 3000 } })).body;
     const o = await buy(T["ana"]!, ev, C["ana"]!, { couponCode: "menos30" });
     assert.equal(o.body.discount, 3000);
-    assert.equal(o.body.total, 7000 + 700);
+    assert.equal(o.body.total, 7000 + 770);
     // cupom maior que o ingresso não deixa negativo
     await api(`/organizer/events/${ev.id}/coupons`, { token: T["org"], body: { code: "TUDO", kind: "fixed", value: 999999 } });
     const free = await buy(T["bia"]!, ev, C["bia"]!, { couponCode: "tudo" });
