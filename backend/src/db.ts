@@ -272,6 +272,10 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS terms_ip TEXT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS terms_user_agent TEXT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS refunded_at TEXT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS refund_by_buyer BOOLEAN NOT NULL DEFAULT FALSE;
+-- Devolução pendente: quando o comprador pediu, o último erro do Mercado Pago e "manual" se o admin devolveu por fora.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS refund_requested_at TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS refund_error TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS refund_note TEXT;
 ALTER TABLE tickets ADD COLUMN IF NOT EXISTS price INTEGER;
 ALTER TABLE tickets ADD COLUMN IF NOT EXISTS list_price INTEGER;
 

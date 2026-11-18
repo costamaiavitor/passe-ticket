@@ -180,6 +180,19 @@ export interface Attendee {
 /** Evento aguardando aprovação (tela do admin). */
 export interface ReviewEvent extends EventDetail { createdAt: string; organizerEmail: string }
 
+/** Devoluções (tela do admin). */
+export type RefundKind = "buyer" | "event_cancelled" | "late_payment" | "duplicate";
+export interface PendingRefund {
+  orderId: string; kind: RefundKind; paymentId: string | null; amount: number; method: "pix" | "card";
+  buyer: { name: string; email: string }; event: { id: string; title: string; startsAt: string; organizer: string };
+  inOrganizerAccount: boolean; since: string; error: string | null;
+}
+export interface DoneRefund {
+  orderId: string; amount: number; refundedAt: string | null; reason: RefundKind | "manual";
+  buyer: { name: string; email: string }; event: { id: string; title: string; organizer: string }; inOrganizerAccount: boolean;
+}
+export interface RefundsOverview { pending: PendingRefund[]; done: DoneRefund[]; window: { orders: number; amount: number } }
+
 /** Repasse por evento (tela do admin). */
 export interface PayoutRow {
   eventId: string; title: string; slug: string; startsAt: string; status: string; tickets: number;

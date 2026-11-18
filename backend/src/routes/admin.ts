@@ -5,6 +5,7 @@ import { all, now, one, run, tx } from "../db.js";
 import { toEventDetail, type EventRow } from "../domain/events.js";
 import { markRefunded, purgeCancelledEvent } from "../domain/orders.js";
 import { listConnections, testSplit } from "../domain/mpaccounts.js";
+import { doneRefunds, markRefundedManually, pendingRefunds, refundWindow, retryRefund } from "../domain/refunds.js";
 import { eventReviewedEmail, payoutEmail, sendEmail } from "../lib/email.js";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
 import { parse, requireRole, user } from "../lib/http.js";
@@ -144,6 +145,23 @@ adminRouter.post("/events/:id/mark-refunded", async (req, res) => {
   for (const o of paid) await markRefunded(o.id);
   console.warn(`Admin ${user(req).id} marcou ${paid.length} compra(s) do evento ${id} como devolvidas por fora.`);
   res.json({ ok: true, orders: paid.length });
+});
+
+// ---------------- Devoluções ----------------
+/** O que falta devolver (e por quê), o que já foi devolvido e quanto ainda está no prazo de devolução. */
+adminRouter.get("/refunds", async (_req, res) => {
+  res.json({ pending: await pendingRefunds(), done: await doneRefunds(), window: await refundWindow() });
+});
+const refundTarget = z.object({ orderId: z.string().min(1), paymentId: z.string().min(1).nullable() });
+/** Tenta o estorno de novo pelo Mercado Pago. */
+adminRouter.post("/refunds/retry", async (req, res) => {
+  const d = parse(refundTarget, req.body);
+  res.json(await retryRefund(d.orderId, d.paymentId));
+});
+/** Você devolveu por fora (Pix direto): só registra. Não movimenta dinheiro. */
+adminRouter.post("/refunds/manual", async (req, res) => {
+  const d = parse(refundTarget, req.body);
+  res.json(await markRefundedManually(d.orderId, d.paymentId, user(req).id));
 });
 
 /** Registra um repasse feito (o Pix em si é feito por você no app do banco). */

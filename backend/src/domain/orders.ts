@@ -111,6 +111,8 @@ export async function refundOwnOrder(userId: string, orderId: string) {
   } catch (e) {
     const reason = e instanceof Error ? e.message : String(e);
     console.error(`ATENÇÃO: devolução do pedido ${o.id} (pagamento ${paymentId}) recusada pelo Mercado Pago:`, e);
+    // Fica na aba Devoluções do admin até alguém estornar de novo ou devolver por fora.
+    await run("UPDATE orders SET refund_requested_at = COALESCE(refund_requested_at, ?), refund_error = ? WHERE id = ?", now(), reason.slice(0, 500), o.id);
     const buyer = await one<{ email: string; name: string }>("SELECT email, name FROM users WHERE id = ?", userId);
     for (const to of config.adminEmails)
       await sendEmail(refundFailedAdminEmail(to, { name: buyer?.name ?? "", email: buyer?.email ?? "", eventTitle: ev.title, total: o.total, orderId: o.id, reason }))
@@ -119,7 +121,7 @@ export async function refundOwnOrder(userId: string, orderId: string) {
       "Não conseguimos fazer a devolução agora. Seus ingressos continuam válidos e nada foi cobrado a mais. A equipe do BooTickets já foi avisada e vai falar com você.");
   }
   await markRefunded(o.id);
-  await run("UPDATE orders SET refunded_at = ?, refund_by_buyer = TRUE WHERE id = ?", now(), o.id);
+  await run("UPDATE orders SET refunded_at = ?, refund_by_buyer = TRUE, refund_error = NULL WHERE id = ?", now(), o.id);
   const buyer = await one<{ email: string; name: string }>("SELECT email, name FROM users WHERE id = ?", userId);
   if (buyer) await sendEmail(orderRefundedEmail(buyer.email, buyer.name, ev.title, o.total)).catch(() => undefined);
   return (await one<OrderRow>("SELECT * FROM orders WHERE id = ?", o.id))!;
@@ -358,10 +360,12 @@ async function confirmPayment(orderId: string, paymentId: string) {
     try {
       await payments.refund(paymentId, await authForOrder(r));
       await run("UPDATE order_payments SET status = 'refunded' WHERE id = ?", paymentId);
-      if (r.status === "refund_required") await run("UPDATE orders SET status = 'refunded' WHERE id = ?", orderId);
+      if (r.status === "refund_required") await run("UPDATE orders SET status = 'refunded', refunded_at = ? WHERE id = ?", now(), orderId);
       console.warn(`Pagamento ${paymentId} do pedido ${orderId} estornado automaticamente (${duplicate ? "pago em dobro" : "sem estoque"}).`);
     } catch (e) {
       console.error(`ATENÇÃO: estorne manualmente o pagamento ${paymentId} do pedido ${orderId}:`, e);
+      // Aparece na aba Devoluções do admin.
+      await run("UPDATE orders SET refund_error = ? WHERE id = ?", (e instanceof Error ? e.message : String(e)).slice(0, 500), orderId).catch(() => undefined);
     }
     return;
   }
@@ -530,6 +534,7 @@ export async function removeEvent(eventId: string) {
     try {
       if (paymentId && o.total > 0) await payments.refund(paymentId, await authForOrder(o));
       await markRefunded(o.id);
+      await run("UPDATE orders SET refunded_at = ?, refund_error = NULL WHERE id = ?", now(), o.id);
       refunded++;
       const buyer = await one<{ email: string; name: string }>("SELECT email, name FROM users WHERE id = ?", o.user_id);
       const ev = await one<{ title: string }>("SELECT title FROM events WHERE id = ?", eventId);
@@ -537,6 +542,7 @@ export async function removeEvent(eventId: string) {
     } catch (e) {
       refundFailed++;
       errors.push(e instanceof Error ? e.message : String(e));
+      await run("UPDATE orders SET refund_error = ? WHERE id = ?", (e instanceof Error ? e.message : String(e)).slice(0, 500), o.id);
       console.error(`ATENÇÃO: estorne manualmente o pedido ${o.id} (pagamento ${paymentId}) do evento cancelado ${eventId}:`, e);
     }
   }

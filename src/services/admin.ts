@@ -1,6 +1,6 @@
 // Área do admin do BooTickets: aprovar eventos e registrar repasses aos organizadores.
 import { queryOptions } from "@tanstack/react-query";
-import type { PayoutRow, ReviewEvent } from "@/types";
+import type { PayoutRow, RefundsOverview, ReviewEvent } from "@/types";
 import { http } from "./http";
 
 export const reviewEventsQuery = () =>
@@ -11,6 +11,13 @@ export const approveEvent = (id: string) =>
 
 export const rejectEvent = (id: string, reason: string) =>
   http<{ ok: true }>(`/admin/events/${encodeURIComponent(id)}/reject`, { method: "POST", body: JSON.stringify({ reason }) });
+
+export const refundsQuery = () =>
+  queryOptions({ queryKey: ["admin-refunds"], queryFn: () => http<RefundsOverview>("/admin/refunds"), refetchInterval: 60_000 });
+export const retryRefund = (d: { orderId: string; paymentId: string | null }) =>
+  http<{ ok: true }>("/admin/refunds/retry", { method: "POST", body: JSON.stringify(d) });
+export const markRefundManual = (d: { orderId: string; paymentId: string | null }) =>
+  http<{ ok: true }>("/admin/refunds/manual", { method: "POST", body: JSON.stringify(d) });
 
 export const markRefundedOutside = (eventId: string) =>
   http<{ ok: true; orders: number }>(`/admin/events/${encodeURIComponent(eventId)}/mark-refunded`, { method: "POST" });

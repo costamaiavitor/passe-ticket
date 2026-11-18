@@ -156,4 +156,44 @@ describe("Devolução e aceite dos Termos", () => {
     assert.equal((await orderRow(o.id))!.status, "paid");
     assert.ok(sentEmails.some((m) => m.to === "adm@t.dev" && m.subject.includes("Devolução não concluída")));
   });
+
+  it("aba Devoluções do admin: mostra o que falta devolver, tenta de novo, registra devolução por fora e lista o que já voltou", async () => {
+    const ev = await event("Festa Aba Admin");
+    // 1) comprador pediu e o Mercado Pago recusou
+    const o1 = await paid("ana", ev);
+    const pay1 = (await orderRow(o1.id))!.payment_id;
+    mockRefundFail.add(pay1);
+    assert.equal((await refund("ana", o1.id)).status, 502);
+    // 2) pagamento atrasado sem vaga (simulado direto no banco)
+    const o2 = await paid("bia", ev);
+    await run("UPDATE orders SET status = 'refund_required' WHERE id = ?", o2.id);
+    // só admin vê
+    assert.equal((await api("/admin/refunds", { token: T["ana"] })).status, 403);
+    let d = (await api("/admin/refunds", { token: T["adm"] })).body;
+    const p1 = d.pending.find((x: any) => x.orderId === o1.id);
+    const p2 = d.pending.find((x: any) => x.orderId === o2.id);
+    assert.equal(p1.kind, "buyer");
+    assert.match(p1.error, /insufficient balance/);
+    assert.equal(p1.amount, 11100);
+    assert.equal(p2.kind, "late_payment");
+    assert.ok(d.window.orders >= 1, "compras ainda no prazo de devolução");
+    // tentar de novo com o Mercado Pago ainda recusando: continua pendente
+    const again = await api("/admin/refunds/retry", { token: T["adm"], body: { orderId: o1.id, paymentId: p1.paymentId } });
+    assert.equal(again.status, 409);
+    assert.equal((await orderRow(o1.id))!.status, "paid");
+    // agora o Mercado Pago aceita: estorna, cancela os ingressos e avisa o comprador
+    mockRefundFail.delete(pay1);
+    assert.equal((await api("/admin/refunds/retry", { token: T["adm"], body: { orderId: o1.id, paymentId: p1.paymentId } })).status, 200);
+    assert.equal((await orderRow(o1.id))!.status, "refunded");
+    assert.equal(mockStatuses.get(pay1), "refunded");
+    // devolvido por fora: só registra
+    assert.equal((await api("/admin/refunds/manual", { token: T["adm"], body: { orderId: o2.id, paymentId: p2.paymentId } })).status, 200);
+    assert.equal((await orderRow(o2.id))!.status, "refunded");
+    // repetir não acha mais a pendência
+    assert.equal((await api("/admin/refunds/manual", { token: T["adm"], body: { orderId: o2.id, paymentId: p2.paymentId } })).status, 404);
+    d = (await api("/admin/refunds", { token: T["adm"] })).body;
+    assert.ok(!d.pending.some((x: any) => x.orderId === o1.id || x.orderId === o2.id));
+    assert.equal(d.done.find((x: any) => x.orderId === o1.id).reason, "buyer");
+    assert.equal(d.done.find((x: any) => x.orderId === o2.id).reason, "manual");
+  });
 });

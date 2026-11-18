@@ -57,7 +57,7 @@ ordersRouter.post("/:id/cancel", async (req, res) => {
 });
 
 /** Devolução pelo comprador: até 7 dias depois da compra e antes do evento começar. */
-ordersRouter.post("/:id/refund", rateLimit({ windowMs: 60_000, max: 5, key: (r) => `refund:${r.auth?.id}` }), async (req, res) => {
+ordersRouter.post("/:id/refund", rateLimit({ windowMs: 60_000, max: config.isTest ? 1000 : 5, key: (r) => `refund:${r.auth?.id}` }), async (req, res) => {
   res.json(await toOrder(await refundOwnOrder(user(req).id, String(req.params.id))));
 });
 

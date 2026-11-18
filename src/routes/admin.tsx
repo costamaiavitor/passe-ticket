@@ -6,10 +6,11 @@ import { toast } from "sonner";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { RequireAuth } from "@/components/require-auth";
 import { Button } from "@/components/ui/button";
-import { allEventsQuery, approveEvent, mpAccountsQuery, testMpAccount, purgeEvent, markRefundedOutside, payoutsQuery, registerPayout, rejectEvent, reviewEventsQuery } from "@/services/admin";
+import { allEventsQuery, approveEvent, mpAccountsQuery, testMpAccount, purgeEvent, markRefundedOutside, payoutsQuery, registerPayout, rejectEvent, reviewEventsQuery,
+  refundsQuery, retryRefund, markRefundManual } from "@/services/admin";
 import { brl, fmtDate, fmtTime } from "@/utils/format";
 import { cn } from "@/lib/utils";
-import type { PayoutRow, ReviewEvent } from "@/types";
+import type { DoneRefund, PayoutRow, PendingRefund, RefundKind, ReviewEvent } from "@/types";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Admin — BooTickets" }, { name: "robots", content: "noindex" }] }),
@@ -25,19 +26,21 @@ export const Route = createFileRoute("/admin")({
 });
 
 function Admin() {
-  const [tab, setTab] = useState<"review" | "events" | "payouts" | "mp">("review");
+  const [tab, setTab] = useState<"review" | "events" | "payouts" | "refunds" | "mp">("review");
   const { data: review } = useQuery(reviewEventsQuery());
+  const { data: refunds } = useQuery(refundsQuery());
   return (
     <>
       <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Admin</h1>
-      <div className="mt-5 inline-grid grid-cols-2 gap-1 rounded-lg bg-surface p-1 sm:grid-cols-4">
-        {([["review", `Aprovar eventos${review?.length ? ` (${review.length})` : ""}`], ["events", "Todos os eventos"], ["payouts", "Repasses"], ["mp", "Mercado Pago"]] as const).map(([k, label]) => (
+      <div className="mt-5 inline-grid grid-cols-2 gap-1 rounded-lg bg-surface p-1 sm:grid-cols-5">
+        {([["review", `Aprovar eventos${review?.length ? ` (${review.length})` : ""}`], ["events", "Todos os eventos"], ["payouts", "Repasses"],
+          ["refunds", `Devoluções${refunds?.pending.length ? ` (${refunds.pending.length})` : ""}`], ["mp", "Mercado Pago"]] as const).map(([k, label]) => (
           <button key={k} type="button" onClick={() => setTab(k)}
             className={cn("rounded-md px-4 py-2 text-sm font-medium transition-colors",
               tab === k ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>{label}</button>
         ))}
       </div>
-      <div className="mt-6">{tab === "review" ? <ReviewList /> : tab === "events" ? <AllEvents /> : tab === "mp" ? <MpAccounts /> : <Payouts />}</div>
+      <div className="mt-6">{tab === "review" ? <ReviewList /> : tab === "events" ? <AllEvents /> : tab === "mp" ? <MpAccounts /> : tab === "refunds" ? <Refunds /> : <Payouts />}</div>
     </>
   );
 }
@@ -211,6 +214,112 @@ function ReviewCard({ ev }: { ev: ReviewEvent }) {
 }
 
 // ---------------- Repasses ----------------
+// ---------------- Devoluções ----------------
+const REFUND_KIND: Record<RefundKind | "manual", { label: string; hint: string }> = {
+  buyer: { label: "Comprador pediu", hint: "O comprador pediu a devolução pelo site e o Mercado Pago recusou o estorno. Os ingressos dele ainda valem até a devolução ser concluída." },
+  event_cancelled: { label: "Evento cancelado", hint: "O evento foi cancelado e o estorno automático falhou." },
+  late_payment: { label: "Pagou fora do prazo", hint: "O pagamento chegou depois que a reserva venceu e não havia mais vaga (ou o evento já estava cancelado). A pessoa não recebeu ingresso." },
+  duplicate: { label: "Pagou em dobro", hint: "A pessoa pagou duas vezes (Pix e cartão). Ela tem os ingressos; só o pagamento repetido precisa voltar." },
+  manual: { label: "Devolvido por fora", hint: "" },
+};
+
+function Refunds() {
+  const { data, isLoading, error } = useQuery(refundsQuery());
+  if (isLoading) return <p className="text-sm text-muted-foreground">Carregando…</p>;
+  if (error) return <p className="text-sm text-destructive">{error.message}</p>;
+  if (!data) return null;
+  const pendingTotal = data.pending.reduce((s, r) => s + r.amount, 0);
+  const doneTotal = data.done.reduce((s, r) => s + r.amount, 0);
+  return (
+    <>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Falta devolver</p>
+          <p className={cn("mt-1 text-2xl font-semibold", data.pending.length ? "text-destructive" : "")}>{brl(pendingTotal)}</p>
+          <p className="text-xs text-muted-foreground">{data.pending.length} pendência(s)</p></div>
+        <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Já devolvido</p>
+          <p className="mt-1 text-2xl font-semibold">{brl(doneTotal)}</p>
+          <p className="text-xs text-muted-foreground">{data.done.length} compra(s)</p></div>
+        <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Ainda no prazo de devolução (7 dias)</p>
+          <p className="mt-1 text-2xl font-semibold">{brl(data.window.amount)}</p>
+          <p className="text-xs text-muted-foreground">{data.window.orders} compra(s) que o comprador ainda pode devolver</p></div>
+      </div>
+
+      <h2 className="mt-8 text-lg font-semibold">Falta devolver</h2>
+      {data.pending.length
+        ? <div className="mt-3 space-y-3">{data.pending.map((r) => <PendingRefundCard key={`${r.orderId}-${r.paymentId}`} r={r} />)}</div>
+        : <p className="mt-3 rounded-xl border p-6 text-center text-sm text-muted-foreground">Nada pendente. Todo mundo que tinha que receber de volta já recebeu.</p>}
+
+      <h2 className="mt-8 text-lg font-semibold">Já devolvido</h2>
+      {data.done.length
+        ? <div className="mt-3 divide-y rounded-xl border">{data.done.map((r) => <DoneRefundRow key={r.orderId} r={r} />)}</div>
+        : <p className="mt-3 rounded-xl border p-6 text-center text-sm text-muted-foreground">Nenhuma devolução ainda.</p>}
+    </>
+  );
+}
+
+function PendingRefundCard({ r }: { r: PendingRefund }) {
+  const qc = useQueryClient();
+  const [confirmManual, setConfirmManual] = useState(false);
+  const done = () => { void qc.invalidateQueries({ queryKey: ["admin-refunds"] }); void qc.invalidateQueries({ queryKey: ["admin-payouts"] }); };
+  const retry = useMutation({
+    mutationFn: () => retryRefund({ orderId: r.orderId, paymentId: r.paymentId }),
+    onSuccess: () => { toast.success("Estornado pelo Mercado Pago. O comprador recebe um e-mail."); done(); },
+    onError: (e) => { toast.error(e instanceof Error ? e.message : "Não foi possível estornar."); done(); },
+  });
+  const manual = useMutation({
+    mutationFn: () => markRefundManual({ orderId: r.orderId, paymentId: r.paymentId }),
+    onSuccess: () => { toast.success("Registrado como devolvido por fora."); done(); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Não foi possível registrar."),
+  });
+  const busy = retry.isPending || manual.isPending;
+  return (
+    <div className="rounded-xl border bg-card p-4 text-sm">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <span className="rounded-full bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning">{REFUND_KIND[r.kind].label}</span>
+          <p className="mt-2 font-medium">{r.buyer.name} <span className="font-normal text-muted-foreground">· {r.buyer.email}</span></p>
+          <p className="text-muted-foreground">{r.event.title} · {fmtDate(r.event.startsAt)} · organizador {r.event.organizer}</p>
+        </div>
+        <p className="text-xl font-semibold">{brl(r.amount)}</p>
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">{REFUND_KIND[r.kind].hint}</p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {r.method === "card" ? "Cartão" : "Pix"} · o dinheiro está na conta {r.inOrganizerAccount ? `Mercado Pago do organizador (${r.event.organizer})` : "Mercado Pago do BooTickets"} · desde {fmtDate(r.since)} {fmtTime(r.since)} · pedido #{r.orderId.slice(0, 8)}
+      </p>
+      {r.error && <p className="mt-1 break-words text-xs text-destructive">Último erro do Mercado Pago: {r.error}</p>}
+      {r.inOrganizerAccount && <p className="mt-1 text-xs text-warning">O estorno sai da conta do organizador: se faltar saldo lá, peça para ele deixar saldo ou devolva você por fora e desconte do próximo repasse.</p>}
+      {confirmManual ? (
+        <div className="mt-3 space-y-2 rounded-lg border p-3">
+          <p className="text-xs">Confirme só se você <strong>já mandou {brl(r.amount)}</strong> para {r.buyer.name} por fora (Pix direto). Isso só registra a devolução{r.kind === "buyer" || r.kind === "event_cancelled" ? " e cancela os ingressos" : ""}; nenhum dinheiro é movimentado.</p>
+          <div className="flex gap-2">
+            <Button size="sm" disabled={busy} onClick={() => manual.mutate()}>{manual.isPending ? "Registrando…" : "Já devolvi, registrar"}</Button>
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => setConfirmManual(false)}>Voltar</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button size="sm" disabled={busy} onClick={() => retry.mutate()}>{retry.isPending ? "Estornando…" : "Tentar estornar de novo"}</Button>
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => setConfirmManual(true)}>Já devolvi por fora</Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DoneRefundRow({ r }: { r: DoneRefund }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
+      <div className="min-w-0">
+        <p className="font-medium">{r.buyer.name} <span className="font-normal text-muted-foreground">· {r.event.title}</span></p>
+        <p className="text-xs text-muted-foreground">
+          {REFUND_KIND[r.reason].label}{r.refundedAt ? ` · ${fmtDate(r.refundedAt)} ${fmtTime(r.refundedAt)}` : ""} · {r.buyer.email} · pedido #{r.orderId.slice(0, 8)}
+        </p>
+      </div>
+      <p className="font-medium">{brl(r.amount)}</p>
+    </div>
+  );
+}
+
 function Payouts() {
   const { data, isLoading, error } = useQuery(payoutsQuery());
   if (isLoading) return <p className="text-sm text-muted-foreground">Carregando…</p>;
