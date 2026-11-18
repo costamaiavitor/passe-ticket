@@ -98,6 +98,25 @@ export function eventCancelledEmail(to: string, name: string, eventTitle: string
   };
 }
 
+export function orderRefundedEmail(to: string, name: string, eventTitle: string, total: number): Email {
+  return {
+    to,
+    subject: `Devolução feita: ${eventTitle}`,
+    html: layout("Devolução feita", `<p>Oi, ${esc(name)}.</p><p>Você devolveu seus ingressos de <strong>${esc(eventTitle)}</strong>. Eles foram cancelados e o valor de <strong>${brl(total)}</strong> foi estornado pelo Mercado Pago.</p><p>No cartão, o estorno pode levar até 2 faturas para aparecer; no Pix, volta para a conta de origem.</p>`),
+    text: `Você devolveu seus ingressos de ${eventTitle}. O valor de ${brl(total)} foi estornado pelo Mercado Pago.`,
+  };
+}
+
+/** Aviso para os admins: o comprador pediu a devolução, mas o Mercado Pago não estornou. */
+export function refundFailedAdminEmail(to: string, d: { name: string; email: string; eventTitle: string; total: number; orderId: string; reason: string }): Email {
+  return {
+    to,
+    subject: `Devolução não concluída: ${d.eventTitle}`,
+    html: layout("Devolução não concluída", `<p><strong>${esc(d.name)}</strong> (${esc(d.email)}) pediu a devolução do pedido #${esc(d.orderId.slice(0, 8))} de <strong>${esc(d.eventTitle)}</strong> (${brl(d.total)}), mas o Mercado Pago recusou o estorno.</p><p>Motivo: ${esc(d.reason)}</p><p>Os ingressos continuam válidos. Confira a conta no Mercado Pago (pode faltar saldo) e fale com o comprador.</p>`),
+    text: `Devolução não concluída: ${d.name} (${d.email}), pedido ${d.orderId}, ${d.eventTitle}, ${brl(d.total)}. Motivo: ${d.reason}`,
+  };
+}
+
 export function eventForReviewEmail(to: string, eventTitle: string, organizer: string): Email {
   const link = `${config.publicUrl}/admin`;
   return {

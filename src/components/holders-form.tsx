@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import type { Holder } from "@/types";
 
@@ -33,6 +34,16 @@ export function HoldersForm({ labels, defaultName, loading, error, onBack, onSub
         </fieldset>
       ))}
       <p className="text-xs text-muted-foreground">O titular precisa apresentar documento com o mesmo CPF na entrada.</p>
+      {/* Aceite obrigatório: o navegador não deixa seguir sem marcar, e o servidor grava versão, data, hora e IP do aceite. */}
+      <label className="flex items-start gap-2 rounded-lg border p-3 text-xs leading-relaxed">
+        <input type="checkbox" required className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]" />
+        <span>
+          Li e aceito os <Link to="/termos" target="_blank" className="font-medium text-foreground underline">Termos de Uso</Link>,
+          incluindo a <Link to="/termos" hash="devolucao" target="_blank" className="font-medium text-foreground underline">Política de Devolução</Link>:
+          posso devolver os ingressos pelo site em até 7 dias depois da compra, desde que o evento ainda não tenha começado.
+          Ingresso usado na entrada ou transferido não pode ser devolvido.
+        </span>
+      </label>
       {error && <p className="text-sm text-destructive">{error}</p>}
       <div className="flex gap-2">
         <Button type="button" variant="outline" onClick={onBack} disabled={loading}>Voltar</Button>

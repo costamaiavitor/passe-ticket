@@ -6,7 +6,7 @@ const mocks = () => import("@/mocks/store");
 
 /** Cria o pedido com um ou mais lotes (carrinho). */
 export async function createOrder(input: {
-  eventId: string; items: { batchId: string; holders: Holder[] }[]; accessCode?: string; couponCode?: string;
+  eventId: string; items: { batchId: string; holders: Holder[] }[]; accessCode?: string; couponCode?: string; acceptTerms: true;
 }): Promise<Order> {
   if (USE_MOCKS) return (await mocks()).mockCreateOrder({ eventId: input.eventId, batchId: input.items[0]!.batchId, holders: input.items.flatMap((i) => i.holders) });
   return http<Order>("/orders", { method: "POST", body: JSON.stringify(input) });
@@ -34,6 +34,15 @@ export interface CardPaymentData {
 /** Paga com cartão: só o token do cartão (gerado pelo Mercado Pago) é enviado; o valor é calculado no servidor. */
 export async function payWithCard(id: string, data: CardPaymentData): Promise<Order> {
   return http<Order>(`/orders/${encodeURIComponent(id)}/card`, { method: "POST", body: JSON.stringify(data) });
+}
+
+/** Pedidos do comprador (para a devolução em "Meus ingressos"). */
+export const myOrdersQuery = () =>
+  queryOptions({ queryKey: ["my-orders"], queryFn: () => (USE_MOCKS ? Promise.resolve([] as Order[]) : http<Order[]>("/orders")) });
+
+/** Devolve o pedido inteiro (estorno pelo Mercado Pago). */
+export async function refundOrder(id: string): Promise<Order> {
+  return http<Order>(`/orders/${encodeURIComponent(id)}/refund`, { method: "POST" });
 }
 
 export async function cancelOrder(id: string): Promise<Order> {

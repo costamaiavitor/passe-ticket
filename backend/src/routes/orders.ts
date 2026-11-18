@@ -2,7 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { config } from "../config.js";
 import { all, now, one } from "../db.js";
-import { approveOrder, cancelOwnOrder, createOrder, MAX_INSTALLMENTS, notifyPaid, payWithCard, releaseOrder, syncPayment, toOrder, type OrderRow } from "../domain/orders.js";
+import { approveOrder, cancelOwnOrder, createOrder, refundOwnOrder, MAX_INSTALLMENTS, notifyPaid, payWithCard, releaseOrder, syncPayment, toOrder, type OrderRow } from "../domain/orders.js";
 import { forbidden, HttpError, notFound } from "../lib/errors.js";
 import { parse, rateLimit, requireAuth, user } from "../lib/http.js";
 
@@ -18,10 +18,12 @@ const createSchema = z.object({
   items: z.array(z.object({ batchId: z.string().min(1), holders: z.array(holderSchema).min(1).max(50) })).min(1).max(20).optional(),
   accessCode: z.string().max(60).optional(),
   couponCode: z.string().max(40).optional(),
+  // Aceite dos Termos de Uso e da Política de Devolução (obrigatório; conferido em createOrder).
+  acceptTerms: z.boolean().optional(),
 });
 
 ordersRouter.post("/", rateLimit({ windowMs: 60_000, max: config.isTest ? 1000 : 20, key: (r) => `order:${r.auth?.id}` }), async (req, res) => {
-  const o = await createOrder(user(req).id, parse(createSchema, req.body));
+  const o = await createOrder(user(req).id, parse(createSchema, req.body), { ip: req.ip, userAgent: req.get("user-agent") });
   res.status(201).json(await toOrder(o));
 });
 
@@ -52,6 +54,11 @@ ordersRouter.get("/:id", async (req, res) => {
 ordersRouter.post("/:id/cancel", async (req, res) => {
   await cancelOwnOrder(user(req).id, req.params.id);
   res.json(await toOrder(await own(user(req).id, req.params.id)));
+});
+
+/** Devolução pelo comprador: até 7 dias depois da compra e antes do evento começar. */
+ordersRouter.post("/:id/refund", rateLimit({ windowMs: 60_000, max: 5, key: (r) => `refund:${r.auth?.id}` }), async (req, res) => {
+  res.json(await toOrder(await refundOwnOrder(user(req).id, String(req.params.id))));
 });
 
 /** Pagamento com cartão: o navegador manda só o token do cartão (gerado pelo formulário seguro do Mercado Pago). */

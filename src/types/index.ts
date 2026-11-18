@@ -89,6 +89,10 @@ export interface Order {
   cardPending?: boolean;
   expiresAt: string;
   paidAt: string | null;
+  /** Até quando dá para devolver pelo site (null = não dá). */
+  refundableUntil?: string | null;
+  refundedAt?: string | null;
+  refundByBuyer?: boolean;
   createdAt: string;
 }
 

@@ -42,6 +42,10 @@ export const config = {
   adminEmails: (env["ADMIN_EMAILS"] ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean),
   // Taxa do BooTickets, paga pelo comprador por fora (ingresso de R$ 100 = R$ 111). Dela sai a tarifa do Mercado Pago.
   feeRate: Number(env["PLATFORM_FEE_RATE"] ?? 0.11),
+  // Versão dos Termos de Uso que o comprador aceita na compra (mude junto com a data em src/components/legal-page.tsx).
+  termsVersion: "2026-11-17",
+  // Prazo de arrependimento (CDC art. 49): dias depois da compra em que o comprador pode devolver pelo site.
+  refundDays: 7,
   // Tarifa do Mercado Pago (estimada) que o BooTickets assume nas vendas que caem direto na conta do organizador.
   // Cartão usa a tarifa mais alta (recebimento na hora): se a conta dele tiver tarifa menor, ele fica com um pouco mais.
   mpPixFeeRate: Number(env["MP_PIX_FEE_RATE"] ?? 0.0099),

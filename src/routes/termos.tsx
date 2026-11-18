@@ -36,6 +36,8 @@ function Terms() {
           <li>Há limite de ingressos por CPF em cada evento, definido pelo organizador.</li>
           <li>Pedidos não pagos dentro do prazo exibido no checkout são cancelados e os ingressos voltam à venda.</li>
           <li>No cartão, o parcelamento pode ter juros do Mercado Pago, sempre informados antes da confirmação.</li>
+          <li><strong>Aceite na compra:</strong> para finalizar um pedido, o comprador marca que leu e aceita estes Termos e a Política de Devolução. O BooTickets registra a versão dos Termos aceita, a data, a hora, o endereço IP e o navegador usados, como comprovante do aceite.</li>
+          <li>O comprador declara que os dados dos titulares (nome e CPF) são verdadeiros e que tem autorização para informá-los.</li>
         </ul>
       </LegalSection>
 
@@ -47,12 +49,17 @@ function Terms() {
         </ul>
       </LegalSection>
 
-      <LegalSection n={5} title="Cancelamento e reembolso">
-        <ul>
-          <li>Pelo Código de Defesa do Consumidor (art. 49), compras pela internet podem ser canceladas em até <strong>7 dias</strong> após a compra, desde que o pedido seja feito antes do evento acontecer, conforme a política do evento.</li>
-          <li>Se o evento for <strong>cancelado ou adiado</strong>, o comprador tem direito ao reembolso integral, que é de responsabilidade do organizador e será processado pelo mesmo meio de pagamento.</li>
-          <li>Ingressos já utilizados na portaria não são reembolsáveis.</li>
-          <li>Pedidos de cancelamento: <a className="text-foreground underline" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.</li>
+      <LegalSection n={5} title="Política de Devolução e reembolso">
+        <ul id="devolucao">
+          <li><strong>Direito de arrependimento (CDC, art. 49):</strong> o comprador pode devolver a compra em até <strong>7 (sete) dias corridos</strong> contados da confirmação do pagamento, desde que o evento <strong>ainda não tenha começado</strong>. Depois do início do evento não há devolução, mesmo dentro dos 7 dias.</li>
+          <li><strong>Como devolver:</strong> pelo próprio site, em “Meus ingressos” → “Devolver ingressos”. A devolução vale para a compra inteira (todos os ingressos do pedido).</li>
+          <li><strong>Valor devolvido:</strong> o valor total pago, incluindo a taxa de serviço, estornado pelo mesmo meio de pagamento pelo Mercado Pago. No Pix, o dinheiro volta para a conta de origem; no cartão, o estorno pode levar até 2 faturas para aparecer.</li>
+          <li>Ao devolver, <strong>todos os ingressos do pedido são cancelados</strong> e seus QR Codes deixam de valer na hora. A devolução não pode ser desfeita; os ingressos podem voltar à venda.</li>
+          <li><strong>Não podem ser devolvidos:</strong> ingressos já utilizados na entrada; pedidos com ingresso transferido para outra pessoa (ou com transferência em aberto); ingressos de cortesia; e compras fora do prazo acima.</li>
+          <li>Fora do prazo de arrependimento, não há devolução por desistência, mudança de planos ou impossibilidade de comparecer. O ingresso pode ser transferido para outra pessoa, se o evento permitir.</li>
+          <li>Se o evento for <strong>cancelado</strong>, o reembolso integral é automático. Se for <strong>adiado ou mudar de forma relevante</strong> (data, local ou atração principal), o comprador pode pedir o reembolso integral, que é de responsabilidade do organizador.</li>
+          <li>Se o estorno não puder ser feito na hora, os ingressos continuam válidos até a devolução ser concluída, e a equipe do BooTickets entra em contato.</li>
+          <li>Dúvidas e pedidos que não puderem ser feitos pelo site: <a className="text-foreground underline" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.</li>
         </ul>
       </LegalSection>
 
@@ -69,6 +76,7 @@ function Terms() {
       <LegalSection n={7} title="Proibido">
         <ul>
           <li>Revender ingressos por preço acima do original (cambismo).</li>
+          <li>Pedir estorno ou contestar a compra no banco ou no cartão (chargeback) de má-fé, depois de usar o ingresso. Nesses casos, o BooTickets pode apresentar o comprovante do aceite destes Termos, os dados do pedido e o registro de entrada na portaria, e suspender a conta.</li>
           <li>Falsificar, copiar ou adulterar QR Codes.</li>
           <li>Tentar burlar limites de compra, sistemas de pagamento ou a segurança do site.</li>
         </ul>

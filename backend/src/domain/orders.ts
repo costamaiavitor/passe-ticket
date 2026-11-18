@@ -4,7 +4,7 @@ import { all, now, one, run, tx } from "../db.js";
 import { isValidCpf, onlyDigits } from "../lib/cpf.js";
 import { badRequest, conflict, forbidden, HttpError, notFound } from "../lib/errors.js";
 import { payments, type CardPaymentInput, type PaymentInfo } from "../payments.js";
-import { eventCancelledEmail, purchaseEmail, sendEmail } from "../lib/email.js";
+import { eventCancelledEmail, orderRefundedEmail, purchaseEmail, refundFailedAdminEmail, sendEmail } from "../lib/email.js";
 import { batchStatus, batchStatuses, categoryOf, normalizeCode, type BatchRow, type EventRow } from "./events.js";
 import { discountFor, findUsableCoupon } from "./promos.js";
 import { authForOrder, explainSplitError, reportSplitFailure, reportSplitOk, sellerAuth } from "./mpaccounts.js";
@@ -18,6 +18,7 @@ export interface OrderRow {
   coupon_id?: string | null; discount?: number; kind?: "sale" | "courtesy";
   /** Split 1:1: organizador em cuja conta Mercado Pago o pagamento foi criado (null = conta do BooTickets). */
   seller_id?: string | null; application_fee?: number;
+  refunded_at?: string | null; refund_by_buyer?: boolean;
   /** Só no retorno de approveOrder: o pedido acabou de ser pago nesta chamada. */
   justPaid?: boolean;
 }
@@ -67,7 +68,61 @@ export async function toOrder(o: OrderRow) {
       ? !!(await one("SELECT 1 FROM order_payments WHERE order_id = ? AND method = 'card' AND status = 'pending'", o.id))
       : false,
     paymentProvider: o.payment_provider, expiresAt: o.expires_at, paidAt: o.paid_at, createdAt: o.created_at,
+    // Até quando o comprador pode devolver pelo site (null = não pode mais / não se aplica).
+    refundableUntil: refundDeadline(o, ev?.starts_at ?? ""), refundedAt: o.refunded_at ?? null, refundByBuyer: !!o.refund_by_buyer,
   };
+}
+
+// ---------- Devolução pelo comprador (direito de arrependimento, CDC art. 49) ----------
+/**
+ * Prazo para devolver: até 7 dias depois do pagamento, e nunca depois do início do evento.
+ * Só compras pagas (cortesia não tem o que devolver).
+ */
+export function refundDeadline(o: Pick<OrderRow, "status" | "kind" | "paid_at">, startsAt: string, at = Date.now()) {
+  if (o.status !== "paid" || o.kind === "courtesy" || !o.paid_at) return null;
+  const until = Math.min(Date.parse(o.paid_at) + config.refundDays * 86400_000, Date.parse(startsAt));
+  return Number.isFinite(until) && until > at ? new Date(until).toISOString() : null;
+}
+
+/** O comprador devolve o pedido inteiro: estorna o valor total (com a taxa) pelo Mercado Pago e cancela os ingressos. */
+export async function refundOwnOrder(userId: string, orderId: string) {
+  const o = await one<OrderRow>("SELECT * FROM orders WHERE id = ?", orderId);
+  if (!o) throw notFound("Pedido não encontrado.");
+  if (o.user_id !== userId) throw forbidden();
+  if (o.status === "refunded") return o;
+  if (o.status !== "paid" || o.kind === "courtesy") throw conflict("NOT_REFUNDABLE", "Este pedido não pode ser devolvido.");
+  const ev = (await one<{ title: string; starts_at: string; status: string }>("SELECT title, starts_at, status FROM events WHERE id = ?", o.event_id))!;
+  if (ev.status === "cancelled") throw conflict("EVENT_CANCELLED", "Este evento foi cancelado: a devolução é feita automaticamente.");
+  if (!refundDeadline(o, ev.starts_at))
+    throw conflict("REFUND_EXPIRED", Date.parse(ev.starts_at) <= Date.now()
+      ? "O evento já começou, então não dá mais para devolver."
+      : `O prazo para devolver acabou: a devolução pode ser feita até ${config.refundDays} dias depois da compra.`);
+  const tickets = await all<{ status: string; owner_id: string }>("SELECT status, owner_id FROM tickets WHERE order_id = ? AND status <> 'cancelled'", o.id);
+  if (tickets.some((t) => t.status === "used")) throw conflict("TICKET_USED", "Um ingresso deste pedido já foi usado na entrada, então ele não pode ser devolvido.");
+  if (tickets.some((t) => t.owner_id !== userId))
+    throw conflict("TICKET_TRANSFERRED", "Um ingresso deste pedido foi transferido para outra pessoa, então o pedido não pode mais ser devolvido.");
+  if (await one("SELECT 1 FROM ticket_transfers tt JOIN tickets t ON t.id = tt.ticket_id WHERE t.order_id = ? AND tt.status = 'pending'", o.id))
+    throw conflict("TRANSFER_PENDING", "Há uma transferência em aberto num ingresso deste pedido. Cancele a transferência antes de devolver.");
+
+  const paymentId = o.paid_payment_id ?? o.payment_id;
+  try {
+    // O Mercado Pago não estorna duas vezes o mesmo pagamento (chave de idempotência), então um clique repetido é seguro.
+    if (paymentId && o.total > 0) await payments.refund(paymentId, await authForOrder(o));
+  } catch (e) {
+    const reason = e instanceof Error ? e.message : String(e);
+    console.error(`ATENÇÃO: devolução do pedido ${o.id} (pagamento ${paymentId}) recusada pelo Mercado Pago:`, e);
+    const buyer = await one<{ email: string; name: string }>("SELECT email, name FROM users WHERE id = ?", userId);
+    for (const to of config.adminEmails)
+      await sendEmail(refundFailedAdminEmail(to, { name: buyer?.name ?? "", email: buyer?.email ?? "", eventTitle: ev.title, total: o.total, orderId: o.id, reason }))
+        .catch(() => undefined);
+    throw new HttpError(502, "REFUND_FAILED",
+      "Não conseguimos fazer a devolução agora. Seus ingressos continuam válidos e nada foi cobrado a mais. A equipe do BooTickets já foi avisada e vai falar com você.");
+  }
+  await markRefunded(o.id);
+  await run("UPDATE orders SET refunded_at = ?, refund_by_buyer = TRUE WHERE id = ?", now(), o.id);
+  const buyer = await one<{ email: string; name: string }>("SELECT email, name FROM users WHERE id = ?", userId);
+  if (buyer) await sendEmail(orderRefundedEmail(buyer.email, buyer.name, ev.title, o.total)).catch(() => undefined);
+  return (await one<OrderRow>("SELECT * FROM orders WHERE id = ?", o.id))!;
 }
 
 export interface Holder { name: string; cpf: string }
@@ -79,8 +134,11 @@ export interface CartItem { batchId: string; holders: Holder[] }
  */
 export async function createOrder(userId: string, input: {
   eventId: string; batchId?: string | undefined; holders?: Holder[] | undefined; items?: CartItem[] | undefined;
-  accessCode?: string | undefined; couponCode?: string | undefined;
-}) {
+  accessCode?: string | undefined; couponCode?: string | undefined; acceptTerms?: boolean | undefined;
+}, proof: { ip?: string | undefined; userAgent?: string | undefined } = {}) {
+  // Sem o aceite dos Termos (com a política de devolução) não há compra. O aceite fica gravado no pedido como prova.
+  if (input.acceptTerms !== true)
+    throw badRequest("TERMS_REQUIRED", "Para comprar, leia e aceite os Termos de Uso e a Política de Devolução.");
   await expireStaleOrders();
   // Junta os itens por lote (o mesmo lote duas vezes vira um item só).
   const raw: CartItem[] = input.items?.length ? input.items : input.batchId ? [{ batchId: input.batchId, holders: input.holders ?? [] }] : [];
@@ -160,10 +218,12 @@ export async function createOrder(userId: string, input: {
     const first = priced[0]!.b;
     for (const l of priced) await run("UPDATE batches SET reserved = reserved + ? WHERE id = ?", l.holders.length, l.b.id);
     await run(
-      `INSERT INTO orders (id, user_id, event_id, batch_id, quantity, unit_price, subtotal, fee, total, status, payment_provider, expires_at, created_at, coupon_id, discount)
-       VALUES (?,?,?,?,?,?,?,?,?, 'pending', ?, ?, ?, ?, ?)`,
+      `INSERT INTO orders (id, user_id, event_id, batch_id, quantity, unit_price, subtotal, fee, total, status, payment_provider, expires_at, created_at, coupon_id, discount,
+         terms_version, terms_accepted_at, terms_ip, terms_user_agent)
+       VALUES (?,?,?,?,?,?,?,?,?, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       id, userId, ev.id, first.id, holders.length, priced.length === 1 ? first.price : Math.round(gross / holders.length),
       subtotal, fee, subtotal + fee, payments.name, expires, t, coupon?.id ?? null, discount,
+      config.termsVersion, t, (proof.ip ?? "").slice(0, 64), (proof.userAgent ?? "").slice(0, 300),
     );
     for (const l of priced)
       for (const [i, h] of l.holders.entries())

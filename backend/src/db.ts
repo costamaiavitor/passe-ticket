@@ -265,6 +265,13 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS application_fee INTEGER NOT NULL DEF
 -- (já com a parte do desconto). Ingressos antigos ficam sem preço e usam o valor do pedido.
 -- Por que a venda NAO foi dividida (split): 'not_connected' = dono do evento sem Mercado Pago conectado; senao, o erro do Mercado Pago.
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS split_note TEXT;
+-- Prova do aceite dos Termos na compra (versão, quando, de onde) e devolução feita pelo próprio comprador.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS terms_version TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS terms_accepted_at TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS terms_ip TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS terms_user_agent TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS refunded_at TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS refund_by_buyer BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE tickets ADD COLUMN IF NOT EXISTS price INTEGER;
 ALTER TABLE tickets ADD COLUMN IF NOT EXISTS list_price INTEGER;
 

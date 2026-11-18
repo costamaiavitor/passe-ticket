@@ -92,7 +92,11 @@ const mock: PaymentProvider = {
     return mockStatuses.get(id) ?? "pending";
   },
   async cancel(id, auth) { mockOwner(id, auth); mockStatuses.set(id, "cancelled"); },
-  async refund(id, auth) { mockOwner(id, auth); mockStatuses.set(id, "refunded"); },
+  async refund(id, auth) {
+    mockOwner(id, auth);
+    if (mockRefundFail.has(id)) throw new Error("Mercado Pago 400: insufficient balance");
+    mockStatuses.set(id, "refunded");
+  },
   async account(auth) { return { id: auth ? auth.accessToken.replace(/^seller-/, "mp-") : "mp-passe" }; },
   // Código "ok-<n>" vira a conta simulada "seller-<n>"; qualquer outro código é recusado.
   async oauthToken(body) {
@@ -102,6 +106,8 @@ const mock: PaymentProvider = {
   },
 };
 
+/** Só para testes: pagamentos simulados cujo estorno o Mercado Pago recusa (ex.: sem saldo na conta). */
+export const mockRefundFail = new Set<string>();
 /** Só para testes: muda o status de um pagamento simulado. */
 export const mockStatuses = new Map<string, PaymentStatus>();
 /** Só para testes: conta (token) onde cada pagamento simulado foi criado, e a taxa do BooTickets (split). */

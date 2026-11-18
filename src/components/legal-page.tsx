@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 
 export const CONTACT_EMAIL = "booticketss@gmail.com";
-export const LEGAL_UPDATED_AT = "5 de novembro de 2026";
+export const LEGAL_UPDATED_AT = "17 de novembro de 2026";
 
 /** Moldura das páginas legais (Privacidade e Termos), no visual do site. */
 export function LegalPage({ title, intro, children }: { title: string; intro: string; children: ReactNode }) {

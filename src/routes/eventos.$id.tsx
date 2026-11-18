@@ -154,7 +154,7 @@ function EventPage() {
     const items = lines.map(({ b, n }) => ({ batchId: b.id, holders: holders.slice(at, (at += n)) }));
     try {
       const order = await createOrder({
-        eventId: ev.id, items,
+        eventId: ev.id, items, acceptTerms: true,
         ...(ev.requiresAccessCode ? { accessCode: code } : {}),
         ...(coupon ? { couponCode: coupon.code } : {}),
       });
