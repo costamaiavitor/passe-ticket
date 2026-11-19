@@ -1,4 +1,5 @@
-import { all, one } from "../db.js";
+import { all, one, run, tx } from "../db.js";
+import { conflict, notFound } from "../lib/errors.js";
 
 export interface EventRow {
   id: string; slug: string; organizer_id: string; title: string; category: string; cover_url: string;
@@ -62,6 +63,37 @@ export function toBatch(b: BatchRow, status: PublicBatchStatus = batchStatus(b))
     sold: b.sold + b.reserved,
     salesStart: b.sales_start, salesEnd: b.sales_end, status,
   };
+}
+
+/**
+ * Virada manual de lote numa categoria (ex.: Feminino): encerra o lote que está aberto e abre o seguinte,
+ * mesmo que o atual ainda tenha ingressos. "back" desfaz: reabre o último lote encerrado e o atual volta a "em breve".
+ */
+export async function switchBatch(eventId: string, category: string, direction: "next" | "back") {
+  return tx(async () => {
+    const all_ = await all<BatchRow>("SELECT * FROM batches WHERE event_id = ? ORDER BY position, price FOR UPDATE", eventId);
+    const group = all_.filter((b) => categoryOf(b) === category.trim().toLowerCase());
+    if (!group.length) throw notFound("Tipo de ingresso não encontrado neste evento.");
+    const at = new Date().toISOString();
+    // O lote "da vez": o primeiro da fila que não esgotou nem encerrou.
+    const cur = group.findIndex((b) => !["soldout", "closed"].includes(batchStatus(b, at)));
+    if (direction === "next") {
+      if (cur < 0) throw conflict("NO_OPEN_BATCH", "Todos os lotes deste tipo já esgotaram ou encerraram.");
+      const next = group.slice(cur + 1).find((b) => b.status !== "closed" && b.sold + b.reserved < b.total);
+      if (!next) throw conflict("LAST_BATCH", "Este já é o último lote deste tipo. Crie um novo lote para virar.");
+      await run("UPDATE batches SET status = 'closed' WHERE id = ?", group[cur]!.id);
+      // O lote seguinte abre na hora, mesmo que estivesse pausado ou marcado para começar depois.
+      await run("UPDATE batches SET status = 'active', sales_start = CASE WHEN sales_start > ? THEN ? ELSE sales_start END WHERE id = ?", at, at, next.id);
+      return { closed: group[cur]!.name, opened: next.name };
+    }
+    const upto = cur < 0 ? group.length : cur;
+    const prev = [...group.slice(0, upto)].reverse().find((b) => b.status === "closed" && b.sold + b.reserved < b.total);
+    if (!prev) throw conflict("NO_PREVIOUS_BATCH", "Não há lote anterior encerrado para reabrir.");
+    const ev = await one<{ starts_at: string }>("SELECT starts_at FROM events WHERE id = ?", eventId);
+    await run("UPDATE batches SET status = 'active', sales_end = CASE WHEN sales_end < ? THEN ? ELSE sales_end END WHERE id = ?",
+      at, ev?.starts_at ?? at, prev.id);
+    return { reopened: prev.name };
+  });
 }
 
 export const batchesOf = (eventId: string) =>

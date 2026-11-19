@@ -69,6 +69,9 @@ export const updateEvent = (id: string, d: EventEdit) => http<OrganizerEvent>(ev
 export const updateBatch = (id: string, d: BatchEdit) => http<OrganizerEvent>(lot(id), { method: "PATCH", body: JSON.stringify(d) });
 export const addBatch = (eventId: string, d: NewBatch & { ticketType: string }) =>
   http<OrganizerEvent>(`${ev(eventId)}/batches`, { method: "POST", body: JSON.stringify(d) });
+/** Virada manual de lote de um tipo de ingresso (next = abre o próximo; back = reabre o anterior). */
+export const switchBatch = (eventId: string, category: string, direction: "next" | "back") =>
+  http<{ closed?: string; opened?: string; reopened?: string }>(`${ev(eventId)}/batches/switch`, { method: "POST", body: JSON.stringify({ category, direction }) });
 export const deleteBatch = (id: string) => http<OrganizerEvent>(lot(id), { method: "DELETE" });
 
 // ---- Cupons ----

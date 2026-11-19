@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import { z } from "zod";
 import { all, now, one, run, tx } from "../db.js";
-import { toEventDetail, type BatchRow, type EventRow } from "../domain/events.js";
+import { batchStatuses, categoryOf, switchBatch, toEventDetail, type BatchRow, type EventRow } from "../domain/events.js";
 import { courtesyEventId, createCoupon, issueCourtesy, listCourtesies, revokeCourtesy, toCoupon, type CouponRow } from "../domain/promos.js";
 import { isValidCpf, onlyDigits } from "../lib/cpf.js";
 import { removeEvent } from "../domain/orders.js";
@@ -122,9 +122,12 @@ organizerRouter.get("/events/:id", async (req, res) => {
     `SELECT b.*, COALESCE((SELECT SUM(COALESCE(t.price, o.subtotal / GREATEST(o.quantity, 1))) FROM tickets t JOIN orders o ON o.id = t.order_id
                  WHERE t.batch_id = b.id AND o.status = 'paid'), 0) revenue
      FROM batches b WHERE b.event_id = ? ORDER BY b.position, b.price`, id);
+  const live = batchStatuses(lots);
   res.json({
     ...(await organizerView(e, user(req).id)),
     salesByBatch: lots.map((b) => ({
+      // Situação de venda como o comprador vê (à venda, em breve, encerrado, esgotado) e o tipo para a virada de lote.
+      saleStatus: live.get(b.id), category: categoryOf(b),
       id: b.id, name: b.name, price: b.price, total: b.total, sold: b.sold, reserved: b.reserved, revenue: Number(b.revenue),
       status: b.status, ticketType: b.ticket_type, salesStart: b.sales_start, salesEnd: b.sales_end,
     })),
@@ -232,6 +235,17 @@ async function assertEditable(eventId: string) {
   const e = await one<{ status: string }>("SELECT status FROM events WHERE id = ?", eventId);
   if (e?.status === "cancelled") throw conflict("EVENT_CANCELLED", "Este evento foi cancelado e não pode mais ser editado.");
 }
+
+/** Virada manual de lote: encerra o lote aberto de um tipo e abre o próximo (ou desfaz, reabrindo o anterior). */
+organizerRouter.post("/events/:id/batches/switch", async (req, res) => {
+  const id = String(req.params.id);
+  await assertEventOwner(user(req), id);
+  await assertEditable(id);
+  const d = parse(z.object({ category: z.string().min(1).max(120), direction: z.enum(["next", "back"]) }), req.body);
+  const r = await switchBatch(id, d.category, d.direction);
+  console.warn(`Virada manual de lote (${d.direction}) no evento ${id} por ${user(req).id}:`, r);
+  res.json(r);
+});
 
 organizerRouter.post("/events/:id/batches", async (req, res) => {
   await assertEventOwner(user(req), req.params.id);

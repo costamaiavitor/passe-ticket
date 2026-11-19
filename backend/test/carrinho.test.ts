@@ -177,5 +177,39 @@ describe("Carrinho", () => {
     const st = Object.fromEntries(((await api(`/events/${ev.id}`)).body.batches as any[]).map((b) => [b.name, b.status]));
     assert.deepEqual(st, { "1º Lote": "active", "2º Lote": "upcoming", "VIP": "active" });
   });
+
+  it("virada manual de lote: encerra o atual e abre o próximo na hora, e dá para desfazer", async () => {
+    const ev = await event("Festa Virada Manual", { batches: [
+      lot({ name: "Masculino — 1º lote", ticketType: "Masculino", price: 5000, total: 3 }),
+      lot({ name: "Masculino — 2º lote", ticketType: "Masculino", price: 6000, total: 3 }),
+      lot({ name: "Feminino — 1º lote", ticketType: "Feminino", price: 4000, total: 3 }),
+    ] });
+    const st = async () => Object.fromEntries(((await api(`/events/${ev.id}`)).body.batches as any[]).map((b) => [b.name, b.status]));
+    const sw = (token: string, category: string, direction: string) =>
+      api(`/organizer/events/${ev.id}/batches/switch`, { token, body: { category, direction } });
+    assert.equal((await st())["Masculino — 2º lote"], "upcoming");
+    assert.equal((await sw(T["ana"]!, "masculino", "next")).status, 403, "só a equipe do evento ou admin");
+    const panel = (await api(`/organizer/events/${ev.id}`, { token: T["org"] })).body;
+    assert.equal(panel.salesByBatch[0].saleStatus, "active");
+    assert.equal(panel.salesByBatch[0].category, "masculino");
+    const r = await sw(T["adm"]!, "masculino", "next");
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.opened, "Masculino — 2º lote");
+    assert.deepEqual(await st(), { "Masculino — 1º lote": "closed", "Masculino — 2º lote": "active", "Feminino — 1º lote": "active" });
+    const b1 = ev.batches.find((b: any) => b.name === "Masculino — 1º lote");
+    const b2 = ev.batches.find((b: any) => b.name === "Masculino — 2º lote");
+    const no = await api("/orders", { token: T["ana"], body: { eventId: ev.id, batchId: b1.id, holders: [{ name: "Pessoa Um", cpf: C["ana"] }] } });
+    assert.ok(no.status >= 400, "lote encerrado não vende: " + JSON.stringify(no.body));
+    const ok = await api("/orders", { token: T["ana"], body: { eventId: ev.id, batchId: b2.id, holders: [{ name: "Pessoa Um", cpf: C["ana"] }] } });
+    assert.equal(ok.status, 201, JSON.stringify(ok.body));
+    assert.equal(ok.body.subtotal, 6000);
+    assert.equal((await sw(T["org"]!, "masculino", "next")).body.code, "LAST_BATCH");
+    assert.equal((await sw(T["org"]!, "feminino", "next")).body.code, "LAST_BATCH");
+    const back = await sw(T["org"]!, "masculino", "back");
+    assert.equal(back.status, 200, JSON.stringify(back.body));
+    assert.equal((await st())["Masculino — 1º lote"], "active");
+    assert.equal((await st())["Masculino — 2º lote"], "upcoming");
+    assert.equal((await sw(T["org"]!, "masculino", "back")).body.code, "NO_PREVIOUS_BATCH");
+  });
 });
 

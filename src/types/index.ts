@@ -167,6 +167,7 @@ export interface EventPanel extends OrganizerEvent {
   salesByBatch: Array<{
     id: string; name: string; price: number; total: number; sold: number; reserved: number; revenue: number;
     status: "active" | "paused" | "closed"; ticketType: string | null; salesStart: string; salesEnd: string;
+    saleStatus?: "active" | "paused" | "closed" | "soldout" | "upcoming"; category?: string;
   }>;
 }
 

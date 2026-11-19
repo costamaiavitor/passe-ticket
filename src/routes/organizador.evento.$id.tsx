@@ -1,11 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { useMemo, useState } from "react";
 import { ArrowLeft, CheckCircle2, Download, ExternalLink, MapPin, Pencil, QrCode, Repeat, Search, Ticket as TicketIcon, Users, Wallet } from "lucide-react";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { RequireAuth } from "@/components/require-auth";
 import { Button } from "@/components/ui/button";
-import { attendeesQuery, eventPanelQuery } from "@/services/organizer";
+import { attendeesQuery, eventPanelQuery, switchBatch } from "@/services/organizer";
 import { brl, fmtDate, fmtTime } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import type { Attendee, EventPanel } from "@/types";
@@ -30,6 +31,64 @@ const STATUS_LABEL: Record<string, { label: string; cls: string }> = {
   draft: { label: "Rascunho", cls: "bg-elevated text-muted-foreground" },
   cancelled: { label: "Cancelado", cls: "bg-destructive/15 text-destructive" },
 };
+
+const SALE: Record<string, { label: string; cls: string }> = {
+  active: { label: "à venda", cls: "bg-primary/15 text-primary" },
+  upcoming: { label: "próximo", cls: "bg-elevated text-muted-foreground" },
+  paused: { label: "pausado", cls: "bg-warning/15 text-warning" },
+  closed: { label: "encerrado", cls: "bg-elevated text-muted-foreground" },
+  soldout: { label: "esgotado", cls: "bg-destructive/15 text-destructive" },
+};
+
+/** Virada manual de lote: um par de botões por tipo de ingresso que tem mais de um lote. */
+function BatchSwitch({ ev }: { ev: EventPanel }) {
+  const qc = useQueryClient();
+  const [confirm, setConfirm] = useState<{ category: string; direction: "next" | "back"; text: string } | null>(null);
+  const m = useMutation({
+    mutationFn: (c: { category: string; direction: "next" | "back" }) => switchBatch(ev.id, c.category, c.direction),
+    onSuccess: (r) => {
+      toast.success(r.opened ? `Lote virado: “${r.opened}” está à venda.` : `“${r.reopened}” voltou a ficar à venda.`);
+      setConfirm(null);
+      void qc.invalidateQueries({ queryKey: ["event-panel", ev.id] });
+    },
+    onError: (e) => { toast.error(e instanceof Error ? e.message : "Não foi possível virar o lote."); setConfirm(null); },
+  });
+  const groups = new Map<string, EventPanel["salesByBatch"]>();
+  for (const b of ev.salesByBatch) if (b.category) groups.set(b.category, [...(groups.get(b.category) ?? []), b]);
+  const multi = [...groups.values()].filter((g) => g.length > 1);
+  if (!multi.length || ev.status === "cancelled") return null;
+  return (
+    <div className="mt-3 space-y-2 rounded-lg border p-3 text-sm">
+      <p className="text-xs text-muted-foreground">Virar lote: encerra o lote que está à venda e abre o próximo na hora, mesmo que ainda sobrem ingressos. Quem já comprou não é afetado.</p>
+      {multi.map((g) => {
+        const cur = g.find((b) => b.saleStatus === "active" || b.saleStatus === "paused");
+        const next = cur ? g.slice(g.indexOf(cur) + 1).find((b) => b.saleStatus === "upcoming") : undefined;
+        const prev = [...g.slice(0, cur ? g.indexOf(cur) : g.length)].reverse().find((b) => b.status === "closed" && b.sold + b.reserved < b.total);
+        const label = g[0]!.ticketType || g[0]!.name.replace(/\s*[—–-]\s*\d+\s*º?\s*lote.*$/i, "");
+        return (
+          <div key={g[0]!.category} className="flex flex-wrap items-center justify-between gap-2">
+            <span className="min-w-0 font-medium">{label} <span className="font-normal text-muted-foreground">· {cur ? `à venda: ${cur.name}` : "nenhum lote à venda"}</span></span>
+            <span className="flex gap-2">
+              {prev && <Button size="sm" variant="outline" disabled={m.isPending}
+                onClick={() => setConfirm({ category: g[0]!.category!, direction: "back", text: `Reabrir “${prev.name}”? ${cur ? `“${cur.name}” volta a ficar como próximo.` : ""}` })}>Voltar ao anterior</Button>}
+              {cur && next && <Button size="sm" disabled={m.isPending}
+                onClick={() => setConfirm({ category: g[0]!.category!, direction: "next", text: `Encerrar “${cur.name}” (${cur.total - cur.sold - cur.reserved} ingresso(s) sobrando) e abrir “${next.name}” por ${brl(next.price)}?` })}>Virar para o próximo lote</Button>}
+            </span>
+          </div>
+        );
+      })}
+      {confirm && (
+        <div className="space-y-2 rounded-md bg-surface p-3">
+          <p className="text-xs">{confirm.text}</p>
+          <div className="flex gap-2">
+            <Button size="sm" disabled={m.isPending} onClick={() => m.mutate({ category: confirm.category, direction: confirm.direction })}>{m.isPending ? "Virando…" : "Confirmar"}</Button>
+            <Button size="sm" variant="outline" disabled={m.isPending} onClick={() => setConfirm(null)}>Cancelar</Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Panel() {
   const { id } = Route.useParams();
@@ -76,11 +135,13 @@ function Panel() {
       {/* Vendas por lote */}
       <section className="mt-4 rounded-xl border bg-card p-5 md:p-6">
         <h2 className="font-medium">Vendas por lote</h2>
+        <BatchSwitch ev={ev} />
         <ul className="mt-4 space-y-4">
           {ev.salesByBatch.map((b) => (
             <li key={b.id}>
               <div className="flex items-baseline justify-between gap-3 text-sm">
-                <span className="min-w-0 truncate font-medium">{b.name} <span className="font-normal text-muted-foreground">· {brl(b.price)}</span></span>
+                <span className="min-w-0 truncate font-medium">{b.name} <span className="font-normal text-muted-foreground">· {brl(b.price)}</span>
+                  {b.saleStatus && <span className={cn("ml-2 rounded-full px-2 py-0.5 text-[11px] font-medium", SALE[b.saleStatus]!.cls)}>{SALE[b.saleStatus]!.label}</span>}</span>
                 <span className="shrink-0 text-muted-foreground"><span className="text-foreground">{b.sold}</span> / {b.total}</span>
               </div>
               <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-elevated">
