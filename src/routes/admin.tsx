@@ -1,3 +1,4 @@
+import { Loading } from "@/components/motion";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -63,7 +64,7 @@ function MpAccounts() {
     onSuccess: (r, userId) => { setResults((m) => ({ ...m, [userId]: r })); void qc.invalidateQueries({ queryKey: ["admin-mp"] }); },
     onError: (e, userId) => setResults((m) => ({ ...m, [userId]: { ok: false, message: e instanceof Error ? e.message : "Não foi possível testar." } })),
   });
-  if (isLoading) return <p className="text-sm text-muted-foreground">Carregando…</p>;
+  if (isLoading) return <Loading />;
   if (error) return <p className="text-sm text-destructive">{error.message}</p>;
   const list = data ?? [];
   const connected = list.filter((r) => r.status === "connected").length;
@@ -124,7 +125,7 @@ function AllEvents() {
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ["admin-events"] }); void qc.invalidateQueries({ queryKey: ["events"] }); toast.success("Evento apagado do site."); },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Não foi possível apagar."),
   });
-  if (isLoading) return <p className="text-sm text-muted-foreground">Carregando…</p>;
+  if (isLoading) return <Loading />;
   if (error) return <p className="text-sm text-destructive">{error.message}</p>;
   const term = q.trim().toLowerCase();
   const list = (data ?? []).filter((e) => !term || `${e.title} ${e.organizer.name} ${e.organizer.email} ${e.city}`.toLowerCase().includes(term));
@@ -163,7 +164,7 @@ function AllEvents() {
 // ---------------- Aprovar eventos ----------------
 function ReviewList() {
   const { data, isLoading, error } = useQuery(reviewEventsQuery());
-  if (isLoading) return <p className="text-sm text-muted-foreground">Carregando…</p>;
+  if (isLoading) return <Loading />;
   if (error) return <p className="text-sm text-destructive">{error.message}</p>;
   if (!data?.length) return <p className="rounded-xl border p-8 text-center text-sm text-muted-foreground">Nenhum evento aguardando aprovação. 🎉</p>;
   return <div className="grid gap-4 md:grid-cols-2">{data.map((e) => <ReviewCard key={e.id} ev={e} />)}</div>;
@@ -225,7 +226,7 @@ const REFUND_KIND: Record<RefundKind | "manual", { label: string; hint: string }
 
 function Refunds() {
   const { data, isLoading, error } = useQuery(refundsQuery());
-  if (isLoading) return <p className="text-sm text-muted-foreground">Carregando…</p>;
+  if (isLoading) return <Loading />;
   if (error) return <p className="text-sm text-destructive">{error.message}</p>;
   if (!data) return null;
   const pendingTotal = data.pending.reduce((s, r) => s + r.amount, 0);
@@ -322,7 +323,7 @@ function DoneRefundRow({ r }: { r: DoneRefund }) {
 
 function Payouts() {
   const { data, isLoading, error } = useQuery(payoutsQuery());
-  if (isLoading) return <p className="text-sm text-muted-foreground">Carregando…</p>;
+  if (isLoading) return <Loading />;
   if (error) return <p className="text-sm text-destructive">{error.message}</p>;
   if (!data?.length) return <p className="rounded-xl border p-8 text-center text-sm text-muted-foreground">Nenhuma venda paga ainda.</p>;
   const total = data.reduce((s, r) => s + r.balance, 0);

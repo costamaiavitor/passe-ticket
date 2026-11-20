@@ -36,6 +36,17 @@ export function RiseWords({ text, delay = 0, className }: { text: string; delay?
   );
 }
 
+/** Carregando: linhas que brilham (no lugar do texto "Carregando…"). Leitor de tela ouve "Carregando". */
+export function Loading({ rows = 3, className }: { rows?: number; className?: string }) {
+  return (
+    <div role="status" aria-label="Carregando" className={`space-y-3 ${className ?? ""}`}>
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} className="m-shimmer h-14 rounded-lg" style={{ opacity: 1 - i * 0.22 }} />
+      ))}
+    </div>
+  );
+}
+
 /** Brilho que segue o mouse dentro de um cartão (usar com a classe m-spot). */
 export function spotlight(e: MouseEvent<HTMLElement>) {
   const r = e.currentTarget.getBoundingClientRect();

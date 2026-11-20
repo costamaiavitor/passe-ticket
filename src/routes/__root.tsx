@@ -20,17 +20,19 @@ function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          The page you're looking for doesn't exist or has been moved.
+        <p className="m-rise bg-gradient-to-b from-foreground to-foreground/30 bg-clip-text text-8xl font-bold tracking-tighter text-transparent">404</p>
+        <h1 className="m-rise mt-4 text-2xl font-semibold text-foreground" style={{ "--i": 1 } as React.CSSProperties}>Essa página não existe</h1>
+        <p className="m-rise mt-2 text-sm text-muted-foreground" style={{ "--i": 2 } as React.CSSProperties}>
+          O link pode estar errado ou o evento saiu do ar. Confira os eventos à venda.
         </p>
-        <div className="mt-6">
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            Go home
+        <div className="m-rise mt-7 flex flex-wrap justify-center gap-2" style={{ "--i": 3 } as React.CSSProperties}>
+          <Link to="/eventos"
+            className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground transition-[background-color,transform] hover:bg-primary/90 active:scale-[0.97]">
+            Ver eventos
+          </Link>
+          <Link to="/"
+            className="inline-flex h-10 items-center justify-center rounded-md border px-5 text-sm font-medium text-foreground transition-[background-color,transform] hover:bg-accent active:scale-[0.97]">
+            Página inicial
           </Link>
         </div>
       </div>
@@ -49,10 +51,10 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
+          A página não carregou
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
+          Algo deu errado do nosso lado. Tente de novo ou volte para a página inicial.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
@@ -62,13 +64,13 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
             }}
             className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            Try again
+            Tentar de novo
           </button>
           <a
             href="/"
             className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
           >
-            Go home
+            Página inicial
           </a>
         </div>
       </div>

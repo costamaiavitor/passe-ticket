@@ -1,3 +1,4 @@
+import { Loading } from "@/components/motion";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -93,7 +94,7 @@ function BatchSwitch({ ev }: { ev: EventPanel }) {
 function Panel() {
   const { id } = Route.useParams();
   const { data: ev, isLoading, error } = useQuery(eventPanelQuery(id));
-  if (isLoading) return <p className="text-sm text-muted-foreground">Carregando…</p>;
+  if (isLoading) return <Loading rows={4} />;
   if (error || !ev) return <p className="text-sm text-destructive">{error?.message ?? "Evento não encontrado."}</p>;
   const st = STATUS_LABEL[ev.status] ?? STATUS_LABEL["draft"]!;
   const capacity = ev.salesByBatch.reduce((s, b) => s + b.total, 0);
@@ -213,7 +214,7 @@ function Attendees({ ev }: { ev: EventPanel }) {
         </div>
       </div>
 
-      {isLoading && <p className="mt-6 text-sm text-muted-foreground">Carregando…</p>}
+      {isLoading && <Loading className="mt-6" />}
       {error && <p className="mt-6 text-sm text-destructive">{error.message}</p>}
       {data && !data.length && <p className="mt-6 rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">Ninguém comprou ainda. Divulgue o link do evento!</p>}
       {data && !!data.length && !list.length && <p className="mt-6 text-sm text-muted-foreground">Nenhum resultado para essa busca.</p>}

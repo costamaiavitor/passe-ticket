@@ -1,3 +1,4 @@
+import { Loading } from "@/components/motion";
 import { Navigate, useLocation } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import type { AuthUser } from "@/types";
@@ -7,7 +8,7 @@ import { hasRole, useSession } from "@/services/session";
 export function RequireAuth({ roles, children }: { roles?: AuthUser["roles"]; children: (user: AuthUser) => ReactNode }) {
   const { user, ready } = useSession();
   const { pathname } = useLocation();
-  if (!ready) return <div className="grid min-h-[50vh] place-items-center text-sm text-muted-foreground">Carregando…</div>;
+  if (!ready) return <Loading className="mx-auto mt-10 max-w-xl" />;
   if (!user) return <Navigate to="/entrar" search={{ redirect: pathname }} />;
   if (roles && !hasRole(user, ...roles))
     return <div className="grid min-h-[50vh] place-items-center text-sm text-muted-foreground">Você não tem acesso a esta área.</div>;

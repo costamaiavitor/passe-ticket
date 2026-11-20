@@ -1,3 +1,4 @@
+import { Loading } from "@/components/motion";
 // Acesso ao evento (público/privado, palavra-senha), cupons de desconto e cortesias.
 // Na criação, cupons e cortesias ficam num rascunho e vão junto com o evento; na edição, cada ação é salva na hora.
 import { useState } from "react";
@@ -198,7 +199,7 @@ export function CouponsManager({ eventId }: { eventId: string }) {
   });
   return (
     <div className="space-y-2">
-      {q.isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
+      {q.isLoading && <Loading rows={2} />}
       {q.data?.map((c) => (
         <div key={c.id} className={cn("flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm", !c.active && "opacity-60")}>
           <span className="min-w-0">
@@ -241,7 +242,7 @@ export function CourtesiesManager({ eventId, batches }: { eventId: string; batch
   const del = useMutation({ mutationFn: (id: string) => revokeCourtesy(id), onSuccess: () => { refresh(); toast.success("Cortesia cancelada. O QR Code não vale mais."); } });
   return (
     <div className="space-y-2">
-      {q.isLoading && <p className="text-sm text-muted-foreground">Carregando…</p>}
+      {q.isLoading && <Loading rows={2} />}
       {!!q.data?.length && (
         <button type="button" onClick={() => setShowCpf((v) => !v)} className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
           {showCpf ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}{q.data.length} cortesia(s)

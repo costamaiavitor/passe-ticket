@@ -8,7 +8,7 @@ import { RequireAuth } from "@/components/require-auth";
 import { TicketQr } from "@/components/ticket-qr";
 import { IncomingTransfers, TransferControls } from "@/components/ticket-transfer";
 import { Button } from "@/components/ui/button";
-import { Rise, RiseWords } from "@/components/motion";
+import { Loading, Rise, RiseWords } from "@/components/motion";
 import { ticketsQuery } from "@/services/tickets";
 import { myOrdersQuery, refundOrder } from "@/services/orders";
 import { brl, fmtDate, fmtTime } from "@/utils/format";
@@ -31,7 +31,7 @@ export const Route = createFileRoute("/ingressos")({
 
 function TicketList() {
   const { data, isLoading, error } = useQuery({ ...ticketsQuery(), refetchInterval: 15_000 });
-  if (isLoading) return <p className="mt-8 text-sm text-muted-foreground">Carregando…</p>;
+  if (isLoading) return <Loading className="mt-8" />;
   if (error) return <p className="mt-8 text-sm text-destructive">{error.message}</p>;
   if (!data?.length)
     return (

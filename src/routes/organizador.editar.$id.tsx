@@ -1,3 +1,4 @@
+import { Loading } from "@/components/motion";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
@@ -34,7 +35,7 @@ export const Route = createFileRoute("/organizador/editar/$id")({
 function Loader({ id }: { id: string }) {
   // Sem atualização automática: o formulário não pode ser sobrescrito enquanto a pessoa digita.
   const q = useQuery({ ...eventPanelQuery(id), refetchInterval: false, staleTime: 0 });
-  if (q.isLoading) return <p className="text-sm text-muted-foreground">Carregando…</p>;
+  if (q.isLoading) return <Loading rows={4} />;
   if (q.error || !q.data) return <p className="text-sm text-destructive">{q.error?.message ?? "Evento não encontrado."}</p>;
   if (q.data.status === "cancelled")
     return <p className="rounded-md border p-4 text-sm text-muted-foreground">Este evento foi cancelado e não pode mais ser editado.</p>;

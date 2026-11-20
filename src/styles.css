@@ -164,8 +164,33 @@
   @keyframes m-parallax { to { transform: translateY(18%) scale(1.06); opacity: 0.45; } }
 }
 
+/* Carregando: brilho que corre da esquerda para a direita. */
+.m-shimmer {
+  background: linear-gradient(90deg, var(--surface) 0%, color-mix(in oklab, var(--surface) 70%, white 6%) 50%, var(--surface) 100%);
+  background-size: 200% 100%; animation: m-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes m-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+
+/* Links do topo: sublinhado que se desenha da esquerda. */
+.m-nav a { position: relative; }
+.m-nav a::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -6px; height: 2px; border-radius: 2px; background: var(--primary);
+  transform: scaleX(0); transform-origin: left; transition: transform 0.28s var(--ease-out);
+}
+.m-nav a:hover::after, .m-nav a[data-status="active"]::after { transform: scaleX(1); }
+
+/* Campos de formulário no site todo: foco com anel suave da cor da marca. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea { transition: border-color 0.2s, box-shadow 0.2s; }
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus-visible, select:focus-visible, textarea:focus-visible {
+  border-color: color-mix(in oklab, var(--primary) 60%, transparent); box-shadow: 0 0 0 4px rgb(160 61 253 / 0.14); outline: none;
+}
+/* Rolagem suave para os links da mesma página (índice dos Termos, "Comprar"). */
+html { scroll-behavior: smooth; }
+
 @media (prefers-reduced-motion: reduce) {
-  .m-rise, .m-word > span, .m-zoom, .m-pop, .m-confetti, .m-header, .m-parallax { animation: none !important; }
+  .m-rise, .m-word > span, .m-zoom, .m-pop, .m-confetti, .m-header, .m-parallax, .m-shimmer { animation: none !important; }
+  .m-nav a::after { transition: none; }
+  html { scroll-behavior: auto; }
   [data-reveal] { opacity: 1 !important; transform: none !important; transition: none !important; }
   .m-check circle, .m-check path { animation: none; stroke-dashoffset: 0; }
   .m-card, .m-card:hover, .m-card:active { transform: none; }

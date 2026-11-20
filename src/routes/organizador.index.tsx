@@ -1,3 +1,4 @@
+import { Loading } from "@/components/motion";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
@@ -69,7 +70,7 @@ function Dashboard() {
       <MercadoPagoCard />
       <PayoutInfoCard />
 
-      {isLoading && <p className="mt-8 text-sm text-muted-foreground">Carregando…</p>}
+      {isLoading && <Loading className="mt-8" />}
       {error && <p className="mt-8 text-sm text-destructive">{error.message}</p>}
       {data && !data.length && (
         <div className="mt-8 rounded-xl border p-8 text-center md:p-10">

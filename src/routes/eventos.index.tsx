@@ -83,7 +83,10 @@ function Explore() {
               <Button variant="outline" className="mt-4" onClick={() => refetch()}>Tentar novamente</Button>
             </div>
           ) : data?.length ? (
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{data.map((e, i) => <Rise key={e.id} i={i % 6}><EventCard event={e} /></Rise>)}</div>
+            <>
+              <p className="mb-4 text-sm text-muted-foreground">{data.length} {data.length === 1 ? "evento encontrado" : "eventos encontrados"}</p>
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{data.map((e, i) => <Rise key={e.id} i={i % 6}><EventCard event={e} /></Rise>)}</div>
+            </>
           ) : (
             <div className="rounded-lg border border-dashed p-12 text-center">
               <p className="font-medium">Nenhum evento encontrado</p>

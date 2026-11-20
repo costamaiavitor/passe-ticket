@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Confetti, DrawCheck } from "@/components/motion";
+import { Confetti, DrawCheck, Loading } from "@/components/motion";
 import { CheckCircle2, Clock, Copy, CreditCard, Loader2, QrCode, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
@@ -42,7 +42,7 @@ function Checkout() {
   const { data: order, error, isLoading } = useQuery(orderQuery(orderId));
   const [busy, setBusy] = useState(false);
 
-  if (isLoading) return <p className="text-sm text-muted-foreground">Carregando pedido…</p>;
+  if (isLoading) return <Loading rows={4} />;
   if (error || !order) return <p className="text-sm text-destructive">{error?.message ?? "Pedido não encontrado."}</p>;
 
   const update = (o: Order) => { qc.setQueryData(orderQuery(orderId).queryKey, o); void qc.invalidateQueries({ queryKey: ["tickets"] }); };

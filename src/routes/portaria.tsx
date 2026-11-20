@@ -1,3 +1,4 @@
+import { Loading } from "@/components/motion";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
@@ -28,7 +29,7 @@ function Gate() {
   const [eventId, setEventId] = useState<string | null>(null);
   useEffect(() => { if (!eventId && events?.length === 1) setEventId(events[0]!.id); }, [events, eventId]);
 
-  if (isLoading) return <p className="text-sm text-muted-foreground">Carregando…</p>;
+  if (isLoading) return <Loading />;
   if (!events?.length) return <p className="text-sm text-muted-foreground">Você não está na equipe de nenhum evento próximo.</p>;
   const ev = events.find((e) => e.id === eventId);
   if (!ev)

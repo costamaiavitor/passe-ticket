@@ -17,7 +17,7 @@ export function SiteHeader() {
         <Link to="/" aria-label="BooTickets — página inicial" className="shrink-0">
           <BrandLogo />
         </Link>
-        <nav className="hidden items-center gap-8 text-sm text-muted-foreground md:flex">
+        <nav className="m-nav hidden items-center gap-8 text-sm text-muted-foreground md:flex">
           <Link to="/eventos" className="transition-colors hover:text-foreground" activeProps={{ className: "text-foreground" }}>Explorar</Link>
           <Link to="/eventos" search={{ category: "shows" }} className="transition-colors hover:text-foreground">Shows</Link>
           <Link to="/eventos" search={{ category: "festas" }} className="transition-colors hover:text-foreground">Festas</Link>
@@ -77,15 +77,44 @@ export function SiteHeader() {
 }
 
 export function SiteFooter() {
+  const year = new Date().getFullYear();
+  const col = "space-y-2.5 text-sm";
+  const link = "text-muted-foreground transition-colors hover:text-foreground";
   return (
-    <footer className="mt-24 border-t">
-      <div className="container-page flex flex-col gap-2 py-8 text-sm text-muted-foreground md:flex-row md:justify-between">
-        <span>© 2026 BooTickets. Ingressos com segurança.</span>
-        <nav className="flex flex-wrap gap-x-5 gap-y-1">
-          <Link to="/termos" className="hover:text-foreground">Termos de Uso</Link>
-          <Link to="/privacidade" className="hover:text-foreground">Privacidade</Link>
-          <span>Taxa de serviço transparente</span>
+    <footer className="mt-24 border-t bg-surface/40">
+      <div className="container-page grid gap-10 py-12 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
+        <div>
+          <Link to="/" aria-label="BooTickets — página inicial" className="inline-block"><BrandLogo /></Link>
+          <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted-foreground">
+            Ingressos nominais com QR Code único. Compra pelo Pix ou cartão, sem fila e sem golpe.
+          </p>
+        </div>
+        <nav aria-label="Explorar" className={col}>
+          <p className="font-medium">Explorar</p>
+          <Link to="/eventos" className={`block ${link}`}>Todos os eventos</Link>
+          <Link to="/eventos" search={{ category: "festas" }} className={`block ${link}`}>Festas</Link>
+          <Link to="/eventos" search={{ category: "shows" }} className={`block ${link}`}>Shows</Link>
+          <Link to="/ingressos" className={`block ${link}`}>Meus ingressos</Link>
         </nav>
+        <nav aria-label="Organizadores" className={col}>
+          <p className="font-medium">Organizadores</p>
+          <Link to="/organizador" className={`block ${link}`}>Criar evento</Link>
+          <Link to="/organizador" className={`block ${link}`}>Painel de vendas</Link>
+          <Link to="/portaria" className={`block ${link}`}>Portaria</Link>
+        </nav>
+        <nav aria-label="Ajuda" className={col}>
+          <p className="font-medium">Ajuda</p>
+          <Link to="/termos" className={`block ${link}`}>Termos de Uso</Link>
+          <Link to="/termos" hash="devolucao" className={`block ${link}`}>Devolução de ingressos</Link>
+          <Link to="/privacidade" className={`block ${link}`}>Privacidade</Link>
+          <a href="mailto:booticketss@gmail.com" className={`block ${link}`}>Fale com a gente</a>
+        </nav>
+      </div>
+      <div className="border-t">
+        <div className="container-page flex flex-col gap-2 py-5 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <span>© {year} BooTickets. Ingressos com segurança.</span>
+          <span>Pagamentos processados pelo Mercado Pago</span>
+        </div>
       </div>
     </footer>
   );
