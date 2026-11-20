@@ -3,17 +3,21 @@ import { Calendar, MapPin } from "lucide-react";
 import type { EventSummary } from "@/types";
 import { brl, fmtDate, fmtTime } from "@/utils/format";
 import { AvailabilityBadge } from "./availability-badge";
+import { spotlight } from "./motion";
 
 export function EventCard({ event }: { event: EventSummary }) {
   return (
     <Link
       to="/eventos/$id"
       params={{ id: event.id }}
-      className="group flex flex-col overflow-hidden rounded-lg border bg-card transition-colors hover:border-muted-foreground/40"
+      onMouseMove={spotlight}
+      // A capa deste cartão "voa" até a página do evento (só o cartão clicado leva o nome da transição).
+      onClick={(e) => { const img = e.currentTarget.querySelector("img"); if (img) img.style.viewTransitionName = "ev-cover"; }}
+      className="m-card m-spot group flex flex-col overflow-hidden rounded-lg border bg-card hover:border-primary/40"
     >
       <div className="relative aspect-[16/10] overflow-hidden">
         <img src={event.coverUrl} alt={event.title} loading="lazy" width={1280} height={768}
-          className="size-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
+          className="size-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.05]" />
         <div className="absolute left-3 top-3"><AvailabilityBadge value={event.availability} /></div>
       </div>
       <div className="flex flex-1 flex-col gap-3 p-4">
@@ -27,7 +31,7 @@ export function EventCard({ event }: { event: EventSummary }) {
             <p className="text-xs text-muted-foreground">A partir de</p>
             <p className="font-medium">{brl(event.priceFrom)}</p>
           </div>
-          <span className="text-sm text-muted-foreground transition-colors group-hover:text-primary">Ver detalhes →</span>
+          <span className="text-sm text-muted-foreground transition-colors group-hover:text-primary">Ver detalhes <span className="inline-block transition-transform duration-300 group-hover:translate-x-1">→</span></span>
         </div>
       </div>
     </Link>

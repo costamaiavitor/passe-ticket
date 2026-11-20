@@ -8,6 +8,7 @@ import { RequireAuth } from "@/components/require-auth";
 import { TicketQr } from "@/components/ticket-qr";
 import { IncomingTransfers, TransferControls } from "@/components/ticket-transfer";
 import { Button } from "@/components/ui/button";
+import { Rise, RiseWords } from "@/components/motion";
 import { ticketsQuery } from "@/services/tickets";
 import { myOrdersQuery, refundOrder } from "@/services/orders";
 import { brl, fmtDate, fmtTime } from "@/utils/format";
@@ -19,7 +20,7 @@ export const Route = createFileRoute("/ingressos")({
     <div className="min-h-screen">
       <SiteHeader />
       <main className="container-page py-12">
-        <h1 className="text-3xl font-semibold tracking-tight">Meus ingressos</h1>
+        <h1 className="text-3xl font-semibold tracking-tight"><RiseWords text="Meus ingressos" /></h1>
         <p className="mt-1 text-sm text-muted-foreground">Apresente o QR Code na entrada junto com um documento do titular.</p>
         <RequireAuth>{() => <><IncomingTransfers /><TicketList /><Refunds /></>}</RequireAuth>
       </main>
@@ -39,7 +40,7 @@ function TicketList() {
         <Button asChild className="mt-4"><Link to="/eventos">Explorar eventos</Link></Button>
       </div>
     );
-  return <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-3">{data.map((t) => <TicketCard key={t.id} t={t} />)}</div>;
+  return <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-3">{data.map((t, i) => <Rise key={t.id} i={i % 6}><TicketCard t={t} /></Rise>)}</div>;
 }
 
 /** Compras que ainda podem ser devolvidas (até 7 dias depois da compra e antes do evento). */

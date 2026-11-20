@@ -1,6 +1,6 @@
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Calendar, MapPin, Minus, Plus, Info, Repeat, Undo2, KeyRound, Tag, X } from "lucide-react";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { AvailabilityBadge } from "@/components/availability-badge";
@@ -13,6 +13,7 @@ import { ApiError } from "@/services/http";
 import { brl, fmtDate, fmtTime, MAX_TICKETS_PER_CPF, platformFee } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import { shareMeta, shareText } from "@/lib/seo";
+import { Reveal, Rise, RiseWords, spotlight } from "@/components/motion";
 
 export const Route = createFileRoute("/eventos/$id")({
   loader: async ({ context, params }) => {
@@ -146,6 +147,28 @@ function EventPage() {
     setStep("holders");
   };
   const holderLabels = lines.flatMap(({ b, n }) => Array.from({ length: n }, () => b.name));
+  // Celular: barra de compra fixa depois que a capa sai da tela; some quando a caixa de ingressos aparece.
+  const coverRef = useRef<HTMLDivElement>(null);
+  const ticketsRef = useRef<HTMLElement>(null);
+  const [seen, setSeen] = useState({ cover: true, tickets: false });
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver((entries) => setSeen((s) => {
+      const n = { ...s };
+      for (const e of entries) {
+        if (e.target === coverRef.current) n.cover = e.isIntersecting;
+        if (e.target === ticketsRef.current) n.tickets = e.isIntersecting;
+      }
+      return n;
+    }), { rootMargin: "0px 0px -15% 0px" });
+    if (coverRef.current) io.observe(coverRef.current);
+    if (ticketsRef.current) io.observe(ticketsRef.current);
+    return () => io.disconnect();
+  }, []);
+  const hideBar = seen.cover || seen.tickets;
+  const fromPrice = groups.length ? Math.min(...groups.map((g) => g.cur.price)) : null;
+  const goToTickets = () => ticketsRef.current?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+
   const placeOrder = async (holders: { name: string; cpf: string }[]) => {
     if (!qty) return;
     setSubmitting(true); setOrderError(null);
@@ -168,25 +191,27 @@ function EventPage() {
   return (
     <div className="min-h-screen">
       <SiteHeader />
-      <div className="relative h-[42vh] min-h-72 overflow-hidden">
-        <img src={ev.coverUrl} alt={ev.title} width={1280} height={768} className="size-full object-cover" />
+      <div ref={coverRef} className="relative h-[42vh] min-h-72 overflow-hidden">
+        <div className="m-parallax size-full">
+          <img src={ev.coverUrl} alt={ev.title} width={1280} height={768} className="m-zoom size-full object-cover" style={{ viewTransitionName: "ev-cover" }} />
+        </div>
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
       </div>
       <main className="container-page -mt-24 relative grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div>
-          {ev.status === "cancelled" ? (
+          <Rise>{ev.status === "cancelled" ? (
             <span className="rounded-full bg-destructive/15 px-2.5 py-1 text-xs font-medium text-destructive">Evento cancelado</span>
-          ) : <AvailabilityBadge value={ev.availability} />}
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight md:text-5xl">{ev.title}</h1>
-          <p className="mt-2 text-sm text-muted-foreground">por {ev.organizer.name}</p>
-          <div className="mt-6 flex flex-wrap gap-x-8 gap-y-3 text-sm">
+          ) : <AvailabilityBadge value={ev.availability} />}</Rise>
+          <h1 className="mt-3 text-3xl font-semibold tracking-tight md:text-5xl"><RiseWords text={ev.title} delay={120} /></h1>
+          <Rise i={4}><p className="mt-2 text-sm text-muted-foreground">por {ev.organizer.name}</p></Rise>
+          <div className="m-rise mt-6 flex flex-wrap gap-x-8 gap-y-3 text-sm" style={{ "--i": 5 } as React.CSSProperties}>
             <span className="flex items-center gap-2"><Calendar className="size-4 text-primary" />{fmtDate(ev.startsAt)} · {fmtTime(ev.startsAt)}</span>
             <span className="flex items-center gap-2"><MapPin className="size-4 text-primary" />{ev.venue}{ev.address ? ` — ${ev.address}` : ""}, {ev.city}</span>
           </div>
-          {ev.description && <p className="mt-8 max-w-2xl whitespace-pre-line leading-relaxed text-muted-foreground">{ev.description}</p>}
-          <EventMap venue={ev.venue} address={ev.address} city={ev.city} />
+          {ev.description && <p className="m-rise mt-8 max-w-2xl whitespace-pre-line leading-relaxed text-muted-foreground" style={{ "--i": 6 } as React.CSSProperties}>{ev.description}</p>}
+          <Reveal><EventMap venue={ev.venue} address={ev.address} city={ev.city} /></Reveal>
 
-          <div className="mt-10 divide-y border-y">
+          <Reveal className="mt-10 divide-y border-y">
             <Policy icon={Info} title="Informações importantes">
               <ul className="list-inside list-disc space-y-1">{ev.importantInfo.map((i) => <li key={i}>{i}</li>)}</ul>
             </Policy>
@@ -197,10 +222,10 @@ function EventPage() {
             <Policy icon={Undo2} title="Política de reembolso">
               {ev.refundPolicy || "Cancelamento em até 7 dias após a compra, desde que antes do evento (Código de Defesa do Consumidor, art. 49). Se o evento for cancelado ou adiado, o reembolso é integral."}
             </Policy>
-          </div>
+          </Reveal>
         </div>
 
-        <aside className="h-fit rounded-xl border bg-card p-5 lg:sticky lg:top-20">
+        <aside id="ingressos" ref={ticketsRef} className="m-rise h-fit scroll-mt-20 rounded-xl border bg-card p-5 lg:sticky lg:top-20" style={{ "--i": 3 } as React.CSSProperties}>
           <h2 className="font-medium">Ingressos</h2>
           <div className="mt-4 space-y-2">
             {/* Só aparecem os lotes à venda agora: próximos lotes, esgotados e pausados ficam escondidos. */}
@@ -210,7 +235,9 @@ function EventPage() {
               const left = b.total - b.sold;
               const parts = split(g, n);
               return (
-                <div key={g.key} className={cn("rounded-lg border px-4 py-3 transition-colors", n > 0 ? "border-primary bg-primary/5" : "")}>
+                <div key={g.key} onMouseMove={spotlight}
+                  className={cn("m-shine m-spot rounded-lg border px-4 py-3 transition-[border-color,background-color,box-shadow] duration-300",
+                    n > 0 ? "border-primary bg-primary/5 shadow-[0_0_0_3px_rgb(160_61_253/0.12)]" : "hover:border-muted-foreground/40")}>
                   <div className="flex items-center gap-3">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium">{b.name}</p>
@@ -219,7 +246,7 @@ function EventPage() {
                     <div className="flex shrink-0 items-center gap-2">
                       <Button size="icon" variant="outline" className="size-8" disabled={step === "holders" || n === 0}
                         onClick={() => setGroupQty(g, n - 1)} aria-label={`Tirar um ingresso ${b.name}`}><Minus /></Button>
-                      <span className="w-5 text-center tabular-nums" aria-live="polite">{n}</span>
+                      <span key={n} className="m-pop w-5 text-center tabular-nums" aria-live="polite">{n}</span>
                       <Button size="icon" variant="outline" className="size-8" disabled={step === "holders" || n >= g.capacity || qty >= MAX_PER_ORDER}
                         onClick={() => setGroupQty(g, n + 1)} aria-label={`Adicionar um ingresso ${b.name}`}><Plus /></Button>
                     </div>
@@ -253,7 +280,7 @@ function EventPage() {
                   </div>
                 )}
                 <Row k="Taxa da plataforma (11%)" v={brl(fee)} />
-                <Row k="Total" v={brl(subtotal - discount + fee)} strong />
+                <div className="flex justify-between pt-1 font-medium"><dt>Total</dt><dd key={subtotal - discount + fee} className="m-pop">{brl(subtotal - discount + fee)}</dd></div>
               </dl>
               {!coupon && step === "select" && unlocked && (
                 couponOpen ? (
@@ -298,7 +325,20 @@ function EventPage() {
           )}
         </aside>
       </main>
-      <SiteFooter />
+      {buyable.length > 0 && ev.status !== "cancelled" && (
+        <div className={cn("fixed inset-x-0 bottom-0 z-40 border-t bg-background/90 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-lg transition-transform duration-300 ease-out lg:hidden",
+          hideBar ? "translate-y-full" : "translate-y-0")} aria-hidden={hideBar}>
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1 leading-tight">
+              {qty
+                ? <><p className="text-xs text-muted-foreground">{qty} {qty === 1 ? "ingresso" : "ingressos"}</p><p key={subtotal - discount + fee} className="m-pop text-lg font-semibold tabular-nums">{brl(subtotal - discount + fee)}</p></>
+                : <><p className="text-xs text-muted-foreground">a partir de</p><p className="text-lg font-semibold tabular-nums">{fromPrice !== null ? brl(fromPrice) : ""}</p></>}
+            </div>
+            <Button className="h-11 px-5" onClick={goToTickets} tabIndex={hideBar ? -1 : 0}>{qty ? "Continuar" : "Comprar ingressos"}</Button>
+          </div>
+        </div>
+      )}
+      <div className="pb-20 lg:pb-0"><SiteFooter /></div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { Confetti, DrawCheck } from "@/components/motion";
 import { CheckCircle2, Clock, Copy, CreditCard, Loader2, QrCode, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
@@ -72,8 +73,9 @@ function Checkout() {
       ))}
 
       {order.status === "paid" && (
-        <div className="mt-6 rounded-xl border border-primary/40 bg-primary/5 p-6 text-center">
-          <CheckCircle2 className="mx-auto size-10 text-primary" />
+        <div className="m-rise relative mt-6 overflow-hidden rounded-xl border border-primary/40 bg-primary/5 p-6 text-center">
+          <Confetti />
+          <DrawCheck className="mx-auto size-12 text-primary" />
           <p className="mt-3 font-medium">Pagamento confirmado!</p>
           <p className="mt-1 text-sm text-muted-foreground">Seus ingressos com QR Code já estão disponíveis.</p>
           <Button asChild className="mt-5"><Link to="/ingressos">Ver meus ingressos</Link></Button>

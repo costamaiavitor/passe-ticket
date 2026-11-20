@@ -9,6 +9,8 @@ export const getRouter = () => {
     routeTree,
     context: { queryClient },
     scrollRestoration: true,
+    // Troca de página suave (View Transitions); quem pede menos movimento recebe a troca normal (CSS).
+    defaultViewTransition: true,
     defaultPreloadStaleTime: 0,
   });
 

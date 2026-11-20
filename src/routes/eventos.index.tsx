@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { EventCard } from "@/components/event-card";
+import { Rise, RiseWords } from "@/components/motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { eventsQuery } from "@/services/events";
@@ -44,7 +45,7 @@ function Explore() {
     <div className="min-h-screen">
       <SiteHeader />
       <main className="container-page py-10">
-        <h1 className="text-3xl font-semibold tracking-tight">Explorar eventos</h1>
+        <h1 className="text-3xl font-semibold tracking-tight"><RiseWords text="Explorar eventos" /></h1>
         <div className="mt-6 grid gap-3 rounded-lg border bg-surface p-4 sm:grid-cols-2 lg:grid-cols-6">
           <input className={`${field} lg:col-span-2`} placeholder="Buscar" defaultValue={s.q}
             onChange={(e) => set({ q: e.target.value || undefined })} />
@@ -82,7 +83,7 @@ function Explore() {
               <Button variant="outline" className="mt-4" onClick={() => refetch()}>Tentar novamente</Button>
             </div>
           ) : data?.length ? (
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{data.map((e) => <EventCard key={e.id} event={e} />)}</div>
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{data.map((e, i) => <Rise key={e.id} i={i % 6}><EventCard event={e} /></Rise>)}</div>
           ) : (
             <div className="rounded-lg border border-dashed p-12 text-center">
               <p className="font-medium">Nenhum evento encontrado</p>

@@ -9,6 +9,7 @@ import { eventsQuery } from "@/services/events";
 import { categoryLabel } from "@/utils/format";
 import type { EventCategory } from "@/types";
 import { shareMeta } from "@/lib/seo";
+import { Reveal, Rise, RiseWords } from "@/components/motion";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -38,13 +39,14 @@ function Home() {
       <section className="relative overflow-hidden border-b">
         <div className="grid-fade pointer-events-none absolute inset-0 opacity-60" />
         <div className="container-page relative py-20 md:py-28">
-          <p className="mb-4 text-sm text-primary">Ingressos nominais · QR Code único</p>
+          <Rise><p className="mb-4 text-sm text-primary">Ingressos nominais · QR Code único</p></Rise>
           <h1 className="max-w-3xl text-4xl font-semibold tracking-tight md:text-6xl">
-            Os melhores eventos, <span className="text-muted-foreground">sem fila, sem golpe.</span>
+            <RiseWords text="Os melhores eventos," /> <RiseWords text="sem fila, sem golpe." delay={180} className="text-muted-foreground" />
           </h1>
           <form
             onSubmit={(e) => { e.preventDefault(); navigate({ to: "/eventos", search: { q: q || undefined } }); }}
-            className="mt-10 flex max-w-xl items-center gap-2 rounded-lg border bg-card p-1.5 focus-within:border-primary/50"
+            className="m-rise mt-10 flex max-w-xl items-center gap-2 rounded-lg border bg-card p-1.5 transition-[border-color,box-shadow] duration-300 focus-within:border-primary/60 focus-within:shadow-[0_0_0_4px_rgb(160_61_253/0.15)]"
+            style={{ "--i": 5 } as React.CSSProperties}
           >
             <Search className="ml-2 size-4 text-muted-foreground" />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar evento ou cidade"
@@ -52,9 +54,9 @@ function Home() {
             <Button type="submit" size="sm">Buscar</Button>
           </form>
           <div className="mt-6 flex flex-wrap gap-2">
-            {(Object.keys(categoryLabel) as EventCategory[]).map((c) => (
-              <Link key={c} to="/eventos" search={{ category: c }}
-                className="rounded-full border px-3 py-1 text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground">
+            {(Object.keys(categoryLabel) as EventCategory[]).map((c, i) => (
+              <Link key={c} to="/eventos" search={{ category: c }} style={{ "--i": 7 + i } as React.CSSProperties}
+                className="m-rise rounded-full border px-3 py-1 text-sm text-muted-foreground transition-[color,border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:text-foreground">
                 {categoryLabel[c]}
               </Link>
             ))}
@@ -63,15 +65,18 @@ function Home() {
       </section>
 
       <main className="container-page space-y-20 pt-16">
-        <Section title="Em destaque">
-          <div className="grid gap-5 md:grid-cols-2">
-            {featured.map((e) => <EventCard key={e.id} event={e} />)}
-          </div>
-        </Section>
+        {/* Sem evento marcado como destaque, a seção não aparece (antes ficava um título sem nada embaixo). */}
+        {featured.length > 0 && (
+          <Section title="Em destaque">
+            <div className="grid gap-5 md:grid-cols-2">
+              {featured.map((e) => <EventCard key={e.id} event={e} />)}
+            </div>
+          </Section>
+        )}
         <Section title="Próximos eventos"><Grid>{upcoming.map((e) => <EventCard key={e.id} event={e} />)}</Grid></Section>
         <Section title="Populares"><Grid>{popular.map((e) => <EventCard key={e.id} event={e} />)}</Grid></Section>
 
-        <section className="rounded-xl border bg-surface p-8 md:p-12">
+        <Reveal><section className="rounded-xl border bg-surface p-8 md:p-12">
           <div className="grid gap-10 md:grid-cols-2">
             <div>
               <p className="text-sm text-primary">Para organizadores</p>
@@ -95,7 +100,7 @@ function Home() {
               })}
             </ul>
           </div>
-        </section>
+        </section></Reveal>
       </main>
       <SiteFooter />
     </div>
@@ -104,13 +109,13 @@ function Home() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section>
+    <Reveal><section>
       <div className="mb-6 flex items-end justify-between">
         <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
-        <Link to="/eventos" className="text-sm text-muted-foreground hover:text-foreground">Ver todos →</Link>
+        <Link to="/eventos" className="group text-sm text-muted-foreground transition-colors hover:text-foreground">Ver todos <span className="inline-block transition-transform duration-300 group-hover:translate-x-1">→</span></Link>
       </div>
       {children}
-    </section>
+    </section></Reveal>
   );
 }
 const Grid = ({ children }: { children: React.ReactNode }) => (

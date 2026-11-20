@@ -12,7 +12,7 @@ export function SiteHeader() {
   const { user } = useSession();
   const navigate = useNavigate();
   return (
-    <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
+    <header className="m-header sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
       <div className="flex h-16 w-full items-center gap-4 px-4 sm:gap-10 sm:px-6 lg:px-10">
         <Link to="/" aria-label="BooTickets — página inicial" className="shrink-0">
           <BrandLogo />
