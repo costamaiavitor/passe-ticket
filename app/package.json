@@ -1,0 +1,24 @@
+{
+  "name": "bootickets-app",
+  "private": true,
+  "version": "1.0.0",
+  "description": "App do BooTickets para App Store e Google Play (Capacitor). Abre bootickets.com.br e acrescenta o que só um app tem: ingressos sem internet, câmera da portaria, ícone e tela de abertura.",
+  "scripts": {
+    "assets": "capacitor-assets generate --iconBackgroundColor \"#090B0F\" --iconBackgroundColorDark \"#090B0F\" --splashBackgroundColor \"#090B0F\" --splashBackgroundColorDark \"#090B0F\"",
+    "sync": "cap sync",
+    "android:debug": "cap sync android && cd android && ./gradlew assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/core": "^8.6.2",
+    "@capacitor/ios": "^8.6.2",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.4"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "4.0.0",
+    "@capacitor/cli": "^8.6.2",
+    "typescript": "^5.9.3"
+  }
+}

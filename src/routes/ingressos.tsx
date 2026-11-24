@@ -1,6 +1,7 @@
+import { isNativeApp, saveTicketsOffline } from "@/lib/native-app";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { CheckCircle2, MapPin } from "lucide-react";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
@@ -31,6 +32,8 @@ export const Route = createFileRoute("/ingressos")({
 
 function TicketList() {
   const { data, isLoading, error } = useQuery({ ...ticketsQuery(), refetchInterval: 15_000 });
+  // No app: guarda os ingressos no celular para o QR abrir sem internet na porta da festa.
+  useEffect(() => { if (data && isNativeApp()) void saveTicketsOffline(data).catch(() => undefined); }, [data]);
   if (isLoading) return <Loading className="mt-8" />;
   if (error) return <p className="mt-8 text-sm text-destructive">{error.message}</p>;
   if (!data?.length)

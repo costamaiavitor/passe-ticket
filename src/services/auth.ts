@@ -55,6 +55,8 @@ export async function logout() {
   if (!USE_MOCKS) await http("/auth/logout", { method: "POST" }).catch(() => undefined);
   setAccessToken(null);
   setSession({ user: null, ready: true });
+  // No app: tira do celular os ingressos guardados para uso sem internet.
+  await import("@/lib/native-app").then((m) => m.clearTicketsOffline()).catch(() => undefined);
 }
 
 /** Restaura a sessão ao abrir o site (cookie httpOnly de refresh). */

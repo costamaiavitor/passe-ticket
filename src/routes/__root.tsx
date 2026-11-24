@@ -14,6 +14,7 @@ import { Toaster } from "@/components/ui/sonner";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { restoreSession } from "@/services/auth";
+import { markNativeApp } from "@/lib/native-app";
 import { DEFAULT_SHARE_IMAGE } from "@/lib/seo";
 
 function NotFoundComponent() {
@@ -82,7 +83,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      // viewport-fit=cover: no app do iPhone a página vai até as bordas; o CSS respeita o entalhe (safe-area).
+      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { title: "BooTickets" },
       { name: "description", content: "Marketplace de eventos e ingressos." },
       { property: "og:site_name", content: "BooTickets" },
@@ -127,7 +129,7 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  useEffect(() => { void restoreSession(); }, []);
+  useEffect(() => { void restoreSession(); markNativeApp(); }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

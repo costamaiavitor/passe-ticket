@@ -1,0 +1,62 @@
+# Monta o app do BooTickets na nuvem (o PC não precisa de Android Studio nem de Mac).
+# - Android: gera um APK de teste para instalar no celular (aba Actions › execução › "Artifacts").
+# - iPhone: compila num Mac da nuvem para garantir que o projeto está certo. O envio para a App Store
+#   vem depois, com a conta de desenvolvedor da Apple.
+name: App
+
+on:
+  push:
+    branches: ["app/**"]
+    paths: ["app/**", ".github/workflows/app.yml"]
+  workflow_dispatch:
+
+jobs:
+  android:
+    name: Android (APK de teste)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - name: Ícones e tela de abertura
+        run: npx capacitor-assets generate --android --iconBackgroundColor "#090B0F" --iconBackgroundColorDark "#090B0F" --splashBackgroundColor "#090B0F" --splashBackgroundColorDark "#090B0F"
+      - run: npx cap sync android
+      - name: Gerar o APK
+        working-directory: app/android
+        run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BooTickets-android-teste
+          path: app/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+
+  ios:
+    name: iPhone (compila no Mac da nuvem)
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - name: Ícones e tela de abertura
+        run: npx capacitor-assets generate --ios --iconBackgroundColor "#090B0F" --iconBackgroundColorDark "#090B0F" --splashBackgroundColor "#090B0F" --splashBackgroundColorDark "#090B0F"
+      - run: npx cap sync ios
+      - name: Compilar para o simulador (sem assinatura)
+        run: xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator -destination "generic/platform=iOS Simulator" CODE_SIGNING_ALLOWED=NO build | tail -40
