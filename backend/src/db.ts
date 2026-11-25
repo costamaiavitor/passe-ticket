@@ -170,6 +170,8 @@ CREATE TABLE IF NOT EXISTS password_resets (
 -- Dados para o organizador receber os repasses.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS payout_pix_key TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS payout_holder TEXT;
+-- Conta excluída pelo próprio usuário (dados pessoais apagados; pedidos pagos ficam como registro).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TEXT;
 
 -- Repasses feitos aos organizadores (registrados pelo admin).
 CREATE TABLE IF NOT EXISTS organizer_payouts (

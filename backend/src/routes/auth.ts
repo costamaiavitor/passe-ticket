@@ -8,6 +8,7 @@ import { hashPassword, randomToken, sha256, signAccessToken, verifyPassword } fr
 import { badRequest, conflict, HttpError, unauthorized } from "../lib/errors.js";
 import { passwordResetEmail, sendEmail } from "../lib/email.js";
 import { google } from "../lib/google.js";
+import { deleteAccount, deletionBlockers } from "../domain/account.js";
 import { parse, rateLimit, requireAuth, user, type Role } from "../lib/http.js";
 
 export const authRouter = Router();
@@ -193,6 +194,21 @@ authRouter.put("/me/cpf", requireAuth, async (req, res) => {
   const r = await run("UPDATE users SET cpf = ? WHERE id = ? AND (cpf IS NULL OR cpf = '')", cpf, user(req).id);
   if (!r.changes) throw conflict("CPF_ALREADY_SET", "Sua conta já tem um CPF. Para trocar, fale com o suporte.");
   res.json({ ok: true });
+});
+
+/** Antes de excluir a conta: o que ainda impede e se a confirmação pede senha (quem entrou só com Google não tem). */
+authRouter.get("/me/deletion", requireAuth, async (req, res) => {
+  const u = await one<UserRow>("SELECT * FROM users WHERE id = ?", user(req).id);
+  if (!u) throw unauthorized();
+  res.json({ blockers: await deletionBlockers(u.id), needsPassword: !!u.password_hash });
+});
+
+/** Exclui a própria conta (App Store, Google Play e LGPD). Dados pessoais somem; pedidos pagos ficam anônimos. */
+authRouter.post("/me/delete", requireAuth, limiter, async (req, res) => {
+  const d = parse(z.object({ password: z.string().max(200).optional(), confirm: z.string().max(20) }), req.body);
+  await deleteAccount(user(req).id, d);
+  res.clearCookie(COOKIE, { ...cookieOpts(), maxAge: undefined });
+  res.status(204).end();
 });
 
 /** Qualquer usuário pode virar produtor e criar eventos (como nas plataformas de ingresso). */

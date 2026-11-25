@@ -59,6 +59,17 @@ export async function logout() {
   await import("@/lib/native-app").then((m) => m.clearTicketsOffline()).catch(() => undefined);
 }
 
+/** O que ainda impede excluir a conta e se a confirmação pede senha. */
+export const deletionCheck = () => http<{ blockers: string[]; needsPassword: boolean }>("/auth/me/deletion");
+
+/** Exclui a própria conta e sai (apaga também os ingressos guardados no celular, no app). */
+export async function deleteMyAccount(d: { password?: string; confirm: string }) {
+  await http("/auth/me/delete", { method: "POST", body: JSON.stringify(d) });
+  setAccessToken(null);
+  setSession({ user: null, ready: true });
+  await import("@/lib/native-app").then((m) => m.clearTicketsOffline()).catch(() => undefined);
+}
+
 /** Restaura a sessão ao abrir o site (cookie httpOnly de refresh). */
 export async function restoreSession() {
   if (getSession().ready) return;
