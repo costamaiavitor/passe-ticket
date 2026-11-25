@@ -5,6 +5,7 @@ import { isValidCpf, onlyDigits } from "../lib/cpf.js";
 import { badRequest, conflict, forbidden, HttpError, notFound } from "../lib/errors.js";
 import { payments, type CardPaymentInput, type PaymentInfo } from "../payments.js";
 import { eventCancelledEmail, orderRefundedEmail, purchaseEmail, refundFailedAdminEmail, sendEmail } from "../lib/email.js";
+import { sendPush } from "../lib/push.js";
 import { batchStatus, batchStatuses, categoryOf, normalizeCode, type BatchRow, type EventRow } from "./events.js";
 import { discountFor, findUsableCoupon } from "./promos.js";
 import { authForOrder, explainSplitError, reportSplitFailure, reportSplitOk, sellerAuth } from "./mpaccounts.js";
@@ -124,6 +125,7 @@ export async function refundOwnOrder(userId: string, orderId: string) {
   await run("UPDATE orders SET refunded_at = ?, refund_by_buyer = TRUE, refund_error = NULL WHERE id = ?", now(), o.id);
   const buyer = await one<{ email: string; name: string }>("SELECT email, name FROM users WHERE id = ?", userId);
   if (buyer) await sendEmail(orderRefundedEmail(buyer.email, buyer.name, ev.title, o.total)).catch(() => undefined);
+  await sendPush(userId, { title: "Devolução feita", body: `Sua compra para ${ev.title} foi devolvida. O valor volta pelo mesmo meio de pagamento.`, url: "/ingressos" });
   return (await one<OrderRow>("SELECT * FROM orders WHERE id = ?", o.id))!;
 }
 
@@ -539,6 +541,7 @@ export async function removeEvent(eventId: string) {
       const buyer = await one<{ email: string; name: string }>("SELECT email, name FROM users WHERE id = ?", o.user_id);
       const ev = await one<{ title: string }>("SELECT title FROM events WHERE id = ?", eventId);
       if (buyer && ev) await sendEmail(eventCancelledEmail(buyer.email, buyer.name, ev.title, o.total));
+      if (ev) await sendPush(o.user_id, { title: "Evento cancelado", body: `${ev.title} foi cancelado. Seu dinheiro já foi devolvido.`, url: "/ingressos" });
     } catch (e) {
       refundFailed++;
       errors.push(e instanceof Error ? e.message : String(e));
@@ -579,8 +582,8 @@ export async function purgeCancelledEvent(eventId: string) {
 /** Manda o e-mail de "compra confirmada" com o resumo e o link para os QR Codes. */
 export async function notifyPaid(orderId: string) {
   const d = await one<{
-    id: string; total: number; email: string; name: string; title: string; starts_at: string; venue: string; city: string; batch: string;
-  }>(`SELECT o.id, o.total, u.email, u.name, e.title, e.starts_at, e.venue, e.city, b.name batch
+    id: string; user_id: string; total: number; email: string; name: string; title: string; starts_at: string; venue: string; city: string; batch: string;
+  }>(`SELECT o.id, o.user_id, o.total, u.email, u.name, e.title, e.starts_at, e.venue, e.city, b.name batch
       FROM orders o JOIN users u ON u.id = o.user_id JOIN events e ON e.id = o.event_id JOIN batches b ON b.id = o.batch_id
       WHERE o.id = ?`, orderId);
   if (!d) return;
@@ -592,4 +595,9 @@ export async function notifyPaid(orderId: string) {
     to: d.email, name: d.name, orderId: d.id, eventTitle: d.title, startsAt: d.starts_at, venue: d.venue, city: d.city,
     batchName: d.batch, total: d.total, holders,
   }));
+  await sendPush(d.user_id, {
+    title: "Pagamento aprovado 🎉",
+    body: `${holders.length === 1 ? "Seu ingresso" : `Seus ${holders.length} ingressos`} para ${d.title} já ${holders.length === 1 ? "está" : "estão"} no app.`,
+    url: "/ingressos",
+  });
 }

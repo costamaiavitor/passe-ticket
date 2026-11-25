@@ -11,6 +11,12 @@
       "framework": "express"
     }
   },
+  "crons": [
+    {
+      "path": "/api/v1/app/cron/lembretes",
+      "schedule": "0 13 * * *"
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/(.*)",

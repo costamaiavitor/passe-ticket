@@ -28,6 +28,7 @@ function Privacy() {
           <li><strong>Login com Google:</strong> nome, e-mail e um identificador da sua conta Google. Não temos acesso à sua senha do Google.</li>
           <li><strong>Compras:</strong> evento, ingressos, valores, nome e CPF de cada titular de ingresso, e a situação do pagamento.</li>
           <li><strong>Uso da portaria:</strong> registro de cada leitura de QR Code (data, hora e resultado), para evitar fraudes.</li>
+          <li><strong>App do BooTickets:</strong> se você permitir notificações, guardamos um código do seu celular para avisar sobre pagamento, ingressos recebidos e o dia do evento. Para abrir sem internet, o app guarda no próprio celular os seus ingressos (sem o CPF), apagados quando você sai da conta.</li>
           <li><strong>Dados técnicos:</strong> endereço IP e registros de acesso, usados para segurança e para limitar tentativas abusivas.</li>
         </ul>
         <p>Os dados do cartão de crédito são digitados diretamente no formulário seguro do Mercado Pago e <strong>não passam pelos nossos servidores</strong>.</p>
@@ -48,6 +49,8 @@ function Privacy() {
         <ul>
           <li><strong>Mercado Pago:</strong> para processar os pagamentos (Pix e cartão).</li>
           <li><strong>Google:</strong> apenas se você escolher entrar com a sua conta Google.</li>
+          <li><strong>Google (Firebase) e Apple:</strong> para entregar as notificações do app no Android e no iPhone.</li>
+          <li><strong>Apple Wallet e Google Wallet:</strong> apenas se você tocar em "Adicionar à Carteira": evento, nome do titular, lote e o QR Code do ingresso.</li>
           <li><strong>Vercel e Neon:</strong> serviços de hospedagem do site e do banco de dados.</li>
           <li><strong>Organizador do evento:</strong> nome do titular, e-mail do comprador e CPF parcialmente oculto dos ingressos do evento dele.</li>
         </ul>

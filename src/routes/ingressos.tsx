@@ -7,6 +7,7 @@ import { CheckCircle2, MapPin } from "lucide-react";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { RequireAuth } from "@/components/require-auth";
 import { TicketQr } from "@/components/ticket-qr";
+import { WalletButtons } from "@/components/wallet-buttons";
 import { IncomingTransfers, TransferControls } from "@/components/ticket-transfer";
 import { Button } from "@/components/ui/button";
 import { Loading, Rise, RiseWords } from "@/components/motion";
@@ -120,6 +121,7 @@ function TicketCard({ t }: { t: Ticket }) {
           <div><dt className="text-xs text-muted-foreground">Lote</dt><dd>{t.batchName}</dd></div>
           <div><dt className="text-xs text-muted-foreground">Status</dt><dd className={used ? "text-muted-foreground" : "text-primary"}>{used ? "Utilizado" : "Válido"}</dd></div>
         </dl>
+        {t.qrPayload && <WalletButtons ticketId={t.id} />}
         <TransferControls t={t} />
         <p className="mt-3 text-center font-mono text-[10px] text-muted-foreground">#{t.id.slice(0, 8)}</p>
       </div>

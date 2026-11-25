@@ -14,7 +14,8 @@ import { Toaster } from "@/components/ui/sonner";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { restoreSession } from "@/services/auth";
-import { markNativeApp } from "@/lib/native-app";
+import { markNativeApp, setupPush } from "@/lib/native-app";
+import { useSession } from "@/services/session";
 import { DEFAULT_SHARE_IMAGE } from "@/lib/seo";
 
 function NotFoundComponent() {
@@ -130,6 +131,9 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   useEffect(() => { void restoreSession(); markNativeApp(); }, []);
+  // No app: depois que a pessoa entra na conta, pede para mandar notificações (pagamento, festa hoje…).
+  const { user } = useSession();
+  useEffect(() => { if (user) void setupPush().catch(() => undefined); }, [user]);
 
   return (
     <QueryClientProvider client={queryClient}>

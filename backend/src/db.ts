@@ -280,6 +280,20 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS refund_error TEXT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS refund_note TEXT;
 ALTER TABLE tickets ADD COLUMN IF NOT EXISTS price INTEGER;
 ALTER TABLE tickets ADD COLUMN IF NOT EXISTS list_price INTEGER;
+-- Celulares com o app instalado (para as notificações). Um token por aparelho.
+CREATE TABLE IF NOT EXISTS push_devices (
+  token TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  platform TEXT NOT NULL CHECK (platform IN ('android','ios')),
+  created_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS push_devices_user ON push_devices(user_id);
+-- Lembrete "sua festa é hoje" já mandado (um por evento).
+CREATE TABLE IF NOT EXISTS event_reminders (
+  event_id TEXT PRIMARY KEY REFERENCES events(id) ON DELETE CASCADE,
+  sent_at TEXT NOT NULL
+);
 
 -- Um CPF por conta (transferências e cortesias são entregues pelo CPF). Só cria a trava se ainda não houver
 -- CPFs repetidos no banco, para a atualização nunca derrubar o site; o cadastro já recusa CPF repetido.

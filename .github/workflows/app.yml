@@ -32,6 +32,12 @@ jobs:
       - name: Ícones e tela de abertura
         run: npx capacitor-assets generate --android --iconBackgroundColor "#090B0F" --iconBackgroundColorDark "#090B0F" --splashBackgroundColor "#090B0F" --splashBackgroundColorDark "#090B0F"
       - run: npx cap sync android
+      # Notificações no Android: o arquivo do Firebase fica guardado como segredo do GitHub (GOOGLE_SERVICES_JSON).
+      # Sem ele o app monta normalmente, só sem notificação.
+      - name: Arquivo do Firebase (se configurado)
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: if [ -n "$GOOGLE_SERVICES_JSON" ]; then printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json; fi
       - name: Gerar o APK
         working-directory: app/android
         run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon
