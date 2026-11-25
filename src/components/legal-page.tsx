@@ -3,7 +3,9 @@ import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { Reveal, Rise, RiseWords } from "@/components/motion";
 
 export const CONTACT_EMAIL = "booticketss@gmail.com";
-export const LEGAL_UPDATED_AT = "17 de novembro de 2026";
+export const LEGAL_UPDATED_AT = "25 de novembro de 2026";
+
+export { LEGAL_ENTITY, legalEntityLine } from "@/lib/legal";
 
 /** Moldura das páginas legais (Privacidade e Termos), no visual do site. */
 export function LegalPage({ title, intro, children }: { title: string; intro: string; children: ReactNode }) {

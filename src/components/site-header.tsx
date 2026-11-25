@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { logout } from "@/services/auth";
 import { hasRole, useSession } from "@/services/session";
+import { legalEntityLine } from "@/lib/legal";
 
 export function SiteHeader() {
   const { user } = useSession();
@@ -107,12 +108,13 @@ export function SiteFooter() {
           <Link to="/termos" className={`block ${link}`}>Termos de Uso</Link>
           <Link to="/termos" hash="devolucao" className={`block ${link}`}>Devolução de ingressos</Link>
           <Link to="/privacidade" className={`block ${link}`}>Privacidade</Link>
+          <Link to="/termos-organizador" className={`block ${link}`}>Termos do Organizador</Link>
           <a href="mailto:booticketss@gmail.com" className={`block ${link}`}>Fale com a gente</a>
         </nav>
       </div>
       <div className="border-t">
         <div className="container-page flex flex-col gap-2 py-5 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <span>© {year} BooTickets. Ingressos com segurança.</span>
+          <span>© {year} {legalEntityLine()}. Ingressos com segurança.</span>
           <span>Pagamentos processados pelo Mercado Pago</span>
         </div>
       </div>

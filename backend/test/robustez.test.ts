@@ -26,7 +26,7 @@ async function api<T = any>(path: string, opts: { method?: string; body?: unknow
   const res = await fetch(base + path, {
     method: opts.method ?? (opts.body !== undefined || opts.raw !== undefined ? "POST" : "GET"),
     headers: { "Content-Type": "application/json", ...(opts.token ? { Authorization: `Bearer ${opts.token}` } : {}) },
-    body: opts.raw ?? (opts.body !== undefined ? JSON.stringify(path === "/orders" && opts.body && typeof opts.body === "object" && !("acceptTerms" in opts.body) ? { acceptTerms: true, ...opts.body } : opts.body) : null),
+    body: opts.raw ?? (opts.body !== undefined ? JSON.stringify(path === "/orders" && opts.body && typeof opts.body === "object" && !("acceptTerms" in opts.body) ? { acceptTerms: true, ...opts.body } : path === "/organizer/events" && opts.body && typeof opts.body === "object" && !("acceptOrganizerTerms" in opts.body) ? { acceptOrganizerTerms: true, ...opts.body } : opts.body) : null),
   });
   const text = await res.text();
   let body: T;

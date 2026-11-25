@@ -11,7 +11,7 @@ const needsBackend = () => {
 /** Libera a conta para criar eventos (o servidor devolve uma sessão nova com o papel de organizador). */
 export async function becomeOrganizer() {
   needsBackend();
-  const r = await http<{ accessToken: string; user: AuthUser }>("/auth/become-organizer", { method: "POST" });
+  const r = await http<{ accessToken: string; user: AuthUser }>("/auth/become-organizer", { method: "POST", body: JSON.stringify({ acceptOrganizerTerms: true }) });
   setAccessToken(r.accessToken);
   setSession({ user: r.user, ready: true });
   return r.user;
@@ -43,6 +43,8 @@ export interface NewEvent {
   coupons?: NewCoupon[];
   /** batchIndex = posição do tipo de ingresso em batches. */
   courtesies?: Array<NewCourtesy & { batchIndex: number }>;
+  /** Marcou "Li e aceito os Termos do Organizador" (obrigatório no primeiro evento e quando os termos mudam). */
+  acceptOrganizerTerms?: boolean;
 }
 
 export interface NewCoupon { code: string; kind: "percent" | "fixed"; value: number; maxUses?: number | null }

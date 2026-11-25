@@ -39,9 +39,11 @@ export function HoldersForm({ labels, defaultName, loading, error, onBack, onSub
         <input type="checkbox" required className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]" />
         <span>
           Li e aceito os <Link to="/termos" target="_blank" className="font-medium text-foreground underline">Termos de Uso</Link>,
-          incluindo a <Link to="/termos" hash="devolucao" target="_blank" className="font-medium text-foreground underline">Política de Devolução</Link>:
-          posso devolver os ingressos pelo site em até 7 dias depois da compra, desde que o evento ainda não tenha começado.
-          Ingresso usado na entrada ou transferido não pode ser devolvido.
+          incluindo a <Link to="/termos" hash="devolucao" target="_blank" className="font-medium text-foreground underline">Política de Devolução</Link>,
+          e a <Link to="/privacidade" target="_blank" className="font-medium text-foreground underline">Política de Privacidade</Link>.
+          Posso devolver os ingressos pelo site em até 7 dias depois da compra, desde que o evento ainda não tenha começado;
+          ingresso usado na entrada ou transferido não pode ser devolvido. Declaro que os dados dos titulares são verdadeiros e que
+          tenho autorização deles (ou sou o responsável, se menor). Meia-entrada exige comprovante na entrada.
         </span>
       </label>
       {error && <p className="text-sm text-destructive">{error}</p>}

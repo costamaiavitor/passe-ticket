@@ -9,10 +9,11 @@ import { badRequest, conflict, HttpError, unauthorized } from "../lib/errors.js"
 import { passwordResetEmail, sendEmail } from "../lib/email.js";
 import { google } from "../lib/google.js";
 import { parse, rateLimit, requireAuth, user, type Role } from "../lib/http.js";
+import { logAccess, requestProof } from "../lib/access-log.js";
 
 export const authRouter = Router();
 
-interface UserRow { id: string; name: string; email: string; cpf: string; password_hash: string; roles: string }
+interface UserRow { id: string; name: string; email: string; cpf: string; password_hash: string; roles: string; organizer_terms_version?: string | null }
 
 const COOKIE = "pt_refresh";
 const cookieOpts = () => ({
@@ -38,7 +39,19 @@ export async function rolesOf(u: Pick<UserRow, "roles" | "email" | "id"> & { goo
   return [...roles];
 }
 
-export const publicUser = async (u: UserRow) => ({ id: u.id, name: u.name, email: u.email, roles: await rolesOf(u) });
+export const publicUser = async (u: UserRow) => ({
+  id: u.id, name: u.name, email: u.email, roles: await rolesOf(u),
+  // Já aceitou a versão atual dos Termos do Organizador (senão, o site pede o aceite antes de criar evento).
+  organizerTermsOk: u.organizer_terms_version === config.organizerTermsVersion,
+});
+
+/** Guarda a prova de que a pessoa aceitou os Termos do Organizador (versão, data, IP e navegador). */
+export async function recordOrganizerTerms(req: Request, userId: string) {
+  const p = requestProof(req);
+  await run("UPDATE users SET organizer_terms_version = ?, organizer_terms_at = ?, organizer_terms_ip = ?, organizer_terms_user_agent = ? WHERE id = ?",
+    config.organizerTermsVersion, now(), p.ip, p.userAgent, userId);
+  await logAccess(req, userId, "organizer_terms");
+}
 
 async function issueSession(res: Response, u: UserRow) {
   const refresh = randomToken();
@@ -79,6 +92,7 @@ authRouter.post("/register", limiter, async (req, res) => {
     "INSERT INTO users (id, name, email, cpf, password_hash, roles, created_at) VALUES (?,?,?,?,?,?,?)",
     id, data.name, data.email, data.cpf, await hashPassword(data.password), JSON.stringify(["buyer"]), now(),
   );
+  await logAccess(req, id, "register");
   res.status(201).json(await issueSession(res, (await one<UserRow>("SELECT * FROM users WHERE id = ?", id))!));
 });
 
@@ -86,6 +100,7 @@ authRouter.post("/login", limiter, async (req, res) => {
   const { email, password } = parse(z.object({ email: z.string().trim().toLowerCase(), password: z.string() }), req.body);
   const u = await one<UserRow>("SELECT * FROM users WHERE email = ?", email);
   if (!u || !(await verifyPassword(password, u.password_hash))) throw new HttpError(401, "INVALID_CREDENTIALS", "E-mail ou senha incorretos.");
+  await logAccess(req, u.id, "login");
   res.json(await issueSession(res, u));
 });
 
@@ -121,6 +136,7 @@ authRouter.post("/google", limiter, async (req, res) => {
     // A conta com esse e-mail já está ligada a OUTRA conta Google: não mistura as duas.
     if (!u || u.google_sub !== g.sub) throw conflict("GOOGLE_ACCOUNT_MISMATCH", "Esse e-mail já está ligado a outra conta Google.");
   }
+  await logAccess(req, u.id, "login_google");
   res.json(await issueSession(res, u));
 });
 
@@ -151,6 +167,7 @@ authRouter.post("/reset", limiter, async (req, res) => {
   if (!used.changes) throw badRequest("RESET_INVALID", "Este link já foi usado. Peça um novo.");
   await run("UPDATE users SET password_hash = ? WHERE id = ?", await hashPassword(password), row.user_id);
   await run("UPDATE refresh_tokens SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL", now(), row.user_id);
+  await logAccess(req, row.user_id, "password_reset");
   res.json(await issueSession(res, (await one<UserRow>("SELECT * FROM users WHERE id = ?", row.user_id))!));
 });
 
@@ -197,11 +214,25 @@ authRouter.put("/me/cpf", requireAuth, async (req, res) => {
 
 /** Qualquer usuário pode virar produtor e criar eventos (como nas plataformas de ingresso). */
 authRouter.post("/become-organizer", requireAuth, async (req, res) => {
+  const { acceptOrganizerTerms } = parse(z.object({ acceptOrganizerTerms: z.boolean().optional() }), req.body ?? {});
+  if (acceptOrganizerTerms !== true)
+    throw badRequest("ORGANIZER_TERMS_REQUIRED", "Para criar eventos, leia e aceite os Termos do Organizador.");
   const u = await one<UserRow>("SELECT * FROM users WHERE id = ?", user(req).id);
   if (!u) throw unauthorized();
   const roles = new Set(await rolesOf(u));
   if (roles.has("organizer")) throw badRequest("ALREADY_ORGANIZER", "Você já é produtor.");
   roles.add("organizer");
   await run("UPDATE users SET roles = ? WHERE id = ?", JSON.stringify([...roles]), u.id);
-  res.json(await issueSession(res, { ...u, roles: JSON.stringify([...roles]) }));
+  await recordOrganizerTerms(req, u.id);
+  await logAccess(req, u.id, "become_organizer");
+  res.json(await issueSession(res, (await one<UserRow>("SELECT * FROM users WHERE id = ?", u.id))!));
+});
+
+/** Produtor que já existia aceita a versão nova dos Termos do Organizador. */
+authRouter.post("/organizer-terms", requireAuth, async (req, res) => {
+  const { accept } = parse(z.object({ accept: z.literal(true) }), req.body);
+  void accept;
+  await recordOrganizerTerms(req, user(req).id);
+  const u = (await one<UserRow>("SELECT * FROM users WHERE id = ?", user(req).id))!;
+  res.json({ user: await publicUser(u) });
 });

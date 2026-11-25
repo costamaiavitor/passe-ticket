@@ -23,7 +23,7 @@ async function api<T = any>(path: string, opts: { method?: string; body?: unknow
   const res = await fetch(base + path, {
     method: opts.method ?? (opts.body !== undefined ? "POST" : "GET"),
     headers: { "Content-Type": "application/json", ...(opts.token ? { Authorization: `Bearer ${opts.token}` } : {}) },
-    body: opts.body !== undefined ? JSON.stringify(path === "/orders" && opts.body && typeof opts.body === "object" && !("acceptTerms" in opts.body) ? { acceptTerms: true, ...opts.body } : opts.body) : null,
+    body: opts.body !== undefined ? JSON.stringify(path === "/orders" && opts.body && typeof opts.body === "object" && !("acceptTerms" in opts.body) ? { acceptTerms: true, ...opts.body } : path === "/organizer/events" && opts.body && typeof opts.body === "object" && !("acceptOrganizerTerms" in opts.body) ? { acceptOrganizerTerms: true, ...opts.body } : opts.body) : null,
   });
   const text = await res.text();
   return { status: res.status, body: (text ? JSON.parse(text) : null) as T };
@@ -86,7 +86,7 @@ describe("Devolução e aceite dos Termos", () => {
     const o = await buy(T["ana"]!, ev, C["ana"]!);
     assert.equal(o.status, 201);
     const row = (await orderRow(o.body.id))!;
-    assert.equal(row.terms_version, "2026-11-17");
+    assert.equal(row.terms_version, "2026-11-25");
     assert.ok(row.terms_accepted_at);
     assert.ok(row.terms_ip, "IP do aceite");
     assert.ok(row.terms_user_agent !== null);

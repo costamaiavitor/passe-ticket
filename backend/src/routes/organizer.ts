@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { recordOrganizerTerms } from "./auth.js";
 import { Router } from "express";
 import { z } from "zod";
 import { all, now, one, run, tx } from "../db.js";
@@ -139,7 +140,15 @@ organizerRouter.post("/events", async (req, res) => {
     coupons: z.array(couponSchema).max(50).default([]),
     // Cortesias já na criação: "batchIndex" é a posição do tipo de ingresso na lista de lotes enviada.
     courtesies: z.array(courtesySchema.extend({ batchIndex: z.number().int().min(0) })).max(200).default([]),
+    acceptOrganizerTerms: z.boolean().optional(),
   }), req.body);
+  // Termos do Organizador: aceite com prova (versão, data, IP) antes do primeiro evento e a cada versão nova.
+  const terms = await one<{ organizer_terms_version: string | null }>("SELECT organizer_terms_version FROM users WHERE id = ?", user(req).id);
+  if (terms?.organizer_terms_version !== config.organizerTermsVersion) {
+    if (d.acceptOrganizerTerms !== true)
+      throw conflict("ORGANIZER_TERMS_REQUIRED", "Os Termos do Organizador foram atualizados. Leia e aceite para publicar o evento.");
+    await recordOrganizerTerms(req, user(req).id);
+  }
   for (const c of d.courtesies) {
     if (!isValidCpf(onlyDigits(c.cpf))) throw badRequest("INVALID_CPF", `CPF inválido na cortesia de ${c.name}.`);
     if (!d.batches[c.batchIndex]) throw badRequest("INVALID_BATCH", `Escolha o tipo de ingresso da cortesia de ${c.name}.`);

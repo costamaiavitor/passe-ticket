@@ -19,6 +19,7 @@ import { Route as PortariaRouteImport } from './routes/portaria'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as RedefinirSenhaRouteImport } from './routes/redefinir-senha'
 import { Route as TermosRouteImport } from './routes/termos'
+import { Route as TermosOrganizadorRouteImport } from './routes/termos-organizador'
 import { Route as CheckoutOrderIdRouteImport } from './routes/checkout.$orderId'
 import { Route as EventosIndexRouteImport } from './routes/eventos.index'
 import { Route as EventosIdRouteImport } from './routes/eventos.$id'
@@ -77,6 +78,11 @@ const TermosRoute = TermosRouteImport.update({
   path: '/termos',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TermosOrganizadorRoute = TermosOrganizadorRouteImport.update({
+  id: '/termos-organizador',
+  path: '/termos-organizador',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CheckoutOrderIdRoute = CheckoutOrderIdRouteImport.update({
   id: '/checkout/$orderId',
   path: '/checkout/$orderId',
@@ -124,6 +130,7 @@ export interface FileRoutesByFullPath {
   '/privacidade': typeof PrivacidadeRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/termos': typeof TermosRoute
+  '/termos-organizador': typeof TermosOrganizadorRoute
   '/checkout/$orderId': typeof CheckoutOrderIdRoute
   '/eventos/$id': typeof EventosIdRoute
   '/organizador/novo': typeof OrganizadorNovoRoute
@@ -143,6 +150,7 @@ export interface FileRoutesByTo {
   '/privacidade': typeof PrivacidadeRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/termos': typeof TermosRoute
+  '/termos-organizador': typeof TermosOrganizadorRoute
   '/checkout/$orderId': typeof CheckoutOrderIdRoute
   '/eventos/$id': typeof EventosIdRoute
   '/organizador/novo': typeof OrganizadorNovoRoute
@@ -163,6 +171,7 @@ export interface FileRoutesById {
   '/privacidade': typeof PrivacidadeRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/termos': typeof TermosRoute
+  '/termos-organizador': typeof TermosOrganizadorRoute
   '/checkout/$orderId': typeof CheckoutOrderIdRoute
   '/eventos/$id': typeof EventosIdRoute
   '/organizador/novo': typeof OrganizadorNovoRoute
@@ -184,6 +193,7 @@ export interface FileRouteTypes {
     | '/privacidade'
     | '/redefinir-senha'
     | '/termos'
+    | '/termos-organizador'
     | '/checkout/$orderId'
     | '/eventos/$id'
     | '/organizador/novo'
@@ -203,6 +213,7 @@ export interface FileRouteTypes {
     | '/privacidade'
     | '/redefinir-senha'
     | '/termos'
+    | '/termos-organizador'
     | '/checkout/$orderId'
     | '/eventos/$id'
     | '/organizador/novo'
@@ -222,6 +233,7 @@ export interface FileRouteTypes {
     | '/privacidade'
     | '/redefinir-senha'
     | '/termos'
+    | '/termos-organizador'
     | '/checkout/$orderId'
     | '/eventos/$id'
     | '/organizador/novo'
@@ -242,6 +254,7 @@ export interface RootRouteChildren {
   PrivacidadeRoute: typeof PrivacidadeRoute
   RedefinirSenhaRoute: typeof RedefinirSenhaRoute
   TermosRoute: typeof TermosRoute
+  TermosOrganizadorRoute: typeof TermosOrganizadorRoute
   CheckoutOrderIdRoute: typeof CheckoutOrderIdRoute
   EventosIdRoute: typeof EventosIdRoute
   OrganizadorNovoRoute: typeof OrganizadorNovoRoute
@@ -323,6 +336,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TermosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/termos-organizador': {
+      id: '/termos-organizador'
+      path: '/termos-organizador'
+      fullPath: '/termos-organizador'
+      preLoaderRoute: typeof TermosOrganizadorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/checkout/$orderId': {
       id: '/checkout/$orderId'
       path: '/checkout/$orderId'
@@ -386,6 +406,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacidadeRoute: PrivacidadeRoute,
   RedefinirSenhaRoute: RedefinirSenhaRoute,
   TermosRoute: TermosRoute,
+  TermosOrganizadorRoute: TermosOrganizadorRoute,
   CheckoutOrderIdRoute: CheckoutOrderIdRoute,
   EventosIdRoute: EventosIdRoute,
   OrganizadorNovoRoute: OrganizadorNovoRoute,

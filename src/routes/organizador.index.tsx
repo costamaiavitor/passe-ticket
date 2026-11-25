@@ -34,6 +34,7 @@ export const Route = createFileRoute("/organizador/")({
 
 function BecomeOrganizer({ user }: { user: AuthUser }) {
   const m = useMutation({ mutationFn: becomeOrganizer });
+  const [accepted, setAccepted] = useState(false);
   return (
     <section className="mx-auto max-w-lg rounded-xl border bg-card p-6 text-center md:p-10">
       <span className="mx-auto grid size-12 place-items-center rounded-lg bg-primary text-primary-foreground"><CalendarPlus className="size-6" /></span>
@@ -46,8 +47,12 @@ function BecomeOrganizer({ user }: { user: AuthUser }) {
         <li className="flex gap-2"><span className="text-primary">✓</span>Lotes com preço e quantidade que você define</li>
         <li className="flex gap-2"><span className="text-primary">✓</span>Portaria com leitor de QR e controle de entradas</li>
       </ul>
+      <label className="mt-6 flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 text-left text-sm">
+        <input type="checkbox" className="mt-0.5 size-4 accent-[var(--primary)]" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} />
+        <span>Li e aceito os <Link to="/termos-organizador" target="_blank" className="font-medium text-foreground underline">Termos do Organizador</Link>, inclusive a minha responsabilidade pela realização do evento, pelas licenças e pelo reembolso aos compradores.</span>
+      </label>
       {m.error && <p className="mt-4 text-sm text-destructive">{m.error.message}</p>}
-      <Button className="mt-6 w-full" size="lg" disabled={m.isPending} onClick={() => m.mutate()}>
+      <Button className="mt-4 w-full" size="lg" disabled={m.isPending || !accepted} onClick={() => m.mutate()}>
         {m.isPending ? "Aguarde…" : "Quero criar eventos"}
       </Button>
       <p className="mt-3 text-xs text-muted-foreground">Conta: {user.email}</p>

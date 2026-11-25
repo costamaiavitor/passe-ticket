@@ -83,9 +83,10 @@ export function purchaseEmail(d: PurchaseEmailData): Email {
       </table>
       <p style="margin:0">Titulares:</p><ul style="margin:6px 0 16px">${holders}</ul>
       <p>O QR Code de cada ingresso está em <strong>Meus ingressos</strong>. Na entrada, mostre o QR e um documento com foto do titular.</p>
-      <p style="font-size:13px;color:#9299A7">Pedido #${esc(d.orderId.slice(0, 8))}. Não compartilhe o QR Code: ele vale para uma única entrada.</p>`,
+      <p style="font-size:13px;color:#9299A7">Pedido #${esc(d.orderId.slice(0, 8))}. Não compartilhe o QR Code: ele vale para uma única entrada.</p>
+      <p style="font-size:12px;color:#9299A7">Você pode devolver esta compra pelo site em até 7 dias, se o evento ainda não tiver começado. Esta compra segue os <a href="${config.publicUrl}/termos" style="color:#9299A7">Termos de Uso</a> (versão ${esc(config.termsVersion)}) e a <a href="${config.publicUrl}/privacidade" style="color:#9299A7">Política de Privacidade</a> que você aceitou.</p>`,
       { label: "Ver meus ingressos", url: link }),
-    text: `Compra confirmada! ${d.eventTitle} — ${fmtDateTime(d.startsAt)}, ${d.venue}, ${d.city}. ${d.holders.length}× ${d.batchName}, total ${brl(d.total)}. Seus QR Codes: ${link}`,
+    text: `Compra confirmada! ${d.eventTitle} — ${fmtDateTime(d.startsAt)}, ${d.venue}, ${d.city}. ${d.holders.length}× ${d.batchName}, total ${brl(d.total)}. Seus QR Codes: ${link}. Termos de Uso (versão ${config.termsVersion}): ${config.publicUrl}/termos`,
   };
 }
 

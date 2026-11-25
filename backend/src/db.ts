@@ -278,6 +278,22 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS refund_error TEXT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS refund_note TEXT;
 ALTER TABLE tickets ADD COLUMN IF NOT EXISTS price INTEGER;
 ALTER TABLE tickets ADD COLUMN IF NOT EXISTS list_price INTEGER;
+-- Prova do aceite dos Termos do Organizador (versão, data, IP e navegador).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS organizer_terms_version TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS organizer_terms_at TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS organizer_terms_ip TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS organizer_terms_user_agent TEXT;
+-- Registro de acessos (Marco Civil da Internet, art. 15: guardar por no mínimo 6 meses).
+CREATE TABLE IF NOT EXISTS access_logs (
+  id TEXT PRIMARY KEY,
+  user_id TEXT,
+  action TEXT NOT NULL,
+  ip TEXT NOT NULL DEFAULT '',
+  user_agent TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS access_logs_user ON access_logs(user_id, created_at);
+CREATE INDEX IF NOT EXISTS access_logs_created ON access_logs(created_at);
 
 -- Um CPF por conta (transferências e cortesias são entregues pelo CPF). Só cria a trava se ainda não houver
 -- CPFs repetidos no banco, para a atualização nunca derrubar o site; o cadastro já recusa CPF repetido.

@@ -109,7 +109,7 @@ function EditEvent({ ev }: { ev: EventPanel }) {
     mutationFn: async () => {
       // 1) Dados do evento: manda só o que mudou.
       const importantInfo = [ageToInfo(age), ...info.split("\n").map((l) => l.trim()).filter(Boolean)];
-      const next: Required<Omit<EventEdit, "maxTransfers">> = {
+      const next: Required<Omit<EventEdit, "maxTransfers" | "acceptOrganizerTerms">> = {
         title: title.trim(), category, coverUrl, startsAt, venue: venue.trim(), city: city.trim(), address: address.trim(),
         description: description.trim(), importantInfo, maxTicketsPerCpf: maxPerCpf,
         visibility, accessCode: accessCode.trim(),

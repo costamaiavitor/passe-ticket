@@ -10,7 +10,7 @@ import { AGES, ageToInfo, CATEGORIES, centsFrom, Chips, COVERS, CoverPicker, inp
 import { AccessFields, CouponDrafts, CourtesyDrafts, type DraftCourtesy } from "@/components/event-promos";
 import { Button } from "@/components/ui/button";
 import { createEvent, type NewCoupon, type NewEvent } from "@/services/organizer";
-import { hasRole } from "@/services/session";
+import { getSession, hasRole, setSession, useSession } from "@/services/session";
 import { brl, categoryLabel, platformFee } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import type { EventCategory, OrganizerEvent } from "@/types";
@@ -74,9 +74,15 @@ function CreateEvent() {
   const coverUrl = coverChoice || presetCover(COVERS[0]!.file);
   const startsAt = date && time ? `${date}T${time}:00-03:00` : "";
 
+  // Termos do Organizador: aceite no primeiro evento e quando a versão muda (o servidor guarda a prova).
+  const { user } = useSession();
+  const needsTerms = !user?.organizerTermsOk;
+  const [acceptTerms, setAcceptTerms] = useState(false);
   const m = useMutation({
     mutationFn: (data: NewEvent) => createEvent(data),
     onSuccess: (ev) => {
+      const u = getSession().user;
+      if (u && !u.organizerTermsOk) setSession({ user: { ...u, organizerTermsOk: true } });
       void qc.invalidateQueries({ queryKey: ["organizer-events"] });
       if (ev.courtesyErrors?.length)
         toast.error(`Evento criado, mas algumas cortesias não foram enviadas: ${ev.courtesyErrors.join(" · ")}`, { duration: 15000 });
@@ -102,6 +108,7 @@ function CreateEvent() {
     if (accessCode.trim() === "" && accessCode !== "") return "Digite a palavra-senha ou desmarque a opção.";
     for (const c of courtesies)
       if (!batches.some((b) => String(b.key) === c.batchKey)) return `Escolha de novo o tipo de ingresso da cortesia de ${c.name} (o tipo foi removido).`;
+    if (needsTerms && !acceptTerms) return "Para publicar, leia e aceite os Termos do Organizador.";
     return null;
   };
 
@@ -126,6 +133,7 @@ function CreateEvent() {
       })),
       coupons,
       courtesies: courtesies.map((c) => ({ name: c.name, cpf: c.cpf, email: c.email, batchIndex: batches.findIndex((b) => String(b.key) === c.batchKey) })),
+      ...(needsTerms ? { acceptOrganizerTerms: true } : {}),
     });
   };
 
@@ -252,6 +260,12 @@ function CreateEvent() {
             </div>
           </Section>
 
+          {needsTerms && (
+            <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border bg-card p-4 text-sm">
+              <input type="checkbox" className="mt-0.5 size-4 accent-[var(--primary)]" checked={acceptTerms} onChange={(e) => setAcceptTerms(e.target.checked)} />
+              <span>Li e aceito os <Link to="/termos-organizador" target="_blank" className="font-medium text-foreground underline">Termos do Organizador</Link>. Declaro que tenho as licenças do evento, que as informações são verdadeiras e que sou responsável pela realização do evento e pelo reembolso em caso de cancelamento.</span>
+            </label>
+          )}
           {(formError || m.error) && <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{formError ?? m.error?.message}</p>}
           <Button type="submit" size="lg" className="hidden w-full md:flex" disabled={m.isPending}>{m.isPending ? "Publicando…" : "Publicar evento"}</Button>
         </div>

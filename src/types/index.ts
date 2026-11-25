@@ -60,6 +60,8 @@ export interface AuthUser {
   name: string;
   email: string;
   roles: Array<"buyer" | "organizer" | "staff" | "admin">;
+  /** Já aceitou a versão atual dos Termos do Organizador. */
+  organizerTermsOk?: boolean;
 }
 
 export interface Holder { name: string; cpf: string }

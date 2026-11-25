@@ -43,7 +43,9 @@ export const config = {
   // Taxa do BooTickets, paga pelo comprador por fora (ingresso de R$ 100 = R$ 111). Dela sai a tarifa do Mercado Pago.
   feeRate: Number(env["PLATFORM_FEE_RATE"] ?? 0.11),
   // Versão dos Termos de Uso que o comprador aceita na compra (mude junto com a data em src/components/legal-page.tsx).
-  termsVersion: "2026-11-17",
+  termsVersion: "2026-11-25",
+  // Versão dos Termos do Organizador (aceita ao virar produtor e ao criar evento, se mudou).
+  organizerTermsVersion: "2026-11-25",
   // Prazo de arrependimento (CDC art. 49): dias depois da compra em que o comprador pode devolver pelo site.
   refundDays: 7,
   // Tarifa do Mercado Pago (estimada) que o BooTickets assume nas vendas que caem direto na conta do organizador.
