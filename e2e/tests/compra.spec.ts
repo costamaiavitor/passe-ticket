@@ -148,7 +148,7 @@ test("evento privado: senha errada não libera, senha certa libera os ingressos"
   const code = page.getByPlaceholder("Palavra-senha");
   await code.fill("errada");
   await page.getByRole("button", { name: "Liberar" }).click();
-  await expect(page.getByText(/incorret|inválid|errad|não confere/i).first()).toBeVisible();
+  await expect(page.getByText(/palavra-senha incorreta/i).first()).toBeVisible();
   await code.fill("segredo");
   await page.getByRole("button", { name: "Liberar" }).click();
   await expect(page.getByRole("button", { name: "Adicionar um ingresso Pista — 1º lote" })).toBeEnabled();
@@ -158,7 +158,9 @@ test("evento grátis: dá para pegar ingresso sem pagar", async ({ page, ip }) =
   const s = state();
   const me = await loggedBuyer(page, ip);
   await page.goto(`/eventos/${s.free.id}`);
-  await addTickets(page, "Gratuito — 1º lote", 1);
+  // Evento com um tipo só já vem com 1 ingresso escolhido.
+  const qty = page.locator("#ingressos [aria-live=polite]").first();
+  if ((await qty.innerText()).trim() === "0") await addTickets(page, "Gratuito — 1º lote", 1);
   await continuar(page);
   await fillHolders(page, [{ name: me.name, cpf: fmtCpf(me.cpf) }]);
   await expect(page).toHaveURL(/checkout/);

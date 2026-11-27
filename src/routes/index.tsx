@@ -112,7 +112,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     <Reveal><section>
       <div className="mb-6 flex items-end justify-between">
         <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
-        <Link to="/eventos" className="group text-sm text-muted-foreground transition-colors hover:text-foreground">Ver todos <span className="inline-block transition-transform duration-300 group-hover:translate-x-1">→</span></Link>
+        <Link to="/eventos" className="group -my-2 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground">Ver todos <span className="inline-block transition-transform duration-300 group-hover:translate-x-1">→</span></Link>
       </div>
       {children}
     </section></Reveal>

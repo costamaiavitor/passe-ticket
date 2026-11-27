@@ -81,8 +81,9 @@ test("login certo, recarregar a página continua logado, e sair funciona", async
   await page.getByLabel("E-mail").fill(b.email);
   await page.getByLabel("Senha", { exact: true }).fill(b.password);
   await page.getByRole("button", { name: "Entrar" }).click();
-  await expect(page).not.toHaveURL(/entrar/);
+  await expect(page).toHaveURL(/localhost:\d+\/?$/);
   await page.goto("/ingressos");
+  await expect(page.getByText(/você ainda não tem ingressos/i)).toBeVisible();
   await page.reload();
   await expect(page.getByText(/você ainda não tem ingressos/i)).toBeVisible();
   // Sair (pode estar num menu no celular)
@@ -98,8 +99,7 @@ test("login certo, recarregar a página continua logado, e sair funciona", async
 test("página protegida manda para o login e volta depois", async ({ page }) => {
   const b = await newBuyer();
   await page.goto("/ingressos");
-  await page.waitForLoadState("networkidle");
-  if (!/entrar/.test(page.url())) await page.locator("main").getByRole("link", { name: /entrar/i }).first().click();
+  await page.locator("main").getByRole("link", { name: /entrar/i }).first().click();
   await expect(page).toHaveURL(/entrar/);
   await page.getByLabel("E-mail").fill(b.email);
   await page.getByLabel("Senha", { exact: true }).fill(b.password);
@@ -109,7 +109,7 @@ test("página protegida manda para o login e volta depois", async ({ page }) => 
 
 test("esqueci a senha responde ok sem revelar se o e-mail existe", async ({ page }) => {
   await page.goto("/esqueci-senha");
-  await page.getByLabel("E-mail").fill("ninguem-tem-esse@teste.dev");
+  await page.getByLabel("E-mail").fill(`ninguem-${Date.now()}-${Math.random().toString(36).slice(2)}@teste.dev`);
   await page.getByRole("button").filter({ hasText: /enviar|link|redefinir/i }).first().click();
   await expect(page.getByText(/enviamos|se .* conta|verifique/i).first()).toBeVisible();
 });

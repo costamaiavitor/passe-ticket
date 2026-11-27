@@ -44,7 +44,7 @@ function Privacy() {
       </LegalSection>
 
       <LegalSection n={3} title="Para que usamos e com qual base legal">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Tabela (role para o lado se precisar)">
           <table className="w-full min-w-[480px] border-collapse text-sm">
             <thead><tr><th className={th}>Finalidade</th><th className={th}>Base legal (LGPD)</th></tr></thead>
             <tbody>
@@ -75,7 +75,7 @@ function Privacy() {
       </LegalSection>
 
       <LegalSection n={6} title="Por quanto tempo guardamos">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Tabela (role para o lado se precisar)">
           <table className="w-full min-w-[480px] border-collapse text-sm">
             <thead><tr><th className={th}>Dado</th><th className={th}>Prazo</th></tr></thead>
             <tbody>

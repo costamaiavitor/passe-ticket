@@ -12,17 +12,19 @@ interface Issues { console: string[]; network: string[] }
 
 export const test = base.extend<{ issues: Issues; ip: string }>({
   ip: async ({}, use) => { await use(fakeIp()); },
-  // O IP falso vai só para o nosso site (mandar para o Google Fonts quebraria as fontes por CORS).
-  context: async ({ context, ip, baseURL }, use) => {
-    await context.route(`${baseURL}/**`, (route) => route.continue({ headers: { ...route.request().headers(), "x-forwarded-for": ip } }));
-    await use(context);
-  },
   // Automático: vale para todo teste, mesmo os que não pedem "issues".
   issues: [async ({ page }, use, info) => {
     const issues: Issues = { console: [], network: [] };
     // "Failed to load resource" é o navegador avisando de um 4xx esperado (ex.: 401 de quem não entrou); os 5xx são pegos abaixo.
-    page.on("console", (m) => { if (m.type() === "error" && !m.text().includes("Failed to load resource")) issues.console.push(m.text().slice(0, 300)); });
-    page.on("pageerror", (e) => issues.console.push(`ERRO JS: ${e.message.slice(0, 300)}`));
+    // Erros que vêm de dentro do mapa do Google (iframe) não são do BooTickets.
+    const thirdParty = (t: string) => /google\.com|gstatic|googleapis/.test(t);
+    page.on("console", async (m) => {
+      if (m.type() !== "error" || m.text().includes("Failed to load resource")) return;
+      let t = m.text();
+      if (t.includes("JSHandle@")) t = (await Promise.all(m.args().map((a) => a.jsonValue().then((v) => JSON.stringify(v)).catch(() => "?")))).join(" ");
+      if (!thirdParty(t)) issues.console.push(t.slice(0, 300));
+    });
+    page.on("pageerror", (e) => { if (!thirdParty(e.message + (e.stack ?? ""))) issues.console.push(`ERRO JS: ${e.message.slice(0, 300)}`); });
     page.on("response", (r) => {
       const url = r.url();
       // 401 da sessão (quem não está logado) e 4xx esperados nos testes de erro não contam.
@@ -86,6 +88,8 @@ export async function audit(page: Page, label: string) {
       const b = el.getBoundingClientRect();
       const cs = getComputedStyle(el);
       if (!b.width || !b.height || cs.visibility === "hidden" || el.closest("footer")) continue;
+      if (el.tagName === "A" && cs.display === "inline" && el.closest("p, li, span, dd, label")) continue; // link no meio do texto
+      if (el.tagName === "INPUT" && el.closest("label")) continue; // a caixa conta junto com o texto dela
       if (b.height < 24 || b.width < 24) small.push(`${el.tagName.toLowerCase()} "${(el.innerText || el.getAttribute("aria-label") || "").trim().slice(0, 30)}" ${Math.round(b.width)}x${Math.round(b.height)}`);
     }
     const noName = Array.from(document.querySelectorAll<HTMLElement>("button, a[href]"))

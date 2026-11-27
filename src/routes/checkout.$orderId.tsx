@@ -162,7 +162,7 @@ function PixPanel({ order, busy, onSimulate }: { order: Order; busy: boolean; on
           : <TicketQr value={pix.pixCode} />}
       </div>
       <div className="mt-5 flex gap-2">
-        <input readOnly value={pix.pixCode} className="h-9 min-w-0 flex-1 rounded-md border bg-background px-3 font-mono text-xs" />
+        <input readOnly aria-label="Código Pix copia e cola" value={pix.pixCode} className="h-9 min-w-0 flex-1 rounded-md border bg-background px-3 font-mono text-xs" />
         <Button variant="outline" onClick={() => navigator.clipboard.writeText(pix.pixCode).then(() => toast.success("Código Pix copiado"))}><Copy />Copiar</Button>
       </div>
       <p className="mt-3 text-xs text-muted-foreground">Abra o app do seu banco, escolha Pix e leia o QR Code ou cole o código. Assim que o pagamento for aprovado esta página atualiza sozinha e seus ingressos são emitidos.</p>

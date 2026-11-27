@@ -16,6 +16,8 @@ export default defineConfig({
     timezoneId: "America/Fortaleza",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
+    // Service worker só no teste de "sem internet" (ele cria o próprio contexto); nos outros atrapalha a rede do robô.
+    serviceWorkers: "block",
   },
   projects: [
     { name: "pc-chrome", use: { ...devices["Desktop Chrome"], viewport: { width: 1366, height: 768 } } },

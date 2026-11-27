@@ -1,11 +1,14 @@
 // Situações de celular na vida real: sem internet na porta, internet lenta, app instalado, voltar/avançar.
-import { buyPaid } from "../api";
+import { buyPaid, newBuyer } from "../api";
 import { expect, loggedBuyer, state, test } from "../fixtures";
 
-test("sem internet na porta: o ingresso abre com o QR Code", async ({ page, context, ip, browserName }) => {
+test("sem internet na porta: o ingresso abre com o QR Code", async ({ browser, browserName }) => {
   test.skip(browserName === "firefox", "o Firefox do Playwright não simula sem-internet com service worker");
   const s = state();
-  const me = await loggedBuyer(page, ip);
+  const context = await browser.newContext({ serviceWorkers: "allow", baseURL: test.info().project.use.baseURL });
+  const page = await context.newPage();
+  const me = await newBuyer();
+  await page.request.post("/api/v1/auth/login", { data: { email: me.email, password: me.password } });
   await buyPaid(me.token, s.main.id, s.main.pista, [{ name: me.name, cpf: me.cpf }]);
   await page.goto("/ingressos");
   await expect(page.locator("article")).toHaveCount(1);
@@ -16,7 +19,7 @@ test("sem internet na porta: o ingresso abre com o QR Code", async ({ page, cont
   await page.goto("/ingressos").catch(() => undefined);
   await expect(page.getByText(s.main.title).first()).toBeVisible();
   await expect(page.locator("img.qr, img[alt*='QR']").first()).toBeVisible();
-  await context.setOffline(false);
+  await context.close();
 });
 
 test("internet lenta (3G): a página do evento abre e dá para escolher ingresso", async ({ page, context, browserName }) => {

@@ -27,7 +27,7 @@ export function SiteHeader() {
           <Link to="/eventos" search={{ category: "esportes" }} className="hidden transition-colors hover:text-foreground xl:inline">Esportes</Link>
         </nav>
         <div className="ml-auto flex min-w-0 items-center gap-1 min-[380px]:gap-1.5 sm:gap-3">
-          <Button asChild variant="ghost" size="icon" className="hidden min-[360px]:inline-flex" aria-label="Buscar eventos"><Link to="/eventos"><Search /></Link></Button>
+          <Button asChild variant="ghost" size="icon" className="hidden shrink-0 min-[360px]:inline-flex" aria-label="Buscar eventos"><Link to="/eventos"><Search /></Link></Button>
           {user ? (
             <>
               {/* Computador: todos os botões à vista. */}
