@@ -198,8 +198,21 @@ html { scroll-behavior: smooth; }
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
 
-/* ===== Dentro do app das lojas (html[data-app]) =====
-   O topo e as barras fixas respeitam o entalhe e a barra de gestos do celular. */
+/* ===== Dentro do app (lojas: html[data-app]; instalado pelo site: display-mode standalone) =====
+   O site ocupa a tela toda, por baixo da barra de hora/bateria: o topo e as barras fixas
+   respeitam o entalhe e a barra de gestos do celular. */
 html[data-app] header.m-header { padding-top: env(safe-area-inset-top); }
 html[data-app] footer { padding-bottom: env(safe-area-inset-bottom); }
 html[data-app] body { overscroll-behavior-y: none; -webkit-tap-highlight-color: transparent; }
+@media (display-mode: standalone) {
+  header.m-header { padding-top: env(safe-area-inset-top); }
+  footer { padding-bottom: env(safe-area-inset-bottom); }
+  body { overscroll-behavior-y: none; -webkit-tap-highlight-color: transparent; }
+}
+/* Faixa fixa atrás da hora/bateria: quando o topo se esconde ao rolar, o conteúdo não passa por baixo do relógio. */
+html[data-app] body::before {
+  content: ""; position: fixed; inset: 0 0 auto 0; height: env(safe-area-inset-top); background: var(--background); z-index: 60; pointer-events: none;
+}
+@media (display-mode: standalone) {
+  body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: env(safe-area-inset-top); background: var(--background); z-index: 60; pointer-events: none; }
+}
