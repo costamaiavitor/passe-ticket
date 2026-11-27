@@ -8,7 +8,7 @@ async function fillRegister(page: import("@playwright/test").Page, d: { name: st
   await page.getByLabel("Nome completo").fill(d.name);
   await page.getByLabel("E-mail").fill(d.email);
   await page.getByLabel("CPF").fill(d.cpf);
-  await page.getByLabel("Senha").fill(d.password);
+  await page.getByLabel("Senha", { exact: true }).fill(d.password);
   await page.getByRole("button", { name: "Criar conta" }).click();
 }
 
@@ -60,7 +60,7 @@ test("cadastro com e-mail em maiúsculas e espaços entra com o e-mail normal de
   await page.context().clearCookies();
   await page.goto("/entrar");
   await page.getByLabel("E-mail").fill(email);
-  await page.getByLabel("Senha").fill("senhaforte123");
+  await page.getByLabel("Senha", { exact: true }).fill("senhaforte123");
   await page.getByRole("button", { name: "Entrar" }).click();
   await expect(page).not.toHaveURL(/entrar/);
 });
@@ -69,7 +69,7 @@ test("login com senha errada mostra erro e não entra", async ({ page }) => {
   const b = await newBuyer();
   await page.goto("/entrar");
   await page.getByLabel("E-mail").fill(b.email);
-  await page.getByLabel("Senha").fill("senha-errada-1");
+  await page.getByLabel("Senha", { exact: true }).fill("senha-errada-1");
   await page.getByRole("button", { name: "Entrar" }).click();
   await expect(page.getByText(/incorret|inválid|errad/i).first()).toBeVisible();
   await expect(page).toHaveURL(/entrar/);
@@ -79,7 +79,7 @@ test("login certo, recarregar a página continua logado, e sair funciona", async
   const b = await newBuyer();
   await page.goto("/entrar");
   await page.getByLabel("E-mail").fill(b.email);
-  await page.getByLabel("Senha").fill(b.password);
+  await page.getByLabel("Senha", { exact: true }).fill(b.password);
   await page.getByRole("button", { name: "Entrar" }).click();
   await expect(page).not.toHaveURL(/entrar/);
   await page.goto("/ingressos");
@@ -98,11 +98,11 @@ test("login certo, recarregar a página continua logado, e sair funciona", async
 test("página protegida manda para o login e volta depois", async ({ page }) => {
   const b = await newBuyer();
   await page.goto("/ingressos");
-  const entrar = page.getByRole("link", { name: /entrar/i }).or(page.getByRole("button", { name: /entrar/i }));
-  await entrar.first().click();
+  await page.waitForLoadState("networkidle");
+  if (!/entrar/.test(page.url())) await page.locator("main").getByRole("link", { name: /entrar/i }).first().click();
   await expect(page).toHaveURL(/entrar/);
   await page.getByLabel("E-mail").fill(b.email);
-  await page.getByLabel("Senha").fill(b.password);
+  await page.getByLabel("Senha", { exact: true }).fill(b.password);
   await page.getByRole("button", { name: "Entrar" }).click();
   await expect(page).toHaveURL(/ingressos/);
 });
@@ -116,9 +116,9 @@ test("esqueci a senha responde ok sem revelar se o e-mail existe", async ({ page
 
 test("mostrar/ocultar senha funciona", async ({ page }) => {
   await page.goto("/entrar");
-  const pw = page.getByLabel("Senha");
+  const pw = page.getByLabel("Senha", { exact: true });
   await pw.fill("minhasenha");
   await expect(pw).toHaveAttribute("type", "password");
   await page.getByRole("button", { name: /mostrar|exibir|ver senha/i }).first().click();
-  await expect(page.getByLabel("Senha")).toHaveAttribute("type", "text");
+  await expect(page.getByLabel("Senha", { exact: true })).toHaveAttribute("type", "text");
 });

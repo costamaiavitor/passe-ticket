@@ -1,6 +1,7 @@
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { useHydrated } from "@/hooks/use-hydrated";
 import { Calendar, MapPin, Minus, Plus, Info, Repeat, Undo2, KeyRound, Tag, X } from "lucide-react";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { AvailabilityBadge } from "@/components/availability-badge";
@@ -69,6 +70,8 @@ function EventPage() {
   // Carrinho: quantos ingressos de cada categoria. Com uma categoria só, já começa com 1.
   // Fica guardado no navegador: quem escolhe, entra na conta e volta encontra o carrinho como deixou.
   const cartKey = `bt-cart:${ev.id}`;
+  // Até o React assumir a página, os botões ficam desativados (senão o toque se perde no celular lento).
+  const hydrated = useHydrated();
   const [cart, setCart] = useState<Record<string, number>>(() => (groups.length === 1 ? { [groups[0]!.key]: 1 } : {}));
   useEffect(() => {
     try {
@@ -244,10 +247,10 @@ function EventPage() {
                       <p className="text-sm font-medium text-foreground">{brl(b.price)}</p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
-                      <Button size="icon" variant="outline" className="size-8" disabled={step === "holders" || n === 0}
+                      <Button size="icon" variant="outline" className="size-8" disabled={!hydrated || step === "holders" || n === 0}
                         onClick={() => setGroupQty(g, n - 1)} aria-label={`Tirar um ingresso ${b.name}`}><Minus /></Button>
                       <span key={n} className="m-pop w-5 text-center tabular-nums" aria-live="polite">{n}</span>
-                      <Button size="icon" variant="outline" className="size-8" disabled={step === "holders" || n >= g.capacity || qty >= MAX_PER_ORDER}
+                      <Button size="icon" variant="outline" className="size-8" disabled={!hydrated || step === "holders" || n >= g.capacity || qty >= MAX_PER_ORDER}
                         onClick={() => setGroupQty(g, n + 1)} aria-label={`Adicionar um ingresso ${b.name}`}><Plus /></Button>
                     </div>
                   </div>
@@ -289,12 +292,12 @@ function EventPage() {
                       <input value={couponInput} onChange={(e) => setCouponInput(e.target.value.toUpperCase())} placeholder="Código do cupom" maxLength={30}
                         onKeyDown={(e) => { if (e.key === "Enter") void applyCoupon(); }}
                         className="h-9 min-w-0 flex-1 rounded-md border bg-surface px-3 text-sm uppercase outline-none focus:border-primary/50" />
-                      <Button size="sm" variant="secondary" disabled={applying} onClick={() => void applyCoupon()}>{applying ? "…" : "Aplicar"}</Button>
+                      <Button size="sm" variant="secondary" disabled={!hydrated || applying} onClick={() => void applyCoupon()}>{applying ? "…" : "Aplicar"}</Button>
                     </div>
                     {couponError && <p className="mt-1.5 text-xs text-destructive">{couponError}</p>}
                   </div>
                 ) : (
-                  <button type="button" onClick={() => setCouponOpen(true)} className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"><Tag className="size-3.5" />Tenho um cupom de desconto</button>
+                  <button type="button" onClick={() => setCouponOpen(true)} className="mt-2 flex min-h-9 items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"><Tag className="size-3.5" />Tenho um cupom de desconto</button>
                 )
               )}
               {!unlocked ? (
@@ -305,12 +308,12 @@ function EventPage() {
                     <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Palavra-senha" maxLength={60}
                       onKeyDown={(e) => { if (e.key === "Enter") void unlock(); }}
                       className="h-10 min-w-0 flex-1 rounded-md border bg-surface px-3 text-sm outline-none focus:border-primary/50" />
-                    <Button disabled={checkingCode} onClick={() => void unlock()}>{checkingCode ? "…" : "Liberar"}</Button>
+                    <Button disabled={!hydrated || checkingCode} onClick={() => void unlock()}>{checkingCode ? "…" : "Liberar"}</Button>
                   </div>
                   {codeError && <p className="mt-1.5 text-xs text-destructive">{codeError}</p>}
                 </div>
               ) : step === "select" ? (
-                <Button className="mt-5 w-full" disabled={!qty} onClick={goToHolders}>{!qty ? "Escolha seus ingressos" : user ? "Continuar" : "Entrar para comprar"}</Button>
+                <Button className="mt-5 w-full" disabled={!hydrated || !qty} onClick={goToHolders}>{!qty ? "Escolha seus ingressos" : user ? "Continuar" : "Entrar para comprar"}</Button>
               ) : (
                 <HoldersForm key={holderLabels.join("|")} labels={holderLabels} defaultName={user?.name} loading={submitting} error={orderError}
                   onBack={() => setStep("select")} onSubmit={placeOrder} />

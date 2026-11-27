@@ -25,7 +25,8 @@ export function Reveal({ className, children }: { className?: string; children: 
 export function RiseWords({ text, delay = 0, className }: { text: string; delay?: number; className?: string }) {
   const words = text.split(" ");
   return (
-    <span aria-label={text} className={className}>
+    <span className={className}>
+      <span className="sr-only">{text}</span>
       {words.map((w, i) => (
         <Fragment key={i}>
           <span aria-hidden className="m-word"><span style={{ "--i": i, "--d": `${delay}ms` } as CSSProperties}>{w}</span></span>

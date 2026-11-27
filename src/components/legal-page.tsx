@@ -12,7 +12,7 @@ export function LegalPage({ title, intro, children }: { title: string; intro: st
   return (
     <div className="min-h-screen">
       <SiteHeader />
-      <main className="container-page grid gap-10 px-5 py-10 md:py-14 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-14">
+      <main className="container-page grid grid-cols-1 gap-10 px-5 py-10 md:py-14 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-14">
         {/* Índice (computador): pula direto para a seção. */}
         <nav aria-label="Nesta página" className="hidden lg:block">
           <div className="sticky top-24">
@@ -30,7 +30,7 @@ export function LegalPage({ title, intro, children }: { title: string; intro: st
             </ol>
           </div>
         </nav>
-        <div className="max-w-3xl">
+        <div className="min-w-0 max-w-3xl">
           <h1 className="text-3xl font-semibold tracking-tight md:text-4xl"><RiseWords text={title} /></h1>
           <Rise i={2}><p className="mt-2 text-sm text-muted-foreground">Última atualização: {LEGAL_UPDATED_AT}</p></Rise>
           <Rise i={3}><p className="mt-6 text-muted-foreground">{intro}</p></Rise>

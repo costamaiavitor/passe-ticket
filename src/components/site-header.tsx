@@ -14,40 +14,40 @@ export function SiteHeader() {
   const navigate = useNavigate();
   return (
     <header className="m-header sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
-      <div className="flex h-16 w-full items-center gap-4 px-4 sm:gap-10 sm:px-6 lg:px-10">
+      <div className="flex h-16 w-full min-w-0 items-center gap-3 px-3 min-[380px]:px-4 sm:gap-6 sm:px-6 lg:gap-10 lg:px-10">
         <Link to="/" aria-label="BooTickets — página inicial" className="shrink-0">
           <BrandLogo />
         </Link>
-        <nav className="m-nav hidden items-center gap-8 text-sm text-muted-foreground md:flex">
+        <nav className="m-nav hidden items-center gap-6 text-sm text-muted-foreground lg:flex xl:gap-8">
           <Link to="/eventos" className="transition-colors hover:text-foreground" activeProps={{ className: "text-foreground" }}>Explorar</Link>
           <Link to="/eventos" search={{ category: "shows" }} className="transition-colors hover:text-foreground">Shows</Link>
           <Link to="/eventos" search={{ category: "festas" }} className="transition-colors hover:text-foreground">Festas</Link>
-          <Link to="/eventos" search={{ category: "conferencias" }} className="transition-colors hover:text-foreground">Conferências</Link>
-          <Link to="/eventos" search={{ category: "teatro" }} className="hidden transition-colors hover:text-foreground lg:inline">Teatro</Link>
-          <Link to="/eventos" search={{ category: "esportes" }} className="hidden transition-colors hover:text-foreground lg:inline">Esportes</Link>
+          <Link to="/eventos" search={{ category: "conferencias" }} className="hidden transition-colors hover:text-foreground xl:inline">Conferências</Link>
+          <Link to="/eventos" search={{ category: "teatro" }} className="hidden transition-colors hover:text-foreground xl:inline">Teatro</Link>
+          <Link to="/eventos" search={{ category: "esportes" }} className="hidden transition-colors hover:text-foreground xl:inline">Esportes</Link>
         </nav>
-        <div className="ml-auto flex items-center gap-1.5 sm:gap-3">
-          <Button asChild variant="ghost" size="icon" aria-label="Buscar eventos"><Link to="/eventos"><Search /></Link></Button>
+        <div className="ml-auto flex min-w-0 items-center gap-1 min-[380px]:gap-1.5 sm:gap-3">
+          <Button asChild variant="ghost" size="icon" className="hidden min-[360px]:inline-flex" aria-label="Buscar eventos"><Link to="/eventos"><Search /></Link></Button>
           {user ? (
             <>
-              {/* Computador e tablet: todos os botões à vista. */}
-              <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex">
+              {/* Computador: todos os botões à vista. */}
+              <Button asChild variant="outline" size="sm" className="hidden lg:inline-flex">
                 <Link to="/organizador"><CalendarPlus />{hasRole(user, "organizer") ? "Meus eventos" : "Criar evento"}</Link>
               </Button>
               {user.roles.includes("admin") && (
-                <Button asChild variant="ghost" size="icon" className="hidden sm:inline-flex" aria-label="Admin" title="Admin"><Link to="/admin"><ShieldCheck /></Link></Button>
+                <Button asChild variant="ghost" size="icon" className="hidden lg:inline-flex" aria-label="Admin" title="Admin"><Link to="/admin"><ShieldCheck /></Link></Button>
               )}
               {hasRole(user, "staff", "organizer") && (
-                <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex"><Link to="/portaria"><ScanLine />Portaria</Link></Button>
+                <Button asChild variant="outline" size="sm" className="hidden lg:inline-flex"><Link to="/portaria"><ScanLine />Portaria</Link></Button>
               )}
-              <Button asChild size="sm"><Link to="/ingressos" aria-label="Meus ingressos"><Ticket /><span className="hidden min-[400px]:inline">Meus ingressos</span></Link></Button>
-              <Button asChild variant="ghost" size="icon" className="hidden sm:inline-flex" aria-label="Minha conta" title="Minha conta"><Link to="/conta"><UserRound /></Link></Button>
-              <Button variant="ghost" size="icon" className="hidden sm:inline-flex" aria-label="Sair" title={`Sair (${user.email})`}
+              <Button asChild size="sm"><Link to="/ingressos" aria-label="Meus ingressos"><Ticket /><span className="hidden min-[420px]:inline">Meus ingressos</span></Link></Button>
+              <Button asChild variant="ghost" size="icon" className="hidden lg:inline-flex" aria-label="Minha conta" title="Minha conta"><Link to="/conta"><UserRound /></Link></Button>
+              <Button variant="ghost" size="icon" className="hidden lg:inline-flex" aria-label="Sair" title={`Sair (${user.email})`}
                 onClick={async () => { await logout(); navigate({ to: "/" }); }}><LogOut /></Button>
               {/* Celular: o resto fica num menu, para nada sair da tela. */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="sm:hidden" aria-label="Menu"><Menu /></Button>
+                  <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Menu"><Menu /></Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel className="truncate font-normal text-muted-foreground">{user.email}</DropdownMenuLabel>
@@ -68,7 +68,7 @@ export function SiteHeader() {
             </>
           ) : (
             <>
-              <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex"><Link to="/cadastro" search={{ redirect: "/organizador" }}>Criar evento</Link></Button>
+              <Button asChild variant="outline" size="sm" className="hidden lg:inline-flex"><Link to="/cadastro" search={{ redirect: "/organizador" }}>Criar evento</Link></Button>
               <Button asChild variant="ghost" size="sm"><Link to="/entrar">Entrar</Link></Button>
               <Button asChild size="sm"><Link to="/cadastro">Criar conta</Link></Button>
             </>

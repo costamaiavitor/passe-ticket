@@ -47,19 +47,19 @@ function Explore() {
       <main className="container-page py-10">
         <h1 className="text-3xl font-semibold tracking-tight"><RiseWords text="Explorar eventos" /></h1>
         <div className="mt-6 grid gap-3 rounded-lg border bg-surface p-4 sm:grid-cols-2 lg:grid-cols-6">
-          <input className={`${field} lg:col-span-2`} placeholder="Buscar" defaultValue={s.q}
+          <input className={`${field} lg:col-span-2`} aria-label="Buscar evento" placeholder="Buscar" defaultValue={s.q}
             onChange={(e) => set({ q: e.target.value || undefined })} />
-          <select className={field} value={s.city ?? ""} onChange={(e) => set({ city: e.target.value || undefined })}>
+          <select className={field} aria-label="Cidade" value={s.city ?? ""} onChange={(e) => set({ city: e.target.value || undefined })}>
             <option value="">Todas as cidades</option>
             {["Fortaleza", "Recife", "Natal"].map((c) => <option key={c}>{c}</option>)}
           </select>
-          <select className={field} value={s.category ?? ""}
+          <select className={field} aria-label="Categoria" value={s.category ?? ""}
             onChange={(e) => set({ category: (e.target.value || undefined) as typeof s.category })}>
             <option value="">Categorias</option>
             {Object.entries(categoryLabel).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
-          <input type="date" className={field} value={s.date ?? ""} onChange={(e) => set({ date: e.target.value || undefined })} />
-          <select className={field} value={s.maxPrice ?? ""} onChange={(e) => set({ maxPrice: e.target.value ? Number(e.target.value) : undefined })}>
+          <input type="date" className={field} aria-label="Data do evento" value={s.date ?? ""} onChange={(e) => set({ date: e.target.value || undefined })} />
+          <select className={field} aria-label="Preço máximo" value={s.maxPrice ?? ""} onChange={(e) => set({ maxPrice: e.target.value ? Number(e.target.value) : undefined })}>
             <option value="">Qualquer preço</option>
             <option value="5000">Até R$ 50</option>
             <option value="10000">Até R$ 100</option>

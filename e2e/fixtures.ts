@@ -12,11 +12,13 @@ interface Issues { console: string[]; network: string[] }
 
 export const test = base.extend<{ issues: Issues; ip: string }>({
   ip: async ({}, use) => { await use(fakeIp()); },
-  context: async ({ context, ip }, use) => {
-    await context.setExtraHTTPHeaders({ "x-forwarded-for": ip });
+  // O IP falso vai só para o nosso site (mandar para o Google Fonts quebraria as fontes por CORS).
+  context: async ({ context, ip, baseURL }, use) => {
+    await context.route(`${baseURL}/**`, (route) => route.continue({ headers: { ...route.request().headers(), "x-forwarded-for": ip } }));
     await use(context);
   },
-  issues: async ({ page }, use, info) => {
+  // Automático: vale para todo teste, mesmo os que não pedem "issues".
+  issues: [async ({ page }, use, info) => {
     const issues: Issues = { console: [], network: [] };
     // "Failed to load resource" é o navegador avisando de um 4xx esperado (ex.: 401 de quem não entrou); os 5xx são pegos abaixo.
     page.on("console", (m) => { if (m.type() === "error" && !m.text().includes("Failed to load resource")) issues.console.push(m.text().slice(0, 300)); });
@@ -27,14 +29,22 @@ export const test = base.extend<{ issues: Issues; ip: string }>({
       if (r.status() >= 500 || (r.status() === 404 && !url.includes("/api/"))) issues.network.push(`${r.status()} ${r.request().method()} ${url}`);
     });
     page.on("requestfailed", (r) => {
+      if (!r.url().startsWith(info.project.use.baseURL ?? "http://localhost:8080")) return; // terceiros (Google Fonts/Maps) não contam
       const err = r.failure()?.errorText ?? "";
       if (!/ERR_ABORTED|NS_BINDING_ABORTED|cancelled|Load request cancelled/i.test(err)) issues.network.push(`FALHOU ${r.url()} (${err})`);
     });
     await use(issues);
+    // Falhou? Guarda o texto da tela e o endereço, para entender o que o comprador estava vendo.
+    if (info.status !== info.expectedStatus) {
+      const text = await page.locator("body").innerText({ timeout: 2000 }).catch(() => "(sem texto)");
+      await info.attach("tela", { body: `${page.url()}
+
+${text.slice(0, 1500)}` });
+    }
     if (issues.console.length) await info.attach("erros-console", { body: issues.console.join("\n") });
     expect.soft(issues.console, "Erros no console do navegador").toEqual([]);
     expect.soft(issues.network, "Chamadas que falharam (5xx / arquivo não encontrado)").toEqual([]);
-  },
+  }, { auto: true }],
 });
 export { expect };
 

@@ -57,9 +57,13 @@ export async function webPushState(): Promise<WebPushState> {
   if (isIos() && !isStandalone()) return "needs-install";
   if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return "unsupported";
   if (Notification.permission === "denied") return "denied";
-  const reg = await navigator.serviceWorker.getRegistration("/");
-  const sub = await reg?.pushManager.getSubscription();
-  return sub && Notification.permission === "granted" ? "on" : "off";
+  try {
+    const reg = await navigator.serviceWorker.getRegistration("/");
+    const sub = await reg?.pushManager.getSubscription();
+    return sub && Notification.permission === "granted" ? "on" : "off";
+  } catch {
+    return "unsupported"; // alguns navegadores (ex.: Safari no computador) recusam ler a inscrição
+  }
 }
 
 function keyBytes(base64url: string) {

@@ -10,7 +10,8 @@ function walk(suite, file) {
       const res = t.results.at(-1) ?? {};
       const errors = (res.errors ?? []).map((e) => (e.message ?? "").replace(/\u001b\[[0-9;]*m/g, "").split("\n").filter(Boolean).slice(0, 6).join(" ⏎ "));
       const notes = (t.annotations ?? []).map((a) => `${a.type}: ${a.description}`);
-      rows.push({ file: spec.file ?? file, title: spec.title, project: t.projectName, status: t.status === "expected" ? "ok" : t.status === "skipped" ? "pulado" : "FALHOU", errors, notes, ms: res.duration ?? 0 });
+      const tela = (res.attachments ?? []).filter((a) => a.name === "tela" && a.body).map((a) => Buffer.from(a.body, "base64").toString().replace(/\s+/g, " ").slice(0, 400));
+      rows.push({ tela, file: spec.file ?? file, title: spec.title, project: t.projectName, status: t.status === "expected" ? "ok" : t.status === "skipped" ? "pulado" : "FALHOU", errors, notes, ms: res.duration ?? 0 });
     }
   }
 }

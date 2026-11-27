@@ -67,7 +67,7 @@ test("sem conta: 'Entrar para comprar' leva ao login e volta para o evento", asy
   await continuar(page);
   await expect(page).toHaveURL(/entrar/);
   await page.getByLabel("E-mail").fill(b.email);
-  await page.getByLabel("Senha").fill(b.password);
+  await page.getByLabel("Senha", { exact: true }).fill(b.password);
   await page.getByRole("button", { name: "Entrar" }).click();
   await expect(page).toHaveURL(new RegExp(s.main.id));
 });
@@ -161,9 +161,8 @@ test("evento grátis: dá para pegar ingresso sem pagar", async ({ page, ip }) =
   await addTickets(page, "Gratuito — 1º lote", 1);
   await continuar(page);
   await fillHolders(page, [{ name: me.name, cpf: fmtCpf(me.cpf) }]);
-  await page.waitForLoadState("networkidle");
-  const sim = page.getByRole("button", { name: "Simular pagamento aprovado" });
-  if (await sim.isVisible().catch(() => false)) await sim.click();
+  await expect(page).toHaveURL(/checkout/);
+  await expect(page.getByText(/pagamento confirmado|ingressos .* disponíveis/i).first()).toBeVisible();
   await page.goto("/ingressos");
   await expect(page.getByText(s.free.title).first()).toBeVisible();
 });

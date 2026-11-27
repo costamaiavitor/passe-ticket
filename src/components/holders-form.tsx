@@ -26,17 +26,17 @@ export function HoldersForm({ labels, defaultName, loading, error, onBack, onSub
       {holders.map((h, i) => (
         <fieldset key={i} className="space-y-2 rounded-lg border p-3">
           <legend className="px-1 text-xs text-muted-foreground">Ingresso {i + 1} · {labels[i]}</legend>
-          <input required minLength={3} placeholder="Nome completo" value={h.name} onChange={(e) => set(i, "name", e.target.value)}
+          <input required minLength={3} aria-label={`Nome completo do titular ${i + 1}`} placeholder="Nome completo" value={h.name} onChange={(e) => set(i, "name", e.target.value)}
             className="h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus:border-primary/50" />
-          <input required inputMode="numeric" pattern="\d{3}\.\d{3}\.\d{3}-\d{2}" placeholder="CPF" value={h.cpf}
+          <input required inputMode="numeric" pattern="\d{3}\.\d{3}\.\d{3}-\d{2}" aria-label={`CPF do titular ${i + 1}`} placeholder="CPF" value={h.cpf}
             onChange={(e) => set(i, "cpf", e.target.value)}
             className="h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus:border-primary/50" />
         </fieldset>
       ))}
       <p className="text-xs text-muted-foreground">O titular precisa apresentar documento com o mesmo CPF na entrada.</p>
       {/* Aceite obrigatório: o navegador não deixa seguir sem marcar, e o servidor grava versão, data, hora e IP do aceite. */}
-      <label className="flex items-start gap-2 rounded-lg border p-3 text-xs leading-relaxed">
-        <input type="checkbox" required className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]" />
+      <label className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-xs leading-relaxed">
+        <input type="checkbox" required className="mt-0.5 size-5 shrink-0 accent-[var(--primary)]" />
         <span>
           Li e aceito os <Link to="/termos" target="_blank" className="font-medium text-foreground underline">Termos de Uso</Link>,
           incluindo a <Link to="/termos" hash="devolucao" target="_blank" className="font-medium text-foreground underline">Política de Devolução</Link>,

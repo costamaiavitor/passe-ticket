@@ -30,7 +30,7 @@ export function AppBanner({ installOnly = false }: { installOnly?: boolean }) {
     setStandalone(isStandalone());
     setInstallable(canPromptInstall());
     try { setHidden(localStorage.getItem(HIDE_KEY) === "1"); } catch { /* nada */ }
-    void webPushState().then(setPush);
+    void webPushState().then(setPush).catch(() => setPush("unsupported"));
     setReady(true);
     return onInstallChange(() => { setInstallable(canPromptInstall()); setStandalone(isStandalone()); });
   }, []);
