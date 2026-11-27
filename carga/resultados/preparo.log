@@ -1,0 +1,11 @@
+file:///home/runner/work/passe-ticket/passe-ticket/carga/preparar.mjs:39
+  if (!res.ok) throw new Error(`${path} → ${res.status} ${text.slice(0, 300)}`);
+                     ^
+
+Error: /admin/events/aa56c4d6-ef3f-4060-b394-dd1757d9d6e5/approve → 409 {"code":"NOT_IN_REVIEW","message":"Este evento não está aguardando aprovação."}
+    at api (file:///home/runner/work/passe-ticket/passe-ticket/carga/preparar.mjs:39:22)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async evento (file:///home/runner/work/passe-ticket/passe-ticket/carga/preparar.mjs:74:3)
+    at async file:///home/runner/work/passe-ticket/passe-ticket/carga/preparar.mjs:79:13
+
+Node.js v22.23.5
