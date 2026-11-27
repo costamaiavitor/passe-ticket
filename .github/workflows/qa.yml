@@ -35,9 +35,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      # Mesmo jeito que a Vercel instala (npm install), que aceita a trava de versões do Windows.
-      - run: npm install --no-audit --no-fund
-      - run: npm install --no-audit --no-fund
+      # O site instala com o Bun (bun.lock), como a Vercel; a API usa o npm (package-lock.json).
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile || bun install
+      - run: npm ci
         working-directory: backend
       - run: npm install --no-audit --no-fund
         working-directory: e2e
