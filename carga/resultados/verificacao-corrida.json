@@ -18,12 +18,12 @@
   ],
   "ingressosValidos": 1000,
   "vendeuMaisQueEstoque": false,
-  "cpfsDuplicados": 0,
+  "cpfsDuplicados": 1,
   "idsDuplicados": 0,
   "pedidosPagosComIngressoErrado": 0,
-  "segundosDoPrimeiroAoUltimoPedido": 3.322,
-  "reservasPorSegundo": 301,
-  "segundosAteUltimoPagamento": 7.667,
-  "vendasConcluidasPorSegundo": 130.4,
-  "ok": true
+  "segundosDoPrimeiroAoUltimoPedido": 2.049,
+  "reservasPorSegundo": 488,
+  "segundosAteUltimoPagamento": 4.937,
+  "vendasConcluidasPorSegundo": 202.6,
+  "ok": false
 }
