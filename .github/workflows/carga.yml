@@ -92,6 +92,7 @@ jobs:
       - name: "C) Jornada completa sob carga (subindo o ritmo)"
         continue-on-error: true
         run: |
+          set +e
           source carga/monitor.sh
           for R in 5 10 20 40 80 160; do
             echo "=== $R pessoas novas por segundo ==="
@@ -99,20 +100,23 @@ jobs:
             k6 run --quiet -e RITMO=$R -e OFFSET=$((1000000 + R * 100000)) -e DURACAO=45s \
               --summary-export carga/resultados/ponta-$R.json carga/ponta.js 2>&1 | grep -v "falhou:" | tail -40 || true
             parar_monitor
-            ruim=$(node -e 'const s=require("./carga/resultados/ponta-'$R'.json").metrics; const ok=(s.jornada_ok||{}).count||0, f=(s.jornada_falhou||{}).count||0, p=(s.tempo_jornada||{})["p(95)"]||1e9; console.log(f>ok*0.05||p>15000?1:0)')
+            ruim=$(node -e 'const s=require("./carga/resultados/ponta-'$R'.json").metrics; const ok=(s.jornada_ok||{}).count||0, f=(s.jornada_falhou||{}).count||0, p=(s.tempo_jornada||{})["p(95)"]||1e9; console.log(f>ok*0.05||p>15000?1:0)' || echo 0)
+            echo "ritmo $R -> ruim=$ruim" | tee -a carga/resultados/laco.log
             if [ "$ruim" = "1" ]; then echo "Passou do limite em $R/s"; break; fi
           done
 
       - name: "A) Navegação (subindo o número de pessoas)"
         continue-on-error: true
         run: |
+          set +e
           source carga/monitor.sh
           for P in 50 100 200 400 800 1600 3200 6400; do
             echo "=== $P pessoas navegando ==="
             monitorar nav-$P
             k6 run --quiet -e PESSOAS=$P -e DURACAO=40s --summary-export carga/resultados/nav-$P.json carga/navegacao.js 2>&1 | tail -30 || true
             parar_monitor
-            ruim=$(node -e 'const s=require("./carga/resultados/nav-'$P'.json").metrics; const p=s.http_req_duration["p(95)"], f=s.http_req_failed.value; console.log(p>2000||f>0.01?1:0)')
+            ruim=$(node -e 'const s=require("./carga/resultados/nav-'$P'.json").metrics; const p=s.http_req_duration["p(95)"], f=s.http_req_failed.value; console.log(p>2000||f>0.01?1:0)' || echo 0)
+            echo "pessoas $P -> ruim=$ruim" | tee -a carga/resultados/laco.log
             if [ "$ruim" = "1" ]; then echo "Passou do limite com $P pessoas"; break; fi
           done
 
