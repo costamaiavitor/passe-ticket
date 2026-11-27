@@ -17,7 +17,9 @@ export const test = base.extend<{ issues: Issues; ip: string }>({
     const issues: Issues = { console: [], network: [] };
     // "Failed to load resource" é o navegador avisando de um 4xx esperado (ex.: 401 de quem não entrou); os 5xx são pegos abaixo.
     // Erros que vêm de dentro do mapa do Google (iframe) não são do BooTickets.
-    const thirdParty = (t: string) => /google\.com|gstatic|googleapis/.test(t);
+    // No Safari, sair da página com uma chamada em andamento aparece como "access control checks": é a chamada
+    // sendo cancelada pela navegação, não um erro para o comprador.
+    const thirdParty = (t: string) => /google\.com|gstatic|googleapis|due to access control checks/.test(t);
     page.on("console", async (m) => {
       if (m.type() !== "error" || m.text().includes("Failed to load resource")) return;
       let t = m.text();

@@ -51,9 +51,10 @@ test("evento inexistente mostra aviso e não quebra", async ({ page, issues }) =
   issues.network.length = 0;
 });
 
-test("Meus ingressos sem conta pede para entrar", async ({ page }) => {
+test("Meus ingressos sem conta manda para o login", async ({ page }) => {
   await page.goto("/ingressos");
-  await expect(page.getByText(/entrar|faça login/i).first()).toBeVisible();
+  await expect(page).toHaveURL(/entrar/);
+  await expect(page.getByRole("button", { name: "Entrar" })).toBeVisible();
 });
 
 test("páginas da conta logada", async ({ page, ip, issues }) => {

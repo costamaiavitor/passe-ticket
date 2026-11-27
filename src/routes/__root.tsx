@@ -138,7 +138,17 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  useEffect(() => { void restoreSession(); markNativeApp(); listenForInstall(); void registerServiceWorker(); }, []);
+  useEffect(() => {
+    void restoreSession(); markNativeApp(); listenForInstall(); void registerServiceWorker();
+    // A animação entre páginas é interrompida quando a pessoa clica rápido ou gira o celular: isso é normal,
+    // não é erro (o navegador avisa como "promessa rejeitada").
+    const quiet = (e: PromiseRejectionEvent) => {
+      const r = e.reason as { name?: string; message?: string } | undefined;
+      if (r?.name === "AbortError" || /transition was (aborted|skipped)|view transition/i.test(r?.message ?? "")) e.preventDefault();
+    };
+    window.addEventListener("unhandledrejection", quiet);
+    return () => window.removeEventListener("unhandledrejection", quiet);
+  }, []);
   // No app: depois que a pessoa entra na conta, pede para mandar notificações (pagamento, festa hoje…).
   const { user } = useSession();
   useEffect(() => { if (user) void setupPush().catch(() => undefined); }, [user]);

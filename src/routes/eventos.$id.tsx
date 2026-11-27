@@ -172,8 +172,10 @@ function EventPage() {
   const fromPrice = groups.length ? Math.min(...groups.map((g) => g.cur.price)) : null;
   const goToTickets = () => ticketsRef.current?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
 
+  const placing = useRef(false);
   const placeOrder = async (holders: { name: string; cpf: string }[]) => {
-    if (!qty) return;
+    if (!qty || placing.current) return;
+    placing.current = true;
     setSubmitting(true); setOrderError(null);
     // Os titulares vêm na mesma ordem dos itens do carrinho.
     let at = 0;
@@ -188,7 +190,7 @@ function EventPage() {
       navigate({ to: "/checkout/$orderId", params: { orderId: order.id } });
     } catch (e) {
       setOrderError(e instanceof Error ? e.message : "Não foi possível reservar.");
-    } finally { setSubmitting(false); }
+    } finally { setSubmitting(false); placing.current = false; }
   };
 
   return (
@@ -289,7 +291,7 @@ function EventPage() {
                 couponOpen ? (
                   <div className="mt-3">
                     <div className="flex gap-2">
-                      <input value={couponInput} onChange={(e) => setCouponInput(e.target.value.toUpperCase())} placeholder="Código do cupom" maxLength={30}
+                      <input value={couponInput} disabled={!hydrated} onChange={(e) => setCouponInput(e.target.value.toUpperCase())} placeholder="Código do cupom" aria-label="Código do cupom" maxLength={30}
                         onKeyDown={(e) => { if (e.key === "Enter") void applyCoupon(); }}
                         className="h-9 min-w-0 flex-1 rounded-md border bg-surface px-3 text-sm uppercase outline-none focus:border-primary/50" />
                       <Button size="sm" variant="secondary" disabled={!hydrated || applying} onClick={() => void applyCoupon()}>{applying ? "…" : "Aplicar"}</Button>
@@ -305,7 +307,7 @@ function EventPage() {
                   <p className="flex items-center gap-2 text-sm font-medium"><KeyRound className="size-4 text-primary" />Este evento pede uma palavra-senha</p>
                   <p className="mt-1 text-xs text-muted-foreground">Peça a senha para quem organiza a festa.</p>
                   <div className="mt-3 flex gap-2">
-                    <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Palavra-senha" maxLength={60}
+                    <input value={code} disabled={!hydrated} onChange={(e) => setCode(e.target.value)} placeholder="Palavra-senha" aria-label="Palavra-senha do evento" maxLength={60}
                       onKeyDown={(e) => { if (e.key === "Enter") void unlock(); }}
                       className="h-10 min-w-0 flex-1 rounded-md border bg-surface px-3 text-sm outline-none focus:border-primary/50" />
                     <Button disabled={!hydrated || checkingCode} onClick={() => void unlock()}>{checkingCode ? "…" : "Liberar"}</Button>

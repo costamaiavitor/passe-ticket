@@ -82,7 +82,9 @@ test("login certo, recarregar a página continua logado, e sair funciona", async
   await page.getByLabel("Senha", { exact: true }).fill(b.password);
   await page.getByRole("button", { name: "Entrar" }).click();
   await expect(page).toHaveURL(/localhost:\d+\/?$/);
-  await page.goto("/ingressos");
+  await page.waitForLoadState("load");
+  await page.waitForTimeout(500);
+  await page.goto("/ingressos", { waitUntil: "domcontentloaded" });
   await expect(page.getByText(/você ainda não tem ingressos/i)).toBeVisible();
   await page.reload();
   await expect(page.getByText(/você ainda não tem ingressos/i)).toBeVisible();
@@ -99,8 +101,8 @@ test("login certo, recarregar a página continua logado, e sair funciona", async
 test("página protegida manda para o login e volta depois", async ({ page }) => {
   const b = await newBuyer();
   await page.goto("/ingressos");
-  await page.locator("main").getByRole("link", { name: /entrar/i }).first().click();
-  await expect(page).toHaveURL(/entrar/);
+  // Sem conta, Meus ingressos manda direto para o login, lembrando para onde voltar.
+  await expect(page).toHaveURL(/entrar.*redirect=%2Fingressos|entrar.*redirect=\/ingressos/);
   await page.getByLabel("E-mail").fill(b.email);
   await page.getByLabel("Senha", { exact: true }).fill(b.password);
   await page.getByRole("button", { name: "Entrar" }).click();

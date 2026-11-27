@@ -4,6 +4,7 @@ import { expect, loggedBuyer, state, test } from "../fixtures";
 
 test("sem internet na porta: o ingresso abre com o QR Code", async ({ browser, browserName }) => {
   test.skip(browserName === "firefox", "o Firefox do Playwright não simula sem-internet com service worker");
+  test.skip(test.info().project.name === "pc-safari", "o Safari de computador do Playwright não abre página com service worker (no iPhone o teste roda)");
   const s = state();
   const context = await browser.newContext({ serviceWorkers: "allow", baseURL: test.info().project.use.baseURL });
   const page = await context.newPage();
