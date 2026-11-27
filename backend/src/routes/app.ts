@@ -12,9 +12,24 @@ import { applePass, appleWalletLink, checkAppleLink, googleWalletUrl, walletStat
 export const appRouter = Router();
 
 /** O que está ligado (o site e o app só mostram o que funciona). */
-appRouter.get("/status", (_req, res) => { res.json({ push: pushStatus(), wallet: walletStatus() }); });
+appRouter.get("/status", (_req, res) => {
+  // A chave pública VAPID vai para o navegador assinar as notificações (é pública por definição).
+  res.json({ push: pushStatus(), wallet: walletStatus(), vapidPublicKey: config.vapidPublicKey || null });
+});
 
-const device = z.object({ token: z.string().min(10).max(4096), platform: z.enum(["android", "ios"]) });
+const device = z.object({ token: z.string().min(10).max(4096), platform: z.enum(["android", "ios", "web"]) }).refine(
+  (d) => d.platform !== "web" || isWebSubscription(d.token), { message: "Inscrição de notificação inválida." });
+
+/** A inscrição do navegador precisa apontar para um serviço de push conhecido (evita usar o servidor para chamar endereços quaisquer). */
+function isWebSubscription(token: string) {
+  try {
+    const s = JSON.parse(token) as { endpoint?: string; keys?: { p256dh?: string; auth?: string } };
+    const host = new URL(String(s.endpoint)).hostname;
+    const known = ["fcm.googleapis.com", "updates.push.services.mozilla.com", "web.push.apple.com", "notify.windows.com"];
+    return new URL(String(s.endpoint)).protocol === "https:" && !!s.keys?.p256dh && !!s.keys?.auth
+      && known.some((k) => host === k || host.endsWith(`.${k}`));
+  } catch { return false; }
+}
 appRouter.post("/devices", requireAuth, rateLimit({ windowMs: 60_000, max: 20, key: (r) => `dev:${r.auth?.id}` }), async (req, res) => {
   const d = parse(device, req.body);
   await registerDevice(user(req).id, d.token, d.platform);

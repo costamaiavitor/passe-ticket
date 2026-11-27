@@ -82,7 +82,7 @@ describe("App: notificações e Carteira", () => {
   it("status mostra o que está ligado", async () => {
     const r = await api("/app/status");
     assert.equal(r.status, 200);
-    assert.deepEqual(r.body.push, { android: false, ios: false });
+    assert.deepEqual(r.body.push, { android: false, ios: false, web: false });
     assert.deepEqual(r.body.wallet, { apple: false, google: true });
   });
 
@@ -94,6 +94,18 @@ describe("App: notificações e Carteira", () => {
     assert.equal((await one<any>("SELECT user_id FROM push_devices WHERE token = 'token-do-celular-1'"))!.user_id, "bia");
     assert.equal((await api("/app/devices/remove", { token: T["bia"], body: { token: "token-do-celular-1" } })).status, 204);
     assert.ok(!(await one("SELECT 1 FROM push_devices WHERE token = 'token-do-celular-1'")));
+  });
+
+  it("navegador (PWA): só aceita inscrição de serviço de push conhecido", async () => {
+    const sub = (endpoint: string) => JSON.stringify({ endpoint, keys: { p256dh: "chave-publica-do-navegador", auth: "segredo-auth" } });
+    const bad = await api("/app/devices", { token: T["ana"], body: { token: sub("https://meu-servidor.example.com/x"), platform: "web" } });
+    assert.equal(bad.status, 400, "endereço desconhecido não pode virar alvo do servidor");
+    const http = await api("/app/devices", { token: T["ana"], body: { token: sub("http://fcm.googleapis.com/fcm/send/abc"), platform: "web" } });
+    assert.equal(http.status, 400);
+    const ok = await api("/app/devices", { token: T["ana"], body: { token: sub("https://fcm.googleapis.com/fcm/send/abc123"), platform: "web" } });
+    assert.equal(ok.status, 204, JSON.stringify(ok.body));
+    const apple = await api("/app/devices", { token: T["ana"], body: { token: sub("https://web.push.apple.com/QGx-abc"), platform: "web" } });
+    assert.equal(apple.status, 204);
   });
 
   it("compra aprovada manda notificação para quem comprou", async () => {

@@ -2,13 +2,13 @@
 import { queryOptions } from "@tanstack/react-query";
 import { http, USE_MOCKS } from "./http";
 
-export interface AppStatus { push: { android: boolean; ios: boolean }; wallet: { apple: boolean; google: boolean } }
-const OFF: AppStatus = { push: { android: false, ios: false }, wallet: { apple: false, google: false } };
+export interface AppStatus { push: { android: boolean; ios: boolean; web: boolean }; wallet: { apple: boolean; google: boolean }; vapidPublicKey: string | null }
+const OFF: AppStatus = { push: { android: false, ios: false, web: false }, wallet: { apple: false, google: false }, vapidPublicKey: null };
 
 export const getAppStatus = () => (USE_MOCKS ? Promise.resolve(OFF) : http<AppStatus>("/app/status").catch(() => OFF));
 export const appStatusQuery = () => queryOptions({ queryKey: ["app-status"], queryFn: getAppStatus, staleTime: 10 * 60_000 });
 
-export const registerPushDevice = (token: string, platform: "android" | "ios") =>
+export const registerPushDevice = (token: string, platform: "android" | "ios" | "web") =>
   http<null>("/app/devices", { method: "POST", body: JSON.stringify({ token, platform }) });
 export const removePushDevice = (token: string) =>
   http<null>("/app/devices/remove", { method: "POST", body: JSON.stringify({ token }) });

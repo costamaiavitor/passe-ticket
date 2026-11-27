@@ -4,7 +4,7 @@ import { fmtDateTime } from "../lib/email.js";
 import { sendPush } from "../lib/push.js";
 
 /** O app manda o token do celular depois que a pessoa entra e libera as notificações. */
-export async function registerDevice(userId: string, token: string, platform: "android" | "ios") {
+export async function registerDevice(userId: string, token: string, platform: "android" | "ios" | "web") {
   const t = now();
   // Mesmo celular com outra conta: o aparelho passa a ser da conta que entrou por último.
   await run(

@@ -46,7 +46,6 @@ const OFFLINE_KEY = "bt-offline-tickets";
  */
 export async function saveTicketsOffline(tickets: Ticket[]) {
   const prefs = bridge()?.Plugins?.Preferences;
-  if (!prefs) return;
   const QRCode = (await import("qrcode")).default;
   const upcoming = tickets.filter((t) => Date.parse(t.event.startsAt) > Date.now() - 24 * 3600_000);
   const list = await Promise.all(upcoming.map(async (t) => ({
@@ -54,12 +53,17 @@ export async function saveTicketsOffline(tickets: Ticket[]) {
     holderName: t.holderName, batchName: t.batchName,
     qr: t.qrPayload ? await QRCode.toDataURL(t.qrPayload, { width: 480, margin: 1, errorCorrectionLevel: "M" }) : null,
   })));
-  await prefs.set({ key: OFFLINE_KEY, value: JSON.stringify({ savedAt: new Date().toISOString(), tickets: list }) });
+  const value = JSON.stringify({ savedAt: new Date().toISOString(), tickets: list });
+  // App das lojas: armazenamento do app. Site e app instalado pelo navegador: armazenamento do navegador,
+  // lido pela página /offline.html quando não há internet.
+  if (prefs) await prefs.set({ key: OFFLINE_KEY, value });
+  else try { localStorage.setItem(OFFLINE_KEY, value); } catch { /* sem espaço ou modo privado */ }
 }
 
 /** Ao sair da conta, apaga os ingressos guardados no celular. */
 export async function clearTicketsOffline() {
   await bridge()?.Plugins?.Preferences?.remove({ key: OFFLINE_KEY });
+  try { localStorage.removeItem(OFFLINE_KEY); } catch { /* nada */ }
 }
 
 // ---------------- Notificações ----------------

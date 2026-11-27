@@ -82,6 +82,10 @@ export const config = {
   apnsBundleId: env["APNS_BUNDLE_ID"] ?? "br.com.bootickets.app",
   // "true" para apps da App Store e do TestFlight; vazio/false para app instalado pelo Xcode.
   apnsProduction: env["APNS_PRODUCTION"] !== "false",
+  // Notificações pelo navegador (app instalado pelo site / PWA): par de chaves VAPID (gratuito, sem conta em loja).
+  vapidPublicKey: env["VAPID_PUBLIC_KEY"] ?? "",
+  vapidPrivateKey: env["VAPID_PRIVATE_KEY"] ?? "",
+  vapidSubject: env["VAPID_SUBJECT"] || "mailto:booticketss@gmail.com",
   // Segredo que a Vercel manda no lembrete diário ("sua festa é hoje").
   cronSecret: env["CRON_SECRET"] ?? "",
   // Google Wallet: o "Issuer ID" e a conta de serviço (JSON inteiro, em uma linha).

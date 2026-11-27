@@ -15,6 +15,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { restoreSession } from "@/services/auth";
 import { markNativeApp, setupPush } from "@/lib/native-app";
+import { listenForInstall, registerServiceWorker } from "@/lib/pwa";
 import { useSession } from "@/services/session";
 import { DEFAULT_SHARE_IMAGE } from "@/lib/seo";
 
@@ -94,6 +95,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:image", content: DEFAULT_SHARE_IMAGE },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:image", content: DEFAULT_SHARE_IMAGE },
+      { name: "theme-color", content: "#090B0F" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-title", content: "BooTickets" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
     ],
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -106,6 +112,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "icon", href: "/favicon.png?v=3", type: "image/png" },
       { rel: "icon", href: "/favicon.ico?v=3", sizes: "any" },
       { rel: "apple-touch-icon", href: "/apple-touch-icon.png?v=3" },
+      // App instalável pelo navegador (PWA): nome, ícones e cores na tela de início.
+      { rel: "manifest", href: "/manifest.webmanifest" },
     ],
   }),
   shellComponent: RootShell,
@@ -130,7 +138,7 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  useEffect(() => { void restoreSession(); markNativeApp(); }, []);
+  useEffect(() => { void restoreSession(); markNativeApp(); listenForInstall(); void registerServiceWorker(); }, []);
   // No app: depois que a pessoa entra na conta, pede para mandar notificações (pagamento, festa hoje…).
   const { user } = useSession();
   useEffect(() => { if (user) void setupPush().catch(() => undefined); }, [user]);

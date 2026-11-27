@@ -1,8 +1,10 @@
-// Notificações no celular de quem tem o app (pagamento aprovado, "sua festa é hoje", ingresso recebido…).
-// Android: Firebase Cloud Messaging (API HTTP v1). iPhone: direto pela Apple (APNs, HTTP/2).
+// Notificações no celular (pagamento aprovado, "sua festa é hoje", ingresso recebido…).
+// App das lojas: Android pelo Firebase Cloud Messaging (API HTTP v1) e iPhone direto pela Apple (APNs, HTTP/2).
+// App instalado pelo site (PWA): web push com chaves VAPID, no Android e no iPhone (iOS 16.4+, instalado na tela de início).
 // Sem as chaves configuradas, nada sai e nada quebra: as notificações só aparecem no log.
 import { connect } from "node:http2";
 import { importPKCS8, SignJWT } from "jose";
+import webpush from "web-push";
 import { config } from "../config.js";
 import { all, run } from "../db.js";
 
@@ -19,15 +21,17 @@ const fcmAccount = (): ServiceAccount | null => {
 const apnsReady = () => !!(config.apnsKey && config.apnsKeyId && config.apnsTeamId);
 
 /** O app pergunta isto antes de pedir permissão de notificação (sem chave do Firebase, o Android não registra). */
-export const pushStatus = () => ({ android: !!fcmAccount(), ios: apnsReady() });
+export const pushStatus = () => ({ android: !!fcmAccount(), ios: apnsReady(), web: webReady() });
+
+const webReady = () => !!(config.vapidPublicKey && config.vapidPrivateKey);
 
 /** Envia para todos os celulares da pessoa. Nunca derruba a operação principal. */
 export async function sendPush(userId: string, msg: Push): Promise<void> {
   if (config.isTest) { sentPushes.push({ userId, ...msg }); return; }
   try {
-    const devices = await all<{ token: string; platform: "android" | "ios" }>("SELECT token, platform FROM push_devices WHERE user_id = ?", userId);
+    const devices = await all<{ token: string; platform: "android" | "ios" | "web" }>("SELECT token, platform FROM push_devices WHERE user_id = ?", userId);
     for (const d of devices) {
-      const ok = d.platform === "android" ? await sendFcm(d.token, msg) : await sendApns(d.token, msg);
+      const ok = d.platform === "web" ? await sendWeb(d.token, msg) : d.platform === "android" ? await sendFcm(d.token, msg) : await sendApns(d.token, msg);
       // Token que não vale mais (app desinstalado, permissão tirada): some da lista.
       if (ok === "gone") await run("DELETE FROM push_devices WHERE token = ?", d.token);
     }
@@ -116,4 +120,24 @@ async function sendApns(token: string, msg: Push): Promise<"ok" | "gone" | "erro
     req.on("error", (e) => { client.close(); console.error("APNs:", e); resolve("error"); });
     req.end(body);
   });
+}
+
+// ---------------- Navegador (web push / PWA) ----------------
+async function sendWeb(token: string, msg: Push): Promise<"ok" | "gone" | "error"> {
+  if (!webReady()) { console.log(`[notificação não enviada — configure VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY] ${msg.title}`); return "error"; }
+  let sub: webpush.PushSubscription;
+  try { sub = JSON.parse(token) as webpush.PushSubscription; } catch { return "gone"; }
+  try {
+    await webpush.sendNotification(sub, JSON.stringify({ title: msg.title, body: msg.body, url: msg.url ?? "/ingressos" }), {
+      vapidDetails: { subject: config.vapidSubject, publicKey: config.vapidPublicKey, privateKey: config.vapidPrivateKey },
+      TTL: 24 * 3600,
+      urgency: "high",
+    });
+    return "ok";
+  } catch (e) {
+    const code = (e as { statusCode?: number }).statusCode;
+    if (code === 404 || code === 410) return "gone";
+    console.error(`Web push recusado (${code ?? "?"}):`, e);
+    return "error";
+  }
 }

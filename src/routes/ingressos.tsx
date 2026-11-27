@@ -1,4 +1,5 @@
-import { isNativeApp, saveTicketsOffline } from "@/lib/native-app";
+import { saveTicketsOffline } from "@/lib/native-app";
+import { AppBanner } from "@/components/install-app";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
@@ -24,7 +25,7 @@ export const Route = createFileRoute("/ingressos")({
       <main className="container-page py-12">
         <h1 className="text-3xl font-semibold tracking-tight"><RiseWords text="Meus ingressos" /></h1>
         <p className="mt-1 text-sm text-muted-foreground">Apresente o QR Code na entrada junto com um documento do titular.</p>
-        <RequireAuth>{() => <><IncomingTransfers /><TicketList /><Refunds /></>}</RequireAuth>
+        <RequireAuth>{() => <><AppBanner /><IncomingTransfers /><TicketList /><Refunds /></>}</RequireAuth>
       </main>
       <SiteFooter />
     </div>
@@ -34,7 +35,8 @@ export const Route = createFileRoute("/ingressos")({
 function TicketList() {
   const { data, isLoading, error } = useQuery({ ...ticketsQuery(), refetchInterval: 15_000 });
   // No app: guarda os ingressos no celular para o QR abrir sem internet na porta da festa.
-  useEffect(() => { if (data && isNativeApp()) void saveTicketsOffline(data).catch(() => undefined); }, [data]);
+  // Guarda os ingressos no aparelho (app das lojas e app instalado pelo site) para o QR abrir sem internet.
+  useEffect(() => { if (data) void saveTicketsOffline(data).catch(() => undefined); }, [data]);
   if (isLoading) return <Loading className="mt-8" />;
   if (error) return <p className="mt-8 text-sm text-destructive">{error.message}</p>;
   if (!data?.length)

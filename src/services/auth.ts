@@ -54,6 +54,7 @@ export async function resetPassword(token: string, password: string) {
 export async function logout() {
   // No app: o celular para de receber as notificações desta conta (precisa estar logado para isso).
   await import("@/lib/native-app").then((m) => m.stopPush()).catch(() => undefined);
+  await import("@/lib/pwa").then((m) => m.disableWebPush()).catch(() => undefined);
   if (!USE_MOCKS) await http("/auth/logout", { method: "POST" }).catch(() => undefined);
   setAccessToken(null);
   setSession({ user: null, ready: true });
