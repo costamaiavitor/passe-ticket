@@ -39,7 +39,6 @@ jobs:
     env:
       DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/boo
       PGPASSWORD: postgres
-      NODE_ENV: production
       PORT: "3333"
       PAYMENT_PROVIDER: mock
       ALLOW_SIMULATED_PAYMENTS: "true"
@@ -67,7 +66,7 @@ jobs:
       - name: Sobe a API
         run: |
           cd backend
-          nohup node --import tsx src/server.ts > ../api.log 2>&1 &
+          NODE_ENV=production nohup node --import tsx src/server.ts > ../api.log 2>&1 &
           echo $! > ../api.pid
           for i in $(seq 1 60); do curl -sf http://127.0.0.1:3333/health && break; sleep 1; done
           curl -sf http://127.0.0.1:3333/api/v1/events >/dev/null && echo "API no ar"
