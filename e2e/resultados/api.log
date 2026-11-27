@@ -11,101 +11,100 @@ BooTickets API em http://localhost:8080/api/v1 (pagamentos: mock)
 [e-mail não enviado — configure SMTP_USER/SMTP_PASS] para produtor@passe.dev: Seu evento foi aprovado: QA Entrada Grátis
 [e-mail não enviado — configure SMTP_USER/SMTP_PASS] para admin@passe.dev: Novo evento para aprovar: QA Últimos Ingressos
 [e-mail não enviado — configure SMTP_USER/SMTP_PASS] para produtor@passe.dev: Seu evento foi aprovado: QA Últimos Ingressos
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para esgota-1795799258076-5552-0-22494@teste.dev: Seus ingressos para QA Esgotado
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799259916-5587-0-248119@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799262174-5594-0-605379@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799280672-5587-8-494789@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799280814-6474-0-188264@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para amigo-1795799280802-5587-9-412479@teste.dev: Comprador Bia Teste quer te passar um ingresso
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799280814-6474-0-188264@teste.dev: Devolução feita: QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799282172-6474-1-168530@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799282172-6474-1-168530@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799282172-6474-1-168530@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799280672-5587-8-494789@teste.dev: Comprador Caio Teste aceitou o ingresso de QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799283122-5587-10-406983@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799339369-9546-0-488493@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799373530-9300-7-936133@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799374705-10812-4-203649@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799374705-10812-4-203649@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799374705-10812-4-203649@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799373530-9300-7-936133@teste.dev: Devolução feita: QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799374719-11156-1-841587@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799376286-9300-8-871746@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para amigo-1795799374956-11156-2-549124@teste.dev: Comprador Ana Teste quer te passar um ingresso
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799374719-11156-1-841587@teste.dev: Comprador Caio Teste aceitou o ingresso de QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799470594-17875-0-982553@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799481334-17974-1-798020@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799535037-19196-6-793376@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799538624-19785-1-370917@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799540163-20149-0-58015@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799540163-20149-0-58015@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799540163-20149-0-58015@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799545840-20384-0-580175@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799690810-24410-0-574537@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799695313-24410-2-329314@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799721473-24729-9-205235@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799721596-25298-0-32862@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799721596-25298-0-32862@teste.dev: Devolução feita: QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para amigo-1795799721649-24729-10-231940@teste.dev: Comprador Ana Teste quer te passar um ingresso
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799723498-25298-1-584738@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799723498-25298-1-584738@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799723498-25298-1-584738@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799721473-24729-9-205235@teste.dev: Comprador Davi Teste aceitou o ingresso de QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799727859-25465-0-365220@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799780212-28251-0-17360@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799786502-28251-2-612327@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799813686-29325-5-651863@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799814081-29694-1-95209@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799813686-29325-5-651863@teste.dev: Devolução feita: QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799815211-29325-6-477198@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para amigo-1795799814274-29694-2-452148@teste.dev: Comprador Bia Teste quer te passar um ingresso
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799815211-29325-6-477198@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799815211-29325-6-477198@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799814081-29694-1-95209@teste.dev: Comprador Caio Teste aceitou o ingresso de QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799818202-30121-0-758179@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799868672-33657-0-713364@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799876051-33657-2-796634@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799914529-34629-4-450126@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799915414-35400-2-382424@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799915414-35400-2-382424@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799915414-35400-2-382424@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799916231-35523-0-241463@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799914529-34629-4-450126@teste.dev: Devolução feita: QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799919444-34629-5-143567@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para amigo-1795799917169-35523-1-817221@teste.dev: Comprador Davi Teste quer te passar um ingresso
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799916231-35523-0-241463@teste.dev: Comprador Ana Teste aceitou o ingresso de QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799987824-39372-0-218594@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795799996653-39672-0-380130@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800021761-39372-2-774457@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800021761-39372-2-774457@teste.dev: Devolução feita: QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800022929-39372-3-928269@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800022929-39372-3-928269@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800022929-39372-3-928269@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800023573-40367-0-2507@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para amigo-1795800024339-40367-1-857793@teste.dev: Comprador Bia Teste quer te passar um ingresso
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800023573-40367-0-2507@teste.dev: Comprador Davi Teste aceitou o ingresso de QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800029795-40552-0-826612@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800077173-43378-0-375314@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800082034-43593-0-902077@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800108864-44258-0-244814@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800109254-43460-1-476921@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800109254-43460-1-476921@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800109254-43460-1-476921@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800108864-44258-0-244814@teste.dev: Devolução feita: QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800110281-44345-0-886631@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800110524-44258-1-492841@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para amigo-1795800110465-44345-1-109710@teste.dev: Comprador Eva Teste quer te passar um ingresso
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800110281-44345-0-886631@teste.dev: Comprador Eva Teste aceitou o ingresso de QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800159063-47157-0-63280@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800164354-47229-0-396057@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para esgota-1795800713395-5877-0-867258@teste.dev: Seus ingressos para QA Esgotado
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800715417-5891-0-827883@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800718759-5891-1-901632@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800741597-5892-8-992024@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800741597-5892-8-992024@teste.dev: Devolução feita: QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800743084-6548-3-632760@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800743576-5892-9-484644@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800743576-5892-9-484644@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800743576-5892-9-484644@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800744873-5898-0-846023@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para amigo-1795800743286-6548-4-938313@teste.dev: Comprador Caio Teste quer te passar um ingresso
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800743084-6548-3-632760@teste.dev: Comprador Ana Teste aceitou o ingresso de QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800814213-7919-0-419113@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800855215-8957-2-781677@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800855489-9119-4-424132@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800856619-7925-7-236849@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800856619-7925-7-236849@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800856619-7925-7-236849@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800855215-8957-2-781677@teste.dev: Devolução feita: QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800857994-8957-3-118180@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para amigo-1795800855850-9119-5-428742@teste.dev: Comprador Ana Teste quer te passar um ingresso
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800855489-9119-4-424132@teste.dev: Comprador Caio Teste aceitou o ingresso de QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800954922-12841-0-449974@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800940693-12407-0-276875@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801011767-14459-0-807005@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801013182-14433-2-272605@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801017897-14741-0-443301@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801017897-14741-0-443301@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801017897-14741-0-443301@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801020072-14886-0-650550@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801219130-18942-0-115003@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801225512-19233-0-673271@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801251387-18942-12-559685@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801251863-19133-2-688358@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801251387-18942-12-559685@teste.dev: Devolução feita: QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801253072-18942-13-983916@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801253072-18942-13-983916@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801253072-18942-13-983916@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para amigo-1795801252112-19133-3-157697@teste.dev: Comprador Eva Teste quer te passar um ingresso
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801251863-19133-2-688358@teste.dev: Comprador Davi Teste aceitou o ingresso de QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801257253-19909-0-521094@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801318820-21049-0-568174@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801327710-21049-1-365997@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801361010-21986-4-473828@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801361010-21986-4-473828@teste.dev: Devolução feita: QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801362537-21704-4-324834@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801363249-21986-5-172699@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801363249-21986-5-172699@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801363249-21986-5-172699@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para amigo-1795801362747-21704-5-654250@teste.dev: Comprador Eva Teste quer te passar um ingresso
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801366615-22917-0-48741@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801362537-21704-4-324834@teste.dev: Comprador Eva Teste aceitou o ingresso de QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801455216-26406-0-636164@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801465252-26517-0-472553@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801514634-27355-4-389852@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801515750-27371-3-767399@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801515750-27371-3-767399@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801515750-27371-3-767399@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801516686-28269-0-136137@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para amigo-1795801514981-27355-5-353417@teste.dev: Comprador Bia Teste quer te passar um ingresso
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801516686-28269-0-136137@teste.dev: Devolução feita: QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801514634-27355-4-389852@teste.dev: Comprador Ana Teste aceitou o ingresso de QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801523475-28564-0-260007@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801602666-31867-0-536416@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801608457-31867-1-68772@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801643517-32083-3-370509@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801644396-32814-0-950948@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801646915-32466-5-873403@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801646915-32466-5-873403@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801646915-32466-5-873403@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801644396-32814-0-950948@teste.dev: Devolução feita: QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para amigo-1795801643837-32083-4-456039@teste.dev: Comprador Eva Teste quer te passar um ingresso
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801648985-32814-1-283872@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801643517-32083-3-370509@teste.dev: Comprador Ana Teste aceitou o ingresso de QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801727138-34811-0-131374@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801737626-34811-2-521308@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801763564-35194-5-579310@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801763734-34827-1-671389@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801764198-35426-4-502940@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801764198-35426-4-502940@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801764198-35426-4-502940@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801763564-35194-5-579310@teste.dev: Devolução feita: QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801765992-35194-6-529330@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para amigo-1795801763978-34827-2-718780@teste.dev: Comprador Ana Teste quer te passar um ingresso
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801763734-34827-1-671389@teste.dev: Comprador Eva Teste aceitou o ingresso de QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801851930-37586-0-631113@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801857232-37586-1-821088@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801900948-38296-5-206529@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801900948-38296-5-206529@teste.dev: Devolução feita: QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801903836-38296-6-956932@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801903836-38296-6-956932@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801903836-38296-6-956932@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801903861-37816-6-619268@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801907049-39577-0-759167@teste.dev: Seus ingressos para QA Festa Principal
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para amigo-1795801904126-37816-7-178004@teste.dev: Comprador Davi Teste quer te passar um ingresso
+[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795801903861-37816-6-619268@teste.dev: Comprador Davi Teste aceitou o ingresso de QA Festa Principal
 1 pedido(s) expirado(s)
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800200098-48599-3-356213@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800200098-48599-3-356213@teste.dev: Devolução feita: QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800202271-47901-5-503379@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800202271-47901-5-503379@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800202271-47901-5-503379@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800202318-48599-4-755956@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800203376-48981-0-131624@teste.dev: Seus ingressos para QA Festa Principal
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para amigo-1795800203834-48981-1-857599@teste.dev: Comprador Eva Teste quer te passar um ingresso
-[e-mail não enviado — configure SMTP_USER/SMTP_PASS] para qa-1795800203376-48981-0-131624@teste.dev: Comprador Caio Teste aceitou o ingresso de QA Festa Principal
-3 pedido(s) expirado(s)
