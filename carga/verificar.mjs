@@ -16,6 +16,8 @@ const [lote] = await q("SELECT total, sold, reserved FROM batches WHERE event_id
 const ingressos = await q("SELECT status, COUNT(*)::int n FROM tickets WHERE event_id = $1 GROUP BY status", [eventId]);
 const pedidos = await q("SELECT status, COUNT(*)::int n FROM orders WHERE event_id = $1 GROUP BY status", [eventId]);
 const [dupCpf] = await q(`SELECT COUNT(*)::int n FROM (SELECT holder_cpf FROM tickets WHERE event_id = $1 AND status IN ('valid','used','pending')
+  GROUP BY holder_cpf HAVING COUNT(*) > (SELECT max_per_cpf FROM events WHERE id = $1)) x`, [eventId]);
+const [cpfRepetido] = await q(`SELECT COUNT(*)::int n FROM (SELECT holder_cpf FROM tickets WHERE event_id = $1 AND status IN ('valid','used','pending')
   GROUP BY holder_cpf HAVING COUNT(*) > 1) x`, [eventId]);
 const [dupId] = await q("SELECT COUNT(*) - COUNT(DISTINCT id) AS n FROM tickets WHERE event_id = $1", [eventId]);
 const [pagosSemIngresso] = await q(`SELECT COUNT(*)::int n FROM orders o WHERE o.event_id = $1 AND o.status = 'paid'
@@ -31,7 +33,8 @@ const r = {
   lote, ingressos, pedidos,
   ingressosValidos: validos,
   vendeuMaisQueEstoque: validos > lote.total || lote.sold + lote.reserved > lote.total,
-  cpfsDuplicados: dupCpf.n,
+  cpfsAcimaDoLimite: dupCpf.n,
+  cpfsComMaisDeUmIngresso: cpfRepetido.n,
   idsDuplicados: Number(dupId.n),
   pedidosPagosComIngressoErrado: pagosSemIngresso.n,
   segundosDoPrimeiroAoUltimoPedido: seg,
@@ -39,7 +42,7 @@ const r = {
   segundosAteUltimoPagamento: segPago,
   vendasConcluidasPorSegundo: +(validos / Math.max(segPago, 0.001)).toFixed(1),
 };
-r.ok = !r.vendeuMaisQueEstoque && r.cpfsDuplicados === 0 && r.idsDuplicados === 0 && r.pedidosPagosComIngressoErrado === 0;
+r.ok = !r.vendeuMaisQueEstoque && r.cpfsAcimaDoLimite === 0 && r.idsDuplicados === 0 && r.pedidosPagosComIngressoErrado === 0;
 writeFileSync(out || "carga/resultados/verificacao-corrida.json", JSON.stringify(r, null, 2));
 console.log(JSON.stringify(r, null, 2));
 if (!r.ok) process.exitCode = 1;

@@ -39,7 +39,7 @@ export const options = {
 };
 
 export function comprar() {
-  const i = exec.vu.idInTest - 1;
+  const i = exec.scenario.iterationInTest; // 0..N-1, um comprador diferente por clique
   const c = compradores[i % compradores.length];
   const n = 10 + i;
   const t0 = Date.now();

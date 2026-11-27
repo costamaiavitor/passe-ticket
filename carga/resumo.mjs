@@ -39,7 +39,7 @@ if (existsSync(`${DIR}/corrida.json`)) {
 if (existsSync(`${DIR}/verificacao-corrida.json`)) {
   const v = ler("verificacao-corrida.json");
   linhas.push("### Conferência no banco", "", "```json", JSON.stringify(v, null, 2), "```", "");
-  avisos.push(`Conferência: ${v.ok ? "OK" : "PROBLEMA"} — ${v.ingressosValidos}/${v.lote.total} vendidos, ${v.reservasPorSegundo} reservas/s, ${v.vendasConcluidasPorSegundo} vendas concluídas/s, CPFs duplicados ${v.cpfsDuplicados}.`);
+  avisos.push(`Conferência: ${v.ok ? "OK" : "PROBLEMA"} — ${v.ingressosValidos}/${v.lote.total} vendidos, ${v.reservasPorSegundo} reservas/s, ${v.vendasConcluidasPorSegundo} vendas concluídas/s, CPFs acima do limite ${v.cpfsAcimaDoLimite}, CPFs com 2 ingressos ${v.cpfsComMaisDeUmIngresso}.`);
 }
 
 // Cenário C
