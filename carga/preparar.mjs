@@ -71,7 +71,7 @@ async function evento(title, lotes) {
       batches: lotes.map((l) => ({ ...l, salesStart: start, salesEnd: future })),
     },
   });
-  await api(`/admin/events/${e.id}/approve`, { method: "POST", token: tok, n: 1 });
+  if (e.status === "review") await api(`/admin/events/${e.id}/approve`, { method: "POST", token: tok, n: 1 });
   return api(`/events/${e.id}`);
 }
 
