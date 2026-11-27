@@ -1,0 +1,156 @@
+# Teste de carga do BooTickets. Roda tudo aqui no GitHub (nada no PC de ninguém):
+# sobe a API com um Postgres de teste, pagamento SIMULADO, cria dados falsos e mede com o k6.
+# Nunca compra nada na produção. O job "producao" só lê páginas, com 5 pessoas, e só roda se
+# a mensagem do commit tiver [producao] (ou se for pedido manualmente com a opção marcada).
+name: Carga
+
+on:
+  push:
+    branches: [teste/carga]
+  workflow_dispatch:
+    inputs:
+      producao:
+        description: "Também medir a produção (só leitura, 5 pessoas, 1 minuto)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: carga
+  cancel-in-progress: false
+
+jobs:
+  carga:
+    name: Carga (API local + Postgres de teste)
+    if: "!contains(github.event.head_commit.message, '[so-producao]')"
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: boo
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 2s --health-timeout 2s --health-retries 30
+    env:
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/boo
+      PGPASSWORD: postgres
+      NODE_ENV: production
+      PORT: "3333"
+      PAYMENT_PROVIDER: mock
+      ALLOW_SIMULATED_PAYMENTS: "true"
+      JWT_SECRET: segredo-de-teste-de-carga-jwt-123456
+      QR_SECRET: segredo-de-teste-de-carga-qr-1234567
+      ADMIN_EMAILS: admin1@carga.test
+      PUBLIC_URL: http://127.0.0.1:3333
+      COMPRADORES: "2000"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+        working-directory: backend
+      - uses: grafana/setup-k6-action@v1
+
+      - name: Máquina de teste
+        run: |
+          nproc; free -m; psql -h 127.0.0.1 -U postgres -d boo -Atc "show max_connections"
+          rm -f carga/resultados/*.json carga/resultados/*.txt carga/resultados/RESUMO.md
+
+      - name: Sobe a API
+        run: |
+          cd backend
+          nohup node --import tsx src/server.ts > ../api.log 2>&1 &
+          echo $! > ../api.pid
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:3333/health && break; sleep 1; done
+          curl -sf http://127.0.0.1:3333/api/v1/events >/dev/null && echo "API no ar"
+
+      - name: Prepara dados (admin, eventos, portaria, compradores)
+        run: node carga/preparar.mjs http://127.0.0.1:3333 $COMPRADORES
+
+      - name: "B) Corrida de compras: ${{ env.COMPRADORES }} pessoas x 1.000 ingressos"
+        continue-on-error: true
+        run: |
+          source carga/monitor.sh
+          monitorar corrida
+          k6 run --quiet -e NAVEGANDO=200 --summary-export carga/resultados/corrida.json carga/corrida.js 2>&1 | tail -80 || true
+          parar_monitor
+
+      - name: Confere estoque e ingressos da corrida
+        continue-on-error: true
+        run: node carga/verificar.mjs "$DATABASE_URL"
+
+      - name: "C) Jornada completa sob carga (subindo o ritmo)"
+        continue-on-error: true
+        run: |
+          source carga/monitor.sh
+          for R in 5 10 20 40 80 160; do
+            echo "=== $R pessoas novas por segundo ==="
+            monitorar ponta-$R
+            k6 run --quiet -e RITMO=$R -e OFFSET=$((1000000 + R * 100000)) -e DURACAO=45s \
+              --summary-export carga/resultados/ponta-$R.json carga/ponta.js 2>&1 | grep -v "falhou:" | tail -40 || true
+            parar_monitor
+            ruim=$(node -e 'const s=require("./carga/resultados/ponta-'$R'.json").metrics; const ok=(s.jornada_ok||{}).count||0, f=(s.jornada_falhou||{}).count||0, p=(s.tempo_jornada||{})["p(95)"]||1e9; console.log(f>ok*0.05||p>15000?1:0)')
+            if [ "$ruim" = "1" ]; then echo "Passou do limite em $R/s"; break; fi
+          done
+
+      - name: "A) Navegação (subindo o número de pessoas)"
+        continue-on-error: true
+        run: |
+          source carga/monitor.sh
+          for P in 50 100 200 400 800 1600 3200 6400; do
+            echo "=== $P pessoas navegando ==="
+            monitorar nav-$P
+            k6 run --quiet -e PESSOAS=$P -e DURACAO=40s --summary-export carga/resultados/nav-$P.json carga/navegacao.js 2>&1 | tail -30 || true
+            parar_monitor
+            ruim=$(node -e 'const s=require("./carga/resultados/nav-'$P'.json").metrics; const p=s.http_req_duration["p(95)"], f=s.http_req_failed.value; console.log(p>2000||f>0.01?1:0)')
+            if [ "$ruim" = "1" ]; then echo "Passou do limite com $P pessoas"; break; fi
+          done
+
+      - name: Resumo
+        if: always()
+        run: |
+          grep -iE "error|erro|fail|falha" api.log | grep -v "e-mail não enviado" | sort | uniq -c | sort -rn | head -40 > carga/resultados/api-erros.txt || true
+          node carga/resumo.mjs
+
+      - name: Guarda os resultados no branch
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f carga/resultados
+          git commit -m "carga: resultados da execução ${{ github.run_number }}" || exit 0
+          for i in 1 2 3; do git pull --rebase -q origin teste/carga && git push origin HEAD:teste/carga && break; sleep 5; done
+
+  producao:
+    name: Produção (só leitura, 5 pessoas)
+    if: contains(github.event.head_commit.message, '[producao]') || contains(github.event.head_commit.message, '[so-producao]') || inputs.producao
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: grafana/setup-k6-action@v1
+      - name: Onde a Vercel atende
+        run: |
+          mkdir -p carga/resultados
+          for u in / /api/v1/events /health; do
+            curl -s -o /dev/null -D - -w "tempo_total=%{time_total}s ttfb=%{time_starttransfer}s\n" "https://bootickets.com.br$u" \
+              | grep -iE "^(x-vercel-id|x-vercel-cache|age|cache-control|server)|tempo_total" | sed "s#^#$u  #"
+          done | tee carga/resultados/producao-cabecalhos.txt
+      - name: Leitura leve (5 pessoas, 1 minuto)
+        run: k6 run --quiet --summary-export carga/resultados/producao.json carga/producao.js 2>&1 | tail -40 || true
+      - name: Guarda os resultados no branch
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f carga/resultados/producao*
+          git commit -m "carga: produção (só leitura) execução ${{ github.run_number }}" || exit 0
+          for i in 1 2 3 4 5; do git pull --rebase -q origin teste/carga && git push origin HEAD:teste/carga && break; sleep 7; done
