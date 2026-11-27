@@ -242,7 +242,7 @@ test("transferir ingresso: a outra pessoa recebe e aceita", async ({ browser, pa
   await page.getByRole("button", { name: /enviar|transferir|confirmar/i }).last().click();
   await expect(page.getByText(/aguardando|enviad|pendente/i).first()).toBeVisible();
 
-  const ctx = await browser.newContext({ extraHTTPHeaders: { "x-forwarded-for": "10.9.9.9" } });
+  const ctx = await browser.newContext({ baseURL: test.info().project.use.baseURL });
   const p2 = await ctx.newPage();
   await p2.request.post("/api/v1/auth/login", { data: { email: friend.email, password: friend.password } });
   await p2.goto("/ingressos");
