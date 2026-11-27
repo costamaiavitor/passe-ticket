@@ -1,0 +1,12 @@
+{
+  "name": "bootickets-e2e",
+  "private": true,
+  "type": "module",
+  "description": "Caça a bugs do comprador (Playwright): roda no GitHub Actions em PC, iPhone, Android e tablet.",
+  "scripts": { "test": "playwright test", "resumo": "node resumo.mjs" },
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "@playwright/test": "1.65.0",
+    "@types/node": "22.16.5"
+  }
+}

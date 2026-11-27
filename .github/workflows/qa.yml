@@ -1,0 +1,80 @@
+# Caça a bugs do comprador: sobe site + API + banco de teste e roda os testes do Playwright em PC, iPhone,
+# Android e tablet (Chrome, Firefox e Safari/WebKit). Pagamento simulado; nada toca a produção.
+# O resumo em português é salvo de volta no próprio branch (e2e/resultados/RESUMO.md).
+name: Caça a bugs
+
+on:
+  push:
+    branches: ["qa/**"]
+    paths-ignore: ["e2e/resultados/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: qa }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:qa@localhost:5432/postgres
+      PAYMENT_PROVIDER: mock
+      JWT_SECRET: segredo-de-teste-jwt-1234567890
+      QR_SECRET: segredo-de-teste-qr-1234567890
+      PUBLIC_URL: http://localhost:8080
+      SITE_URL: http://localhost:8080
+      CORS_ORIGINS: http://localhost:8080
+      ADMIN_EMAILS: admin@passe.dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+      - run: npm ci
+        working-directory: backend
+      - run: npm install --no-audit --no-fund
+        working-directory: e2e
+      - run: npx playwright install --with-deps chromium firefox webkit
+        working-directory: e2e
+      - name: Montar o site (servidor Node)
+        run: npm run build
+        env: { NITRO_PRESET: node-server, VITE_API_URL: "http://localhost:8080" }
+      - name: Subir API, site e proxy
+        run: |
+          (cd backend && nohup node --import tsx src/server.ts > ../api.log 2>&1 &)
+          for i in $(seq 1 60); do curl -sf http://localhost:3333/health && break; sleep 1; done
+          (cd backend && node --import tsx src/seed.ts)
+          PORT=3000 nohup node .output/server/index.mjs > site.log 2>&1 &
+          nohup node e2e/proxy.mjs > proxy.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf -o /dev/null http://localhost:8080/ && break; sleep 1; done
+          curl -sf http://localhost:8080/api/v1/events > /dev/null && echo "tudo no ar"
+      - name: Rodar os testes
+        working-directory: e2e
+        run: npx playwright test || true
+        env: { CI: "1" }
+      - name: Resumo
+        run: node e2e/resumo.mjs
+      - name: Logs do servidor (erros)
+        if: always()
+        run: grep -iE "error|erro|exception" api.log site.log | head -80 || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: relatorio-playwright
+          path: e2e/resultados/
+          retention-days: 7
+      - name: Salvar o resumo no branch
+        if: always()
+        run: |
+          mkdir -p e2e/resultados && cp api.log e2e/resultados/api.log 2>/dev/null || true
+          cp site.log e2e/resultados/site.log 2>/dev/null || true
+          git config user.name "qa-bot" && git config user.email "qa-bot@users.noreply.github.com"
+          git add -f e2e/resultados/RESUMO.md e2e/resultados/resultados.json e2e/resultados/api.log e2e/resultados/site.log || true
+          git commit -m "qa: resultado da caça a bugs [skip ci]" || exit 0
+          git push
