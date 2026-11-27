@@ -72,7 +72,10 @@ jobs:
           curl -sf http://127.0.0.1:3333/api/v1/events >/dev/null && echo "API no ar"
 
       - name: Prepara dados (admin, eventos, portaria, compradores)
-        run: node carga/preparar.mjs http://127.0.0.1:3333 $COMPRADORES
+        run: |
+          set -o pipefail
+          node carga/preparar.mjs http://127.0.0.1:3333 $COMPRADORES 2>&1 | tee carga/resultados/preparo.log
+          echo "::notice title=Preparo::$(tail -c 900 carga/resultados/preparo.log | tr -s '[:space:]' ' ')"
 
       - name: "B) Corrida de compras: ${{ env.COMPRADORES }} pessoas x 1.000 ingressos"
         continue-on-error: true
@@ -116,6 +119,8 @@ jobs:
       - name: Resumo
         if: always()
         run: |
+          tail -c 20000 api.log | grep -v "e-mail não enviado" | tail -60 > carga/resultados/api-final.txt || true
+          [ -f carga/resultados/preparo.log ] && echo "::notice title=Preparo::$(tail -c 900 carga/resultados/preparo.log | tr -s '[:space:]' ' ')" || true
           grep -iE "error|erro|fail|falha" api.log | grep -v "e-mail não enviado" | sort | uniq -c | sort -rn | head -40 > carga/resultados/api-erros.txt || true
           node carga/resumo.mjs
 
