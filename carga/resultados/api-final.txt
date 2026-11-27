@@ -1,2 +1,1 @@
-ATENÇÃO: modo demonstração — pagamentos simulados liberados, ninguém paga de verdade.
-BooTickets API em http://127.0.0.1:3333/api/v1 (pagamentos: mock)
+ SMTP_USER/SMTP_PASS] para ponta1500067@carga.test: Seus ingressos para Festa Ponta a Ponta

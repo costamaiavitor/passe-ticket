@@ -1,0 +1,29 @@
+{
+  "lote": {
+    "total": 1000,
+    "sold": 1000,
+    "reserved": 0
+  },
+  "ingressos": [
+    {
+      "status": "valid",
+      "n": 1000
+    }
+  ],
+  "pedidos": [
+    {
+      "status": "paid",
+      "n": 1000
+    }
+  ],
+  "ingressosValidos": 1000,
+  "vendeuMaisQueEstoque": false,
+  "cpfsDuplicados": 0,
+  "idsDuplicados": 0,
+  "pedidosPagosComIngressoErrado": 0,
+  "segundosDoPrimeiroAoUltimoPedido": 3.322,
+  "reservasPorSegundo": 301,
+  "segundosAteUltimoPagamento": 7.667,
+  "vendasConcluidasPorSegundo": 130.4,
+  "ok": true
+}
