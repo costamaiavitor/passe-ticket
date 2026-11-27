@@ -72,6 +72,28 @@ export const config = {
   emailFrom: env["EMAIL_FROM"] || "BooTickets <no-reply@bootickets.com.br>",
   // Login com Google: o "ID do cliente" OAuth (é público; o mesmo valor vai no site como VITE_GOOGLE_CLIENT_ID).
   googleClientId: env["GOOGLE_CLIENT_ID"] ?? "",
+  // ---------- App (notificações e Carteira). Sem estas variáveis, tudo isso fica desligado sem erro. ----------
+  // Notificações no Android: conta de serviço do Firebase (JSON inteiro, em uma linha).
+  fcmServiceAccount: env["FCM_SERVICE_ACCOUNT"] ?? "",
+  // Notificações no iPhone: chave .p8 da Apple (conteúdo do arquivo), o "Key ID" e o "Team ID".
+  apnsKey: (env["APNS_KEY"] ?? "").replace(/\\n/g, "\n"),
+  apnsKeyId: env["APNS_KEY_ID"] ?? "",
+  apnsTeamId: env["APNS_TEAM_ID"] ?? env["APPLE_TEAM_ID"] ?? "",
+  apnsBundleId: env["APNS_BUNDLE_ID"] ?? "br.com.bootickets.app",
+  // "true" para apps da App Store e do TestFlight; vazio/false para app instalado pelo Xcode.
+  apnsProduction: env["APNS_PRODUCTION"] !== "false",
+  // Segredo que a Vercel manda no lembrete diário ("sua festa é hoje").
+  cronSecret: env["CRON_SECRET"] ?? "",
+  // Google Wallet: o "Issuer ID" e a conta de serviço (JSON inteiro, em uma linha).
+  googleWalletIssuerId: env["GOOGLE_WALLET_ISSUER_ID"] ?? "",
+  googleWalletServiceAccount: env["GOOGLE_WALLET_SERVICE_ACCOUNT"] ?? "",
+  // Apple Wallet: certificado do "Pass Type ID" (PEM), a chave dele (PEM), a senha da chave (se tiver)
+  // e o certificado intermediário da Apple (WWDR G4, PEM).
+  applePassTypeId: env["APPLE_PASS_TYPE_ID"] ?? "",
+  applePassCert: (env["APPLE_PASS_CERT"] ?? "").replace(/\\n/g, "\n"),
+  applePassKey: (env["APPLE_PASS_KEY"] ?? "").replace(/\\n/g, "\n"),
+  applePassKeyPassphrase: env["APPLE_PASS_KEY_PASSPHRASE"] ?? "",
+  appleWwdrCert: (env["APPLE_WWDR_CERT"] ?? "").replace(/\\n/g, "\n"),
   // Modo demonstração: libera o botão "Simular pagamento" no site publicado.
   // Qualquer visitante consegue ingresso sem pagar — nunca ligue isso para vender de verdade.
   allowSimulatedPayments: env["ALLOW_SIMULATED_PAYMENTS"] === "true",

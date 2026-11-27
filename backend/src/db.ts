@@ -170,6 +170,8 @@ CREATE TABLE IF NOT EXISTS password_resets (
 -- Dados para o organizador receber os repasses.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS payout_pix_key TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS payout_holder TEXT;
+-- Conta excluída pelo próprio usuário (dados pessoais apagados; pedidos pagos ficam como registro).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TEXT;
 
 -- Repasses feitos aos organizadores (registrados pelo admin).
 CREATE TABLE IF NOT EXISTS organizer_payouts (
@@ -294,6 +296,20 @@ CREATE TABLE IF NOT EXISTS access_logs (
 );
 CREATE INDEX IF NOT EXISTS access_logs_user ON access_logs(user_id, created_at);
 CREATE INDEX IF NOT EXISTS access_logs_created ON access_logs(created_at);
+-- Celulares e navegadores que recebem notificação. Um token por aparelho (no navegador, a inscrição de web push em JSON).
+CREATE TABLE IF NOT EXISTS push_devices (
+  token TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  platform TEXT NOT NULL CHECK (platform IN ('android','ios','web')),
+  created_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS push_devices_user ON push_devices(user_id);
+-- Lembrete "sua festa é hoje" já mandado (um por evento).
+CREATE TABLE IF NOT EXISTS event_reminders (
+  event_id TEXT PRIMARY KEY REFERENCES events(id) ON DELETE CASCADE,
+  sent_at TEXT NOT NULL
+);
 
 -- Um CPF por conta (transferências e cortesias são entregues pelo CPF). Só cria a trava se ainda não houver
 -- CPFs repetidos no banco, para a atualização nunca derrubar o site; o cadastro já recusa CPF repetido.

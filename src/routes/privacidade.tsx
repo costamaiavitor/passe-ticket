@@ -99,7 +99,7 @@ function Privacy() {
           <li>revogação de consentimento, quando o tratamento depender dele;</li>
           <li>revisão de decisões tomadas só por meios automatizados.</li>
         </ul>
-        <p>Peça pelo {mail}. Para proteger você, podemos confirmar sua identidade antes. Respondemos em até <strong>15 dias</strong>. Alguns dados não podem ser apagados enquanto a lei exigir que sejam guardados (seção 6). Você também pode pedir a exclusão da sua conta e reclamar à Autoridade Nacional de Proteção de Dados (ANPD, gov.br/anpd).</p>
+        <p>Peça pelo {mail}. Para proteger você, podemos confirmar sua identidade antes. Respondemos em até <strong>15 dias</strong>. Alguns dados não podem ser apagados enquanto a lei exigir que sejam guardados (seção 6). Você também pode excluir sua conta pelo site, em <Link to="/conta" className="text-foreground underline">Minha conta</Link>, e reclamar à Autoridade Nacional de Proteção de Dados (ANPD, gov.br/anpd).</p>
       </LegalSection>
 
       <LegalSection n={8} title="Segurança">

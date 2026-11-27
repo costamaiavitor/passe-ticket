@@ -1,6 +1,6 @@
 import { BrandLogo } from "@/components/brand-logo";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { CalendarPlus, LogOut, Menu, ScanLine, Search, ShieldCheck, Ticket } from "lucide-react";
+import { CalendarPlus, LogOut, Menu, ScanLine, Search, ShieldCheck, Ticket, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -41,6 +41,7 @@ export function SiteHeader() {
                 <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex"><Link to="/portaria"><ScanLine />Portaria</Link></Button>
               )}
               <Button asChild size="sm"><Link to="/ingressos" aria-label="Meus ingressos"><Ticket /><span className="hidden min-[400px]:inline">Meus ingressos</span></Link></Button>
+              <Button asChild variant="ghost" size="icon" className="hidden sm:inline-flex" aria-label="Minha conta" title="Minha conta"><Link to="/conta"><UserRound /></Link></Button>
               <Button variant="ghost" size="icon" className="hidden sm:inline-flex" aria-label="Sair" title={`Sair (${user.email})`}
                 onClick={async () => { await logout(); navigate({ to: "/" }); }}><LogOut /></Button>
               {/* Celular: o resto fica num menu, para nada sair da tela. */}
@@ -59,6 +60,7 @@ export function SiteHeader() {
                   {user.roles.includes("admin") && (
                     <DropdownMenuItem asChild><Link to="/admin"><ShieldCheck />Admin</Link></DropdownMenuItem>
                   )}
+                  <DropdownMenuItem asChild><Link to="/conta"><UserRound />Minha conta</Link></DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onSelect={async () => { await logout(); navigate({ to: "/" }); }}><LogOut />Sair</DropdownMenuItem>
                 </DropdownMenuContent>
@@ -109,6 +111,7 @@ export function SiteFooter() {
           <Link to="/termos" hash="devolucao" className={`block ${link}`}>Devolução de ingressos</Link>
           <Link to="/privacidade" className={`block ${link}`}>Privacidade</Link>
           <Link to="/termos-organizador" className={`block ${link}`}>Termos do Organizador</Link>
+          <Link to="/conta" className={`block ${link}`}>Excluir minha conta</Link>
           <a href="mailto:booticketss@gmail.com" className={`block ${link}`}>Fale com a gente</a>
         </nav>
       </div>

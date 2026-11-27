@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { all, now, one, run, tx } from "../db.js";
 import { sendEmail, transferOfferEmail, transferResultEmail } from "../lib/email.js";
+import { sendPush } from "../lib/push.js";
 import { buildQrPayload, parseQrPayload } from "../lib/crypto.js";
 import { isValidCpf, maskCpf, onlyDigits } from "../lib/cpf.js";
 import { badRequest, conflict, forbidden, notFound } from "../lib/errors.js";
@@ -94,8 +95,10 @@ export async function offerTransfer(userId: string, ticketId: string, cpfInput: 
   });
   // Avisa por e-mail quem já tem conta com esse CPF.
   const from = await one<{ name: string }>("SELECT name FROM users WHERE id = ?", userId);
-  for (const u of await all<{ email: string; name: string }>("SELECT email, name FROM users WHERE cpf = ?", cpf))
+  for (const u of await all<{ id: string; email: string; name: string }>("SELECT id, email, name FROM users WHERE cpf = ?", cpf)) {
     await sendEmail(transferOfferEmail(u.email, u.name, from?.name ?? "Alguém", r.eventTitle));
+    await sendPush(u.id, { title: "Você recebeu um ingresso", body: `${from?.name ?? "Alguém"} quer te passar um ingresso para ${r.eventTitle}. Toque para aceitar.`, url: "/ingressos" });
+  }
   return { id: r.id };
 }
 

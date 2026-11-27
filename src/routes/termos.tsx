@@ -43,7 +43,7 @@ function Terms() {
           <li>Para comprar é preciso ter <strong>18 anos ou mais</strong>. Menores podem ser <em>titulares</em> de ingresso, desde que a compra seja feita por um responsável legal (ver seção 6).</li>
           <li>Os dados informados (nome, e-mail e CPF) devem ser verdadeiros e seus. Cada CPF só pode ter uma conta.</li>
           <li>A conta é pessoal. Você é responsável por guardar a senha e por tudo o que for feito com ela. Se suspeitar de uso indevido, troque a senha e fale com a gente.</li>
-          <li>Você pode pedir a exclusão da sua conta quando quiser. Compras pagas continuam guardadas, sem os seus dados pessoais, pelo prazo que a lei exige (ver Política de Privacidade).</li>
+          <li>Você pode excluir a sua conta quando quiser, em <Link to="/conta" className="text-foreground underline">Minha conta</Link>. Compras pagas continuam guardadas, sem os seus dados pessoais, pelo prazo que a lei exige (ver Política de Privacidade).</li>
         </ul>
       </LegalSection>
 

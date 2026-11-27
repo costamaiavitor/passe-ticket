@@ -1,3 +1,4 @@
+import { isNativeApp } from "@/lib/native-app";
 // Botão oficial "Continuar com Google" (Google Identity Services).
 // Só aparece quando VITE_GOOGLE_CLIENT_ID está configurado e o backend está ligado.
 import { useEffect, useRef, useState } from "react";
@@ -61,7 +62,8 @@ export function GoogleButton({ onSuccess }: { onSuccess: () => void }) {
     return () => { cancelled = true; };
   }, [onSuccess]);
 
-  if (!GOOGLE_ENABLED) return null;
+  // Dentro do app das lojas o Google bloqueia o login por janela embutida: lá fica só o login por e-mail.
+  if (!GOOGLE_ENABLED || isNativeApp()) return null;
   return (
     <div className="space-y-4">
       {/* colorScheme "light": sem isso o navegador pinta um fundo branco atrás do botão do Google no tema escuro. */}

@@ -14,6 +14,7 @@ import { ticketsRouter } from "./routes/tickets.js";
 import { webhooksRouter } from "./routes/webhooks.js";
 import { mpCallbackRouter, mpOrganizerRouter } from "./routes/mercadopago.js";
 import { imagesRouter } from "./routes/images.js";
+import { appRouter } from "./routes/app.js";
 
 export function createApp() {
   const app = express();
@@ -46,6 +47,7 @@ export function createApp() {
   api.use("/admin", adminRouter);
   api.use("/webhooks", webhooksRouter);
   api.use("/images", imagesRouter);
+  api.use("/app", appRouter);
   app.use("/api/v1", api);
 
   app.use((_req, _res, next) => next(new HttpError(404, "NOT_FOUND", "Rota não encontrada.")));

@@ -197,3 +197,9 @@ html { scroll-behavior: smooth; }
   .m-shine::after { display: none; }
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
+
+/* ===== Dentro do app das lojas (html[data-app]) =====
+   O topo e as barras fixas respeitam o entalhe e a barra de gestos do celular. */
+html[data-app] header.m-header { padding-top: env(safe-area-inset-top); }
+html[data-app] footer { padding-bottom: env(safe-area-inset-bottom); }
+html[data-app] body { overscroll-behavior-y: none; -webkit-tap-highlight-color: transparent; }

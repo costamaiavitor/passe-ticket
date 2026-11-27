@@ -1,11 +1,13 @@
+import { isNativeApp, saveTicketsOffline } from "@/lib/native-app";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { CheckCircle2, MapPin } from "lucide-react";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { RequireAuth } from "@/components/require-auth";
 import { TicketQr } from "@/components/ticket-qr";
+import { WalletButtons } from "@/components/wallet-buttons";
 import { IncomingTransfers, TransferControls } from "@/components/ticket-transfer";
 import { Button } from "@/components/ui/button";
 import { Loading, Rise, RiseWords } from "@/components/motion";
@@ -31,6 +33,8 @@ export const Route = createFileRoute("/ingressos")({
 
 function TicketList() {
   const { data, isLoading, error } = useQuery({ ...ticketsQuery(), refetchInterval: 15_000 });
+  // No app: guarda os ingressos no celular para o QR abrir sem internet na porta da festa.
+  useEffect(() => { if (data && isNativeApp()) void saveTicketsOffline(data).catch(() => undefined); }, [data]);
   if (isLoading) return <Loading className="mt-8" />;
   if (error) return <p className="mt-8 text-sm text-destructive">{error.message}</p>;
   if (!data?.length)
@@ -117,6 +121,7 @@ function TicketCard({ t }: { t: Ticket }) {
           <div><dt className="text-xs text-muted-foreground">Lote</dt><dd>{t.batchName}</dd></div>
           <div><dt className="text-xs text-muted-foreground">Status</dt><dd className={used ? "text-muted-foreground" : "text-primary"}>{used ? "Utilizado" : "Válido"}</dd></div>
         </dl>
+        {t.qrPayload && <WalletButtons ticketId={t.id} />}
         <TransferControls t={t} />
         <p className="mt-3 text-center font-mono text-[10px] text-muted-foreground">#{t.id.slice(0, 8)}</p>
       </div>
