@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { all } from "../db.js";
-import { eventCheckinStats, scanTicket } from "../domain/tickets.js";
+import { eventCheckinStats, manualCheckin, scanTicket, searchEventTickets } from "../domain/tickets.js";
 import { forbidden } from "../lib/errors.js";
 import { canScan, parse, rateLimit, requireAuth, user } from "../lib/http.js";
 
@@ -34,6 +34,20 @@ checkinRouter.post(
     res.json(await scanTicket(a.id, eventId, code));
   },
 );
+
+/** Plano B: procura o ingresso por CPF, nome ou código curto (#3d387d76). */
+checkinRouter.get("/events/:id/search", rateLimit({ windowMs: 60_000, max: 120, key: (r) => `busca:${r.auth?.id}` }), async (req, res) => {
+  if (!(await canScan(user(req), String(req.params.id)))) throw forbidden("Você não faz parte da equipe deste evento.");
+  res.json(await searchEventTickets(String(req.params.id), String(req.query["q"] ?? "").slice(0, 80)));
+});
+
+/** Plano B: libera a entrada do ingresso escolhido na busca (depois de conferir o documento). */
+checkinRouter.post("/manual", rateLimit({ windowMs: 60_000, max: 120, key: (r) => `manual:${r.auth?.id}` }), async (req, res) => {
+  const { eventId, ticketId } = parse(z.object({ eventId: z.string().min(1), ticketId: z.string().min(1).max(64) }), req.body);
+  const a = user(req);
+  if (!(await canScan(a, eventId))) throw forbidden("Você não faz parte da equipe deste evento.");
+  res.json(await manualCheckin(a.id, eventId, ticketId));
+});
 
 checkinRouter.get("/events/:id/stats", async (req, res) => {
   if (!(await canScan(user(req), req.params.id))) throw forbidden();

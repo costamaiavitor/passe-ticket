@@ -7,7 +7,8 @@ import { SiteHeader } from "@/components/site-header";
 import { RequireAuth } from "@/components/require-auth";
 import { QrScanner } from "@/components/qr-scanner";
 import { Button } from "@/components/ui/button";
-import { checkinStatsQuery, scanEventsQuery, scanTicket } from "@/services/tickets";
+import { checkinStatsQuery, manualCheckin, scanEventsQuery, scanTicket, searchDoorTickets, type DoorTicket } from "@/services/tickets";
+import { toast } from "sonner";
 import { fmtDate, fmtTime } from "@/utils/format";
 import { cn } from "@/lib/utils";
 import type { ScanResult } from "@/types";
@@ -89,10 +90,36 @@ function Scanner({ eventId, title, onChange }: { eventId: string; title: string;
     }
   }, [eventId, qc]);
 
-  const manual = (e: FormEvent<HTMLFormElement>) => {
+  // Plano B (sem QR): busca por CPF, nome ou código curto e libera depois de conferir o documento.
+  const [query, setQuery] = useState("");
+  const [found, setFound] = useState<DoorTicket[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const search = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const input = e.currentTarget.elements.namedItem("code") as HTMLInputElement;
-    if (input.value.trim()) { last.current = null; void handle(input.value.trim()); input.value = ""; }
+    const q = query.trim();
+    if (!q) return;
+    // Código inteiro do QR colado/lido por um leitor externo: valida como QR.
+    if (q.length > 40 && q.includes(".")) { last.current = null; setQuery(""); void handle(q); return; }
+    setSearching(true);
+    try { setFound(await searchDoorTickets(eventId, q)); }
+    catch (err) { toast.error(err instanceof Error ? err.message : "Não foi possível buscar."); }
+    finally { setSearching(false); }
+  };
+  const release = async (t: DoorTicket) => {
+    setBusy(true);
+    try {
+      const r = await manualCheckin(eventId, t.id);
+      setResult(r);
+      beep(r.ok);
+      setFound((list) => list?.map((x) => (x.id === t.id && r.ok ? { ...x, status: "used", checkedInAt: r.checkedInAt ?? null } : x)) ?? null);
+      void qc.invalidateQueries({ queryKey: ["checkin-stats", eventId] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Não foi possível liberar.");
+    } finally {
+      setBusy(false);
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => setResult(null), 3500);
+    }
   };
 
   return (
@@ -138,10 +165,32 @@ function Scanner({ eventId, title, onChange }: { eventId: string; title: string;
         )}
       </div>
 
-      <form onSubmit={manual} className="mt-4 flex gap-2">
-        <input name="code" placeholder="Digitar código do ingresso" className="h-9 min-w-0 flex-1 rounded-md border bg-background px-3 text-sm" />
-        <Button type="submit" variant="outline" disabled={busy}>Validar</Button>
-      </form>
+      <div className="mt-4 rounded-lg border p-3">
+        <p className="text-sm font-medium">Sem QR? Busque o ingresso</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">CPF, nome ou o código que aparece embaixo do QR (ex.: #3d387d76). Confira o documento com foto antes de liberar.</p>
+        <form onSubmit={search} className="mt-2 flex gap-2">
+          <input value={query} onChange={(e) => setQuery(e.target.value)} aria-label="CPF, nome ou código do ingresso"
+            placeholder="CPF, nome ou #código" autoComplete="off" className="h-10 min-w-0 flex-1 rounded-md border bg-background px-3 text-sm" />
+          <Button type="submit" variant="outline" disabled={searching || !query.trim()}>{searching ? "…" : "Buscar"}</Button>
+        </form>
+        {found && (
+          found.length ? (
+            <ul className="mt-3 divide-y rounded-md border text-sm">
+              {found.map((t) => (
+                <li key={t.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{t.holderName}</p>
+                    <p className="text-xs text-muted-foreground"><span className="font-mono">{t.holderCpf}</span> · {t.batchName} · {t.code}</p>
+                  </div>
+                  {t.status === "valid"
+                    ? <Button size="sm" disabled={busy} onClick={() => void release(t)}>Liberar</Button>
+                    : <span className="shrink-0 text-xs text-amber-500">Já entrou{t.checkedInAt ? ` ${fmtTime(t.checkedInAt)}` : ""}</span>}
+                </li>
+              ))}
+            </ul>
+          ) : <p className="mt-3 text-sm text-muted-foreground">Nenhum ingresso deste evento com esse CPF, nome ou código.</p>
+        )}
+      </div>
 
       {!!stats?.recent.length && (
         <div className="mt-6">

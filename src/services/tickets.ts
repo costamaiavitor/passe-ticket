@@ -53,6 +53,13 @@ async function getStats(eventId: string): Promise<CheckinStats> {
   return http<CheckinStats>(`/checkin/events/${encodeURIComponent(eventId)}/stats`);
 }
 
+/** Portaria sem QR: busca por CPF, nome ou código curto e libera pelo ingresso escolhido. */
+export interface DoorTicket { id: string; code: string; holderName: string; holderCpf: string; batchName: string; status: "valid" | "used"; checkedInAt: string | null }
+export const searchDoorTickets = (eventId: string, q: string) =>
+  http<DoorTicket[]>(`/checkin/events/${encodeURIComponent(eventId)}/search?q=${encodeURIComponent(q)}`);
+export const manualCheckin = (eventId: string, ticketId: string) =>
+  http<ScanResult>("/checkin/manual", { method: "POST", body: JSON.stringify({ eventId, ticketId }) });
+
 export const scanEventsQuery = () => queryOptions({ queryKey: ["scan-events"], queryFn: listScanEvents });
 export const checkinStatsQuery = (eventId: string) =>
   queryOptions({ queryKey: ["checkin-stats", eventId], queryFn: () => getStats(eventId), refetchInterval: 10_000 });

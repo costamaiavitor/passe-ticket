@@ -251,3 +251,53 @@ export async function eventCheckinStats(eventId: string) {
   );
   return { totalTickets: s.total, checkedIn: s.used, remaining: s.total - s.used, recent };
 }
+
+// ------------------------- Portaria sem QR (plano B) -------------------------
+// Celular sem bateria, tela quebrada, QR que não lê: a equipe procura o ingresso pelo CPF, pelo nome ou pelo
+// código curto (#3d387d76) que aparece no ingresso, confere o documento e libera a entrada por aqui.
+
+/** Busca ingressos do evento (no máximo 10). CPF completo, código curto (4+ letras/números) ou parte do nome (3+ letras). */
+export async function searchEventTickets(eventId: string, q: string) {
+  const s = q.trim().replace(/^#/, "");
+  const digits = onlyDigits(s);
+  let where: string, arg: string;
+  if (digits.length === 11 && /^[\d.\-\s]+$/.test(s)) { where = "t.holder_cpf = ?"; arg = digits; }
+  else if (/^[0-9a-f]{4,36}$/i.test(s) && /\d/.test(s)) { where = "t.id LIKE ?"; arg = `${s.toLowerCase()}%`; }
+  else {
+    // Nome: tira os curingas do LIKE (% e _) e exige 3 letras de verdade.
+    const name = s.toLowerCase().replace(/[%_\\]/g, "").trim();
+    if (name.length < 3) return [];
+    where = "LOWER(t.holder_name) LIKE ?"; arg = `%${name}%`;
+  }
+  const rows = await all<JoinedTicket>(
+    `${SELECT} WHERE t.event_id = ? AND t.status IN ('valid','used') AND ${where} ORDER BY t.holder_name LIMIT 10`, eventId, arg);
+  return rows.map((t) => ({
+    id: t.id, code: `#${t.id.slice(0, 8)}`, holderName: t.holder_name, holderCpf: maskCpf(t.holder_cpf),
+    batchName: t.batch_name, status: t.status, checkedInAt: t.checked_in_at,
+  }));
+}
+
+/** Libera a entrada pelo ingresso escolhido na busca (mesmas regras do QR: só uma vez, só deste evento). */
+export async function manualCheckin(staffId: string, eventId: string, ticketId: string) {
+  const at = now();
+  const t = await one<JoinedTicket>(`${SELECT} WHERE t.id = ?`, ticketId);
+  const respond = async (result: ScanResult, extra: Record<string, unknown> = {}) => {
+    await run("INSERT INTO checkins (event_id, ticket_id, staff_id, result, at) VALUES (?,?,?,?,?)", eventId, t?.id ?? null, staffId, result, at);
+    return {
+      result, ok: result === "ok", message: MESSAGES[result], scannedAt: at, manual: true,
+      ticket: t ? { id: t.id, holderName: t.holder_name, holderCpf: maskCpf(t.holder_cpf), batchName: t.batch_name, eventTitle: t.event_title } : null,
+      ...extra,
+    };
+  };
+  if (!t) return respond("invalid");
+  if (t.event_id !== eventId) return respond("wrong_event");
+  if (t.status === "pending") return respond("not_paid");
+  if (t.status === "cancelled") return respond("cancelled");
+  if (t.status === "used") return respond("already_used", { checkedInAt: t.checked_in_at });
+  const r = await run("UPDATE tickets SET status = 'used', checked_in_at = ?, checked_in_by = ? WHERE id = ? AND status = 'valid'", at, staffId, t.id);
+  if (r.changes === 0) {
+    const cur = (await one<TicketRow>("SELECT * FROM tickets WHERE id = ?", t.id))!;
+    return respond(cur.status === "used" ? "already_used" : "invalid", { checkedInAt: cur.checked_in_at });
+  }
+  return respond("ok", { checkedInAt: at });
+}
