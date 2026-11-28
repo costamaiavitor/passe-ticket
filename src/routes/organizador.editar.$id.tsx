@@ -45,6 +45,14 @@ function Loader({ id }: { id: string }) {
 interface LotForm {
   key: number; id?: string; name: string; type: string; price: number; total: string;
   taken: number; paused: boolean; removed: boolean;
+  /** Nome do tipo como está salvo (para saber se o organizador renomeou). */
+  origType?: string;
+}
+
+/** "Pista — 2º lote" com o tipo trocado: "Masculino — 2º lote" (mantém o número do lote). */
+function renamedLot(name: string, type: string) {
+  const n = name.match(/(\d+)º lote/)?.[1];
+  return n ? `${type} — ${n}º lote` : type;
 }
 let nextKey = 1;
 
@@ -78,9 +86,12 @@ function EditEvent({ ev }: { ev: EventPanel }) {
   const [visibility, setVisibility] = useState<"public" | "unlisted">(ev.visibility ?? "public");
   const [accessCode, setAccessCode] = useState(ev.accessCode ?? "");
   const [lots, setLots] = useState<LotForm[]>(() => ev.salesByBatch.map((b) => ({
-    key: nextKey++, id: b.id, name: b.name, type: b.ticketType ?? "", price: b.price, total: String(b.total),
+    key: nextKey++, id: b.id, name: b.name, type: b.ticketType ?? b.name, origType: b.ticketType ?? b.name, price: b.price, total: String(b.total),
     taken: b.sold + b.reserved, paused: b.status !== "active", removed: false,
   })));
+  /** Renomeia o tipo em todos os lotes dele de uma vez (1º, 2º, 3º lote…), para a virada continuar certa. */
+  const renameType = (origType: string, type: string) =>
+    setLots((ls) => ls.map((x) => (x.id && x.origType === origType ? { ...x, type } : x)));
   const [formError, setFormError] = useState<string | null>(null);
 
   const startsAt = fromLocalParts(date, time);
@@ -98,6 +109,7 @@ function EditEvent({ ev }: { ev: EventPanel }) {
     for (const l of visible) {
       const label = l.id ? l.name : newLotName(lots, l) || "novo ingresso";
       if (!l.id && !l.type.trim()) return "Informe o tipo de cada ingresso novo (ex.: Pista, Camarote).";
+      if (l.id && !l.type.trim()) return "O nome do ingresso não pode ficar vazio.";
       const n = Number(l.total);
       if (!Number.isInteger(n) || n < 1) return `Informe quantos ingressos “${label}” terá.`;
       if (n < l.taken) return `“${label}” já tem ${l.taken} ingresso(s) vendido(s) ou reservado(s). A quantidade não pode ser menor que isso.`;
@@ -129,6 +141,12 @@ function EditEvent({ ev }: { ev: EventPanel }) {
         const orig = ev.salesByBatch.find((b) => b.id === l.id)!;
         if (l.removed) { await deleteBatch(l.id!); continue; }
         const d: BatchEdit = {};
+        // Nome trocado: muda o tipo e o nome do lote ("Masculino — 2º lote").
+        const type = l.type.trim();
+        if (type && type !== l.origType) {
+          d.ticketType = type;
+          d.name = renamedLot(l.name, type);
+        }
         if (l.price !== orig.price) d.price = l.price;
         if (Number(l.total) !== orig.total) d.total = Number(l.total);
         const wantStatus = l.paused ? "paused" : "active";
@@ -203,8 +221,8 @@ function EditEvent({ ev }: { ev: EventPanel }) {
               return (
                 <div key={l.key} className={cn("rounded-lg border bg-surface p-3", l.paused && "opacity-70")}>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="min-w-0 truncate text-xs font-medium">
-                      {label}
+                    <span className="min-w-0 break-words text-xs font-medium">
+                      {l.id && l.type.trim() && l.type.trim() !== l.origType ? renamedLot(l.name, l.type.trim()) : label}
                       {l.id && <span className="ml-2 font-normal text-muted-foreground">{l.taken} vendido(s)</span>}
                       {l.paused && <span className="ml-2 rounded bg-elevated px-1.5 py-0.5 font-normal text-muted-foreground">pausado</span>}
                     </span>
@@ -223,6 +241,13 @@ function EditEvent({ ev }: { ev: EventPanel }) {
                       )}
                     </div>
                   </div>
+                  {l.id && (
+                    <label className="mt-2 block space-y-1.5">
+                      <span className="text-xs text-muted-foreground">Nome do ingresso (vale para todos os lotes dele)</span>
+                      <input value={l.type} onChange={(e) => renameType(l.origType!, e.target.value)} maxLength={40}
+                        placeholder="Ex.: Masculino, Feminino, Pista" className={inputCls} />
+                    </label>
+                  )}
                   {!l.id && (
                     <>
                       <input value={l.type} onChange={(e) => setLot(l.key, { type: e.target.value })} placeholder="Tipo (ex.: Pista, Camarote)" maxLength={40} className={cn(inputCls, "mt-1")} />
